@@ -51,11 +51,12 @@ public partial class InstallDialog : Window
 
     private void ValidateInputs()
     {
-        if (TxtInstallerPath is null || PwdSaPassword is null || BtnInstall is null || TxtValidation is null)
+        if (TxtInstallerPath is null || PwdSaPassword is null || PwdSaPasswordConfirm is null || BtnInstall is null || TxtValidation is null)
             return;
 
         var path = TxtInstallerPath.Text.Trim();
         var password = PwdSaPassword.Password;
+        var confirmPassword = PwdSaPasswordConfirm.Password;
 
         // Check installer path
         if (string.IsNullOrWhiteSpace(path))
@@ -83,6 +84,14 @@ public partial class InstallDialog : Window
         if (password.Length < 15)
         {
             TxtValidation.Text = "SA password must be at least 15 characters.";
+            BtnInstall.IsEnabled = false;
+            return;
+        }
+
+        // Check password confirmation
+        if (password != confirmPassword)
+        {
+            TxtValidation.Text = "Passwords do not match.";
             BtnInstall.IsEnabled = false;
             return;
         }

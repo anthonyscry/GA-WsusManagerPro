@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
         Title="Install WSUS with SQL Server Express"
-        Width="480" Height="400"
+        Width="480" Height="500"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         Background="{DynamicResource PrimaryBackground}"
@@ -61,6 +61,16 @@
                        FontSize="12" Margin="0,0,0,4"/>
             <PasswordBox x:Name="PwdSaPassword"
                          automation:AutomationProperties.AutomationId="SaPasswordBox"
+                         Background="{DynamicResource InputBackground}" Foreground="{DynamicResource TextPrimary}"
+                         BorderBrush="{DynamicResource BorderPrimary}" Padding="6,4" FontSize="12"
+                         Margin="0,0,0,12"
+                         PasswordChanged="Input_Changed"/>
+
+            <!-- Confirm SA Password -->
+            <TextBlock Text="Confirm SA Password" Foreground="{DynamicResource TextSecondary}"
+                       FontSize="12" Margin="0,0,0,4"/>
+            <PasswordBox x:Name="PwdSaPasswordConfirm"
+                         automation:AutomationProperties.AutomationId="SaPasswordConfirmBox"
                          Background="{DynamicResource InputBackground}" Foreground="{DynamicResource TextPrimary}"
                          BorderBrush="{DynamicResource BorderPrimary}" Padding="6,4" FontSize="12"
                          PasswordChanged="Input_Changed"/>

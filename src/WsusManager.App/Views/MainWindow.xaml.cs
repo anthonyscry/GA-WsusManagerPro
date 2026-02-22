@@ -1,5 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
+using WsusManager.App.Services;
 using WsusManager.App.ViewModels;
 using WsusManager.Core.Infrastructure;
 using WsusManager.Core.Models;
@@ -32,6 +34,12 @@ public partial class MainWindow : Window
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
+        // Unsubscribe immediately (before any await) to prevent memory leak and re-entry
+        Loaded -= MainWindow_Loaded;
+
+        // Apply title bar colors now that the HWND exists
+        TitleBarService.SetTitleBarColors(this, null, null);
+
         // Restore window bounds if enabled and valid
         if (_settings.PersistWindowState && _settings.WindowBounds != null)
         {
@@ -54,9 +62,6 @@ public partial class MainWindow : Window
         }
 
         await _viewModel.InitializeAsync().ConfigureAwait(false);
-
-        // Unsubscribe from Loaded event to prevent memory leak
-        Loaded -= MainWindow_Loaded;
     }
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)

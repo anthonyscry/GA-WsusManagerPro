@@ -608,7 +608,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(LogToggleText))]
     private bool _isLogPanelExpanded = true;
 
-    public double LogPanelHeight => IsLogPanelExpanded ? 250 : 0;
+    public double LogPanelHeight => IsLogPanelExpanded ? 200 : 0;
 
     public Visibility LogTextVisibility => IsLogPanelExpanded ? Visibility.Visible : Visibility.Collapsed;
 
@@ -1250,11 +1250,80 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanExecuteWsusOperation))]
     private async Task RunCreateGpo()
     {
+        // Show hostname + port input dialog on UI thread before starting operation
+        string? wsusHostname = null;
+        int wsusPort = 8530;
+
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            var dialog = new Window
+            {
+                Title = "Create GPO — WSUS Server",
+                Width = 400,
+                Height = 220,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ResizeMode = ResizeMode.NoResize,
+                Background = Application.Current.FindResource("PrimaryBackground") as System.Windows.Media.Brush
+            };
+            if (Application.Current.MainWindow is not null)
+                dialog.Owner = Application.Current.MainWindow;
+
+            var grid = new System.Windows.Controls.Grid { Margin = new Thickness(20) };
+            grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
+
+            var hostLabel = new System.Windows.Controls.TextBlock { Text = "WSUS Hostname", FontSize = 12, Foreground = Application.Current.FindResource("TextSecondary") as System.Windows.Media.Brush, Margin = new Thickness(0, 0, 0, 4) };
+            System.Windows.Controls.Grid.SetRow(hostLabel, 0);
+            grid.Children.Add(hostLabel);
+
+            var hostnameBox = new System.Windows.Controls.TextBox { Text = Environment.MachineName, FontSize = 12, Padding = new Thickness(6, 4, 6, 4), Background = Application.Current.FindResource("InputBackground") as System.Windows.Media.Brush, Foreground = Application.Current.FindResource("TextPrimary") as System.Windows.Media.Brush, BorderBrush = Application.Current.FindResource("BorderPrimary") as System.Windows.Media.Brush, Margin = new Thickness(0, 0, 0, 12) };
+            System.Windows.Controls.Grid.SetRow(hostnameBox, 1);
+            grid.Children.Add(hostnameBox);
+
+            var portLabel = new System.Windows.Controls.TextBlock { Text = "HTTP Port", FontSize = 12, Foreground = Application.Current.FindResource("TextSecondary") as System.Windows.Media.Brush, Margin = new Thickness(0, 0, 0, 4) };
+            System.Windows.Controls.Grid.SetRow(portLabel, 2);
+            grid.Children.Add(portLabel);
+
+            var portBox = new System.Windows.Controls.TextBox { Text = "8530", FontSize = 12, Padding = new Thickness(6, 4, 6, 4), Background = Application.Current.FindResource("InputBackground") as System.Windows.Media.Brush, Foreground = Application.Current.FindResource("TextPrimary") as System.Windows.Media.Brush, BorderBrush = Application.Current.FindResource("BorderPrimary") as System.Windows.Media.Brush, Margin = new Thickness(0, 0, 0, 12) };
+            System.Windows.Controls.Grid.SetRow(portBox, 3);
+            grid.Children.Add(portBox);
+
+            var btnPanel = new System.Windows.Controls.StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            System.Windows.Controls.Grid.SetRow(btnPanel, 5);
+
+            var cancelBtn = new System.Windows.Controls.Button { Content = "Cancel", Padding = new Thickness(20, 8, 20, 8), Margin = new Thickness(0, 0, 8, 0) };
+            cancelBtn.Click += (s, e) => { dialog.DialogResult = false; dialog.Close(); };
+            btnPanel.Children.Add(cancelBtn);
+
+            var okBtn = new System.Windows.Controls.Button { Content = "Create GPO", Padding = new Thickness(20, 8, 20, 8) };
+            okBtn.Click += (s, e) => { dialog.DialogResult = true; dialog.Close(); };
+            btnPanel.Children.Add(okBtn);
+
+            grid.Children.Add(btnPanel);
+            dialog.Content = grid;
+
+            dialog.KeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Escape) dialog.Close(); };
+
+            if (dialog.ShowDialog() == true)
+            {
+                wsusHostname = hostnameBox.Text.Trim();
+                if (int.TryParse(portBox.Text.Trim(), out var p) && p > 0 && p <= 65535)
+                    wsusPort = p;
+            }
+        });
+
+        if (string.IsNullOrWhiteSpace(wsusHostname))
+            return;
+
         Navigate("Install");
 
         await RunOperationAsync("Create GPO", async (progress, ct) =>
         {
-            var result = await _gpoDeploymentService.DeployGpoFilesAsync(progress, ct).ConfigureAwait(false);
+            var result = await _gpoDeploymentService.DeployGpoFilesAsync(wsusHostname, wsusPort, progress, ct).ConfigureAwait(false);
 
             if (result.Success && result.Data is not null)
             {

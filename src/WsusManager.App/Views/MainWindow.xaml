@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
         Title="WSUS Manager"
-        Width="950" Height="736"
+        Width="950" Height="780"
         MinWidth="800" MinHeight="600"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResize"
@@ -140,41 +140,21 @@
 
                 <!-- DATA Category -->
                 <TextBlock DockPanel.Dock="Top" Text="DATA" Style="{StaticResource CategoryLabel}"/>
-                <Button DockPanel.Dock="Top" Content="Computers"
-                        ToolTip="View and filter computer list"
+                <Button DockPanel.Dock="Top"
+                        ToolTip="Coming Soon — Work in Progress"
                         x:Name="BtnComputers"
                         automation:AutomationProperties.AutomationId="ComputersButton"
-                        Command="{Binding NavigateCommand}" CommandParameter="Computers">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource NavBtn}">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding CurrentPanel}" Value="Computers">
-                                    <Setter Property="Background" Value="{DynamicResource NavActiveBackground}"/>
-                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                                    <Setter Property="BorderThickness" Value="3,0,0,0"/>
-                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
+                        Style="{StaticResource NavBtn}"
+                        IsEnabled="False">
+                    <StackPanel Orientation="Horizontal"><TextBlock Text="&#x25A3;" Width="22" TextAlignment="Left"/><TextBlock Text="Computers (WIP)"/></StackPanel>
                 </Button>
-                <Button DockPanel.Dock="Top" Content="Updates"
-                        ToolTip="View and filter update list"
+                <Button DockPanel.Dock="Top"
+                        ToolTip="Coming Soon — Work in Progress"
                         x:Name="BtnUpdates"
                         automation:AutomationProperties.AutomationId="UpdatesButton"
-                        Command="{Binding NavigateCommand}" CommandParameter="Updates">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource NavBtn}">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding CurrentPanel}" Value="Updates">
-                                    <Setter Property="Background" Value="{DynamicResource NavActiveBackground}"/>
-                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                                    <Setter Property="BorderThickness" Value="3,0,0,0"/>
-                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
+                        Style="{StaticResource NavBtn}"
+                        IsEnabled="False">
+                    <StackPanel Orientation="Horizontal"><TextBlock Text="&#x25CF;" Width="22" TextAlignment="Left"/><TextBlock Text="Updates (WIP)"/></StackPanel>
                 </Button>
 
                 <!-- Bottom utility buttons -->

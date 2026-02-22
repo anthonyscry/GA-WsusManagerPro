@@ -114,10 +114,15 @@ public static class TitleBarService
             catch { }
         }
 
-        // Set border color to match background for seamless look
+        // Set border color with slight offset for contrast
         if (backgroundColor.HasValue)
         {
-            int borderColor = ColorToAbgr(backgroundColor.Value);
+            var bg = backgroundColor.Value;
+            var borderCol = Color.FromRgb(
+                (byte)Math.Min(255, bg.R + 30),
+                (byte)Math.Min(255, bg.G + 30),
+                (byte)Math.Min(255, bg.B + 30));
+            int borderColor = ColorToAbgr(borderCol);
             try
             {
                 DwmSetWindowAttribute(hwnd, DwmWindowAttribute.DWMWA_BORDER_COLOR,
@@ -159,14 +164,16 @@ public static class TitleBarService
     /// </summary>
     private static int ColorToAbgr(Color color)
     {
-        return (color.A << 24) | (color.B << 16) | (color.G << 8) | color.R;
+        // DWM expects COLORREF format: 0x00BBGGRR (no alpha byte)
+        return (color.B << 16) | (color.G << 8) | color.R;
     }
 
     /// <summary>
-    /// Converts a Color to ARGB format.
+    /// Converts a Color to COLORREF format for DWM text color.
     /// </summary>
     private static int ColorToArgb(Color color)
     {
-        return (color.A << 24) | (color.R << 16) | (color.G << 8) | color.B;
+        // DWM text color also uses COLORREF: 0x00BBGGRR
+        return (color.B << 16) | (color.G << 8) | color.R;
     }
 }

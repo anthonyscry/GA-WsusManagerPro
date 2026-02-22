@@ -25,6 +25,8 @@ public class GpoDeploymentService : IGpoDeploymentService
 
     /// <inheritdoc/>
     public async Task<OperationResult<string>> DeployGpoFilesAsync(
+        string wsusHostname,
+        int httpPort = 8530,
         IProgress<string>? progress = null,
         CancellationToken ct = default)
     {
@@ -56,7 +58,7 @@ public class GpoDeploymentService : IGpoDeploymentService
             _logService.Info("GPO deployment complete: {Count} files copied", fileCount);
             progress?.Report($"[OK] Copied {fileCount} files to {DefaultDestination}");
 
-            var instructions = BuildInstructionText();
+            var instructions = BuildInstructionText(wsusHostname, httpPort);
             return OperationResult<string>.Ok(instructions, $"GPO files deployed ({fileCount} files).");
         }
         catch (OperationCanceledException)
@@ -97,17 +99,20 @@ public class GpoDeploymentService : IGpoDeploymentService
     /// <summary>
     /// Builds the step-by-step instruction text for the DC admin.
     /// </summary>
-    internal static string BuildInstructionText()
+    internal static string BuildInstructionText(string wsusHostname, int httpPort = 8530)
     {
+        var serverUrl = $"http://{wsusHostname}:{httpPort}";
         return $"""
             GPO files have been copied to {DefaultDestination}
+
+            WSUS Server: {serverUrl}
 
             Steps for the Domain Controller admin:
 
             1. Copy the "WSUS GPO" folder to the Domain Controller
 
             2. Run Set-WsusGroupPolicy.ps1 on the Domain Controller:
-               powershell -ExecutionPolicy Bypass -File Set-WsusGroupPolicy.ps1
+               powershell -ExecutionPolicy Bypass -File Set-WsusGroupPolicy.ps1 -WsusServerUrl "{serverUrl}"
 
             3. Force client check-in on target machines:
                gpupdate /force

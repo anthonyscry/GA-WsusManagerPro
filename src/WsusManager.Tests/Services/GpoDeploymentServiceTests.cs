@@ -21,7 +21,7 @@ public class GpoDeploymentServiceTests
         var service = CreateService();
 
         // In test environment, DomainController/ won't be next to the test DLL
-        var result = await service.DeployGpoFilesAsync();
+        var result = await service.DeployGpoFilesAsync("WSUS01");
 
         Assert.False(result.Success);
         Assert.Contains("DomainController", result.Message);
@@ -30,11 +30,12 @@ public class GpoDeploymentServiceTests
     [Fact]
     public void BuildInstructionText_Contains_Required_Steps()
     {
-        var text = GpoDeploymentService.BuildInstructionText();
+        var text = GpoDeploymentService.BuildInstructionText("WSUS01", 8530);
 
         Assert.Contains(@"C:\WSUS\WSUS GPO", text);
         Assert.Contains("Domain Controller", text);
         Assert.Contains("Set-WsusGroupPolicy.ps1", text);
+        Assert.Contains("http://WSUS01:8530", text);
         Assert.Contains("gpupdate /force", text);
         Assert.Contains("wuauclt /detectnow", text);
     }
