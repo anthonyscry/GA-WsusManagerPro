@@ -226,6 +226,8 @@ public class InstallationServiceTests
 
         try
         {
+            var originalPasswordEnv = Environment.GetEnvironmentVariable("WSUS_INSTALL_SA_PASSWORD");
+
             // Create service with temp base directory
             var service = new TestableInstallationService(
                 _mockRunner.Object, _mockLog.Object, scriptPath);
@@ -256,11 +258,14 @@ public class InstallationServiceTests
                     args.Contains("-NonInteractive") &&
                     args.Contains("-InstallerPath") &&
                     args.Contains("-SaUsername") &&
-                    args.Contains("-SaPassword") &&
+                    args.Contains("-SaPassword $env:WSUS_INSTALL_SA_PASSWORD") &&
+                    !args.Contains(options.SaPassword) &&
                     args.Contains("-ExecutionPolicy Bypass")),
                 It.IsAny<IProgress<string>>(),
                 It.IsAny<CancellationToken>()),
                 Times.Once);
+
+            Assert.Equal(originalPasswordEnv, Environment.GetEnvironmentVariable("WSUS_INSTALL_SA_PASSWORD"));
         }
         finally
         {
@@ -345,17 +350,27 @@ public class InstallationServiceTests
                             $"-NonInteractive " +
                             $"-InstallerPath \"{options.InstallerPath}\" " +
                             $"-SaUsername \"{options.SaUsername}\" " +
-                            $"-SaPassword \"{options.SaPassword}\"";
+                            $"-SaPassword $env:WSUS_INSTALL_SA_PASSWORD";
 
             var processRunnerField = typeof(InstallationService)
                 .GetField("_processRunner",
                     System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             var runner = (IProcessRunner)processRunnerField!.GetValue(this)!;
 
-            var result = await runner.RunAsync("powershell.exe", arguments, progress, ct);
-            return result.Success
-                ? OperationResult.Ok("Installation completed successfully.")
-                : OperationResult.Fail($"Installation failed with exit code {result.ExitCode}.");
+            var previousPasswordEnv = Environment.GetEnvironmentVariable("WSUS_INSTALL_SA_PASSWORD");
+            Environment.SetEnvironmentVariable("WSUS_INSTALL_SA_PASSWORD", options.SaPassword);
+
+            try
+            {
+                var result = await runner.RunAsync("powershell.exe", arguments, progress, ct);
+                return result.Success
+                    ? OperationResult.Ok("Installation completed successfully.")
+                    : OperationResult.Fail($"Installation failed with exit code {result.ExitCode}.");
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable("WSUS_INSTALL_SA_PASSWORD", previousPasswordEnv);
+            }
         }
     }
 }

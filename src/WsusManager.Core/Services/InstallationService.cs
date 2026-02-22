@@ -23,6 +23,9 @@ public class InstallationService : IInstallationService
     /// <summary>PowerShell script filename for installation.</summary>
     public const string InstallScriptName = "Install-WsusWithSqlExpress.ps1";
 
+    /// <summary>Process-scoped env var used to pass SA password securely to PowerShell.</summary>
+    public const string SaPasswordEnvVar = "WSUS_INSTALL_SA_PASSWORD";
+
     /// <summary>Minimum SA password length.</summary>
     public const int MinPasswordLength = 15;
 
@@ -106,18 +109,28 @@ public class InstallationService : IInstallationService
             progress?.Report("Starting installation (this may take 30+ minutes)...");
             progress?.Report("");
 
-            // Build PowerShell arguments
+            // Pass password via environment variable reference to avoid exposing plaintext in process args.
             var arguments = $"-ExecutionPolicy Bypass -File \"{scriptPath}\" " +
                             $"-NonInteractive " +
                             $"-InstallerPath \"{options.InstallerPath}\" " +
                             $"-SaUsername \"{options.SaUsername}\" " +
-                            $"-SaPassword \"{options.SaPassword}\"";
+                            $"-SaPassword $env:{SaPasswordEnvVar}";
 
-            var result = await _processRunner.RunAsync(
-                "powershell.exe",
-                arguments,
-                progress,
-                ct);
+            var previousPasswordEnv = Environment.GetEnvironmentVariable(SaPasswordEnvVar);
+            Environment.SetEnvironmentVariable(SaPasswordEnvVar, options.SaPassword);
+            ProcessResult result;
+            try
+            {
+                result = await _processRunner.RunAsync(
+                    "powershell.exe",
+                    arguments,
+                    progress,
+                    ct);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(SaPasswordEnvVar, previousPasswordEnv);
+            }
 
             if (result.Success)
             {

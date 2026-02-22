@@ -91,6 +91,7 @@ $config = New-PesterConfiguration
 # Test paths
 $config.Run.Path = $TestFiles.FullName
 $config.Run.Exit = $false
+$config.Run.PassThru = $true
 
 # Filter by test name if specified
 if ($TestName) {
@@ -124,6 +125,10 @@ if ($OutputFile) {
 # Run tests
 Write-Host "`nRunning Pester tests...`n" -ForegroundColor Cyan
 $result = Invoke-Pester -Configuration $config
+
+if (-not $result) {
+    throw "Invoke-Pester did not return a result object. Ensure Run.PassThru is enabled."
+}
 
 # Summary
 Write-Host "`n========================================" -ForegroundColor Cyan
