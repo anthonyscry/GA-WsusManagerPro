@@ -15,12 +15,13 @@ public class DashboardServiceTests
 {
     private readonly Mock<ILogService> _mockLog = new();
     private readonly Mock<ISqlService> _mockSql = new();
+    private readonly Mock<IWsusServerService> _mockWsus = new();
     private readonly DashboardService _service;
     private readonly AppSettings _settings = new();
 
     public DashboardServiceTests()
     {
-        _service = new DashboardService(_mockLog.Object, _mockSql.Object);
+        _service = new DashboardService(_mockLog.Object, _mockSql.Object, _mockWsus.Object);
     }
 
     [Fact]
@@ -121,5 +122,35 @@ public class DashboardServiceTests
         var data = await _service.CollectAsync(settings, CancellationToken.None);
 
         Assert.Equal(-1, data.DatabaseSizeGB);
+    }
+
+    [Fact]
+    public async Task GetComputersAsync_Does_Not_Return_Phase29_Mock_Hosts()
+    {
+        _mockWsus
+            .Setup(s => s.GetComputersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<ComputerInfo>());
+
+        var computers = await _service.GetComputersAsync(CancellationToken.None);
+
+        Assert.DoesNotContain(computers, c => c.Hostname.StartsWith("LAB-", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task GetComputersAsync_Returns_Data_From_WsusService()
+    {
+        var expected = new[]
+        {
+            new ComputerInfo("REAL-WSUS-CLIENT", "10.0.0.5", "Online", DateTime.UtcNow, 0, "Windows 11 Pro")
+        };
+
+        _mockWsus
+            .Setup(s => s.GetComputersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expected);
+
+        var computers = await _service.GetComputersAsync(CancellationToken.None);
+
+        Assert.Single(computers);
+        Assert.Equal("REAL-WSUS-CLIENT", computers[0].Hostname);
     }
 }

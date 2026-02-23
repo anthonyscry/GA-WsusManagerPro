@@ -48,4 +48,10 @@ public interface IWsusServerService
     /// Returns the count of updates approved.
     /// </summary>
     Task<OperationResult<int>> ApproveUpdatesAsync(int maxCount, IProgress<string>? progress, CancellationToken ct);
+
+    /// <summary>
+    /// Gets computer targets currently known by WSUS.
+    /// Returns an empty list when WSUS is unavailable.
+    /// </summary>
+    Task<IReadOnlyList<ComputerInfo>> GetComputersAsync(CancellationToken ct = default);
 }

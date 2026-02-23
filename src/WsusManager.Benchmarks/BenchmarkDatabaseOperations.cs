@@ -36,7 +36,8 @@ public class BenchmarkDatabaseOperations
     {
         var logService = new LogService();
         _sqlService = new SqlService(logService);
-        _dashboardService = new DashboardService(logService, _sqlService);
+        var wsusServerService = new WsusServerService(logService);
+        _dashboardService = new DashboardService(logService, _sqlService, wsusServerService);
     }
 
     [GlobalCleanup]

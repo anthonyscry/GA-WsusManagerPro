@@ -22,15 +22,17 @@ public class DashboardService : IDashboardService
 
     private readonly ILogService _logService;
     private readonly ISqlService _sqlService;
+    private readonly IWsusServerService _wsusServerService;
     private DashboardData? _cachedStatus;
     private DateTime _cacheTimestamp;
     private IReadOnlyList<UpdateInfo>? _cachedUpdates;
     private DateTime _updateCacheTimestamp;
 
-    public DashboardService(ILogService logService, ISqlService sqlService)
+    public DashboardService(ILogService logService, ISqlService sqlService, IWsusServerService wsusServerService)
     {
         _logService = logService;
         _sqlService = sqlService;
+        _wsusServerService = wsusServerService;
     }
 
     public async Task<DashboardData> CollectAsync(AppSettings settings, CancellationToken ct)
@@ -309,29 +311,23 @@ public class DashboardService : IDashboardService
 
     /// <summary>
     /// Gets a list of all computers from the WSUS server.
-    /// Phase 29: Returns mock data for UI testing.
-    /// Future: Query WSUS API for real computer list.
+    /// Returns live WSUS data only. Never returns sample/mock hosts.
     /// </summary>
     public async Task<IReadOnlyList<ComputerInfo>> GetComputersAsync(CancellationToken ct = default)
     {
-        // Phase 29: Return mock data for UI testing
-        // Future: Query WSUS API for real computer list
-        await Task.Delay(50, ct).ConfigureAwait(false); // Simulate network delay
-
-        var now = DateTime.UtcNow;
-        return new List<ComputerInfo>
+        try
         {
-            new("LAB-PC001", "192.168.1.10", "Online", now.AddMinutes(-5), 0, "Windows 11 Pro"),
-            new("LAB-PC002", "192.168.1.11", "Online", now.AddMinutes(-10), 3, "Windows 10 Pro"),
-            new("LAB-PC003", "192.168.1.12", "Offline", now.AddHours(-2), 5, "Windows 10 Pro"),
-            new("LAB-SRV001", "192.168.1.20", "Online", now.AddMinutes(-15), 0, "Windows Server 2022"),
-            new("LAB-SRV002", "192.168.1.21", "Error", now.AddHours(-8), 12, "Windows Server 2019"),
-            new("HR-PC001", "192.168.2.10", "Online", now.AddMinutes(-30), 1, "Windows 11 Pro"),
-            new("HR-PC002", "192.168.2.11", "Offline", now.AddDays(-1), 0, "Windows 10 Pro"),
-            new("FIN-PC001", "192.168.3.10", "Online", now.AddMinutes(-20), 0, "Windows 11 Pro"),
-            new("FIN-PC002", "192.168.3.11", "Online", now.AddMinutes(-45), 7, "Windows 10 Pro"),
-            new("DEV-PC001", "192.168.4.10", "Error", now.AddHours(-4), 2, "Windows 11 Pro"),
-        };
+            return await _wsusServerService.GetComputersAsync(ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logService.Error(ex, "Failed to fetch WSUS computer targets");
+            return Array.Empty<ComputerInfo>();
+        }
     }
 
     /// <summary>

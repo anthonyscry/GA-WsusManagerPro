@@ -11,25 +11,12 @@ namespace WsusManager.App.Services;
 /// </summary>
 public static class TitleBarService
 {
-    #region DWM Imports
-
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(
         IntPtr hwnd,
         DwmWindowAttribute attr,
         ref int attrValue,
         int attrSize);
-
-    [DllImport("dwmapi.dll", CharSet = CharSet.Unicode, PreserveSig = false)]
-    private static extern void DwmSetWindowAttribute(
-        IntPtr hwnd,
-        DwmWindowAttribute attr,
-        ref bool attrValue,
-        int attrSize);
-
-    #endregion
-
-    #region Enums
 
     private enum DwmWindowAttribute
     {
@@ -50,6 +37,7 @@ public static class TitleBarService
         DWMWA_FREEZE_REPRESENTATION = 15,
         DWMWA_PASSIVE_UPDATE_WINDOW = 16,
         DWMWA_USE_HOSTBACKDROPBRUSH = 17,
+        DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 = 19,
         DWMWA_USE_IMMERSIVE_DARK_MODE = 20,
         DWMWA_WINDOW_CORNER_PREFERENCE = 33,
         DWMWA_BORDER_COLOR = 34,
@@ -58,8 +46,6 @@ public static class TitleBarService
         DWMWA_VISIBLE_FRAME_BORDER_THICKNESS = 37,
         DWMWA_MICA_EFFECT = 38
     }
-
-    #endregion
 
     /// <summary>
     /// Sets the title bar colors for the main window.
@@ -81,37 +67,23 @@ public static class TitleBarService
             return;
         }
 
-        // Enable immersive dark mode for title bar (better for dark themes)
-        bool darkMode = true;
-        try
-        {
-            DwmSetWindowAttribute(hwnd, DwmWindowAttribute.DWMWA_USE_IMMERSIVE_DARK_MODE,
-                ref darkMode, sizeof(bool));
-        }
-        catch { }
+        // Enable immersive dark mode for title bar.
+        // Windows Server 2019 / older Win10 builds use attribute 19.
+        _ = TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_USE_IMMERSIVE_DARK_MODE, 1)
+            || TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1, 1);
 
         // Set background color if provided
         if (backgroundColor.HasValue)
         {
             int color = ColorToAbgr(backgroundColor.Value);
-            try
-            {
-                DwmSetWindowAttribute(hwnd, DwmWindowAttribute.DWMWA_CAPTION_COLOR,
-                    ref color, sizeof(int));
-            }
-            catch { }
+            _ = TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_CAPTION_COLOR, color);
         }
 
         // Set text color if provided
         if (foregroundColor.HasValue)
         {
             int color = ColorToArgb(foregroundColor.Value);
-            try
-            {
-                DwmSetWindowAttribute(hwnd, DwmWindowAttribute.DWMWA_TEXT_COLOR,
-                    ref color, sizeof(int));
-            }
-            catch { }
+            _ = TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_TEXT_COLOR, color);
         }
 
         // Set border color with slight offset for contrast
@@ -123,12 +95,7 @@ public static class TitleBarService
                 (byte)Math.Min(255, bg.G + 30),
                 (byte)Math.Min(255, bg.B + 30));
             int borderColor = ColorToAbgr(borderCol);
-            try
-            {
-                DwmSetWindowAttribute(hwnd, DwmWindowAttribute.DWMWA_BORDER_COLOR,
-                    ref borderColor, sizeof(int));
-            }
-            catch { }
+            _ = TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_BORDER_COLOR, borderColor);
         }
     }
 
@@ -146,17 +113,25 @@ public static class TitleBarService
 
         // Reset to default (value = -1)
         int defaultValue = -1;
+        int disabledValue = 0;
 
+        _ = TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_CAPTION_COLOR, defaultValue);
+        _ = TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_TEXT_COLOR, defaultValue);
+        _ = TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_BORDER_COLOR, defaultValue);
+        _ = TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_USE_IMMERSIVE_DARK_MODE, disabledValue);
+        _ = TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1, disabledValue);
+    }
+
+    private static bool TrySetIntAttribute(IntPtr hwnd, DwmWindowAttribute attr, int value)
+    {
         try
         {
-            DwmSetWindowAttribute(hwnd, DwmWindowAttribute.DWMWA_CAPTION_COLOR,
-                ref defaultValue, sizeof(int));
-            DwmSetWindowAttribute(hwnd, DwmWindowAttribute.DWMWA_TEXT_COLOR,
-                ref defaultValue, sizeof(int));
-            DwmSetWindowAttribute(hwnd, DwmWindowAttribute.DWMWA_BORDER_COLOR,
-                ref defaultValue, sizeof(int));
+            return DwmSetWindowAttribute(hwnd, attr, ref value, sizeof(int)) == 0;
         }
-        catch { }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>

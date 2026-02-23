@@ -467,4 +467,166 @@ public class WsusServerService : IWsusServerService
             }
         }, ct).ConfigureAwait(false);
     }
+
+    public async Task<IReadOnlyList<ComputerInfo>> GetComputersAsync(CancellationToken ct = default)
+    {
+        if (_updateServer is null)
+        {
+            var connectResult = await ConnectAsync(ct).ConfigureAwait(false);
+            if (!connectResult.Success || _updateServer is null)
+            {
+                _logService.Warning("WSUS computer inventory unavailable: {Message}", connectResult.Message);
+                return Array.Empty<ComputerInfo>();
+            }
+        }
+
+        return await Task.Run(() =>
+        {
+            try
+            {
+                var getTargetsMethod = _updateServer.GetType().GetMethod("GetComputerTargets", Type.EmptyTypes);
+                if (getTargetsMethod is null)
+                {
+                    _logService.Warning("WSUS API method GetComputerTargets not found");
+                    return (IReadOnlyList<ComputerInfo>)Array.Empty<ComputerInfo>();
+                }
+
+                var targets = getTargetsMethod.Invoke(_updateServer, null) as System.Collections.IEnumerable;
+                if (targets is null)
+                {
+                    return (IReadOnlyList<ComputerInfo>)Array.Empty<ComputerInfo>();
+                }
+
+                var nowUtc = DateTime.UtcNow;
+                var computers = new List<ComputerInfo>();
+
+                foreach (var target in targets)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    if (target is null)
+                    {
+                        continue;
+                    }
+
+                    var hostname = ReadStringProperty(target, "FullDomainName", "Name", "ComputerName");
+                    if (string.IsNullOrWhiteSpace(hostname))
+                    {
+                        continue;
+                    }
+
+                    var ipAddress = ReadStringProperty(target, "IPAddress");
+                    if (string.IsNullOrWhiteSpace(ipAddress))
+                    {
+                        ipAddress = "N/A";
+                    }
+
+                    var osVersion = ReadStringProperty(target, "OSDescription", "OSFamily", "MakeModel");
+                    if (string.IsNullOrWhiteSpace(osVersion))
+                    {
+                        osVersion = "Unknown";
+                    }
+
+                    var lastSync = ReadDateTimeProperty(target, "LastSyncTime", "LastReportedStatusTime");
+                    var status = DetermineComputerStatus(target, lastSync, nowUtc);
+                    var pendingUpdates = ReadIntProperty(target, "NotInstalledUpdateCount", "NeededUpdateCount", "PendingUpdateCount");
+                    if (pendingUpdates < 0)
+                    {
+                        pendingUpdates = 0;
+                    }
+
+                    computers.Add(new ComputerInfo(hostname, ipAddress, status, lastSync, pendingUpdates, osVersion));
+                }
+
+                _logService.Info("Loaded {Count} WSUS computer targets", computers.Count);
+                return (IReadOnlyList<ComputerInfo>)computers
+                    .OrderBy(c => c.Hostname, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                var inner = ex.InnerException ?? ex;
+                _logService.Error(inner, "Failed to query WSUS computer targets");
+                return (IReadOnlyList<ComputerInfo>)Array.Empty<ComputerInfo>();
+            }
+        }, ct).ConfigureAwait(false);
+    }
+
+    private static string ReadStringProperty(object instance, params string[] propertyNames)
+    {
+        foreach (var propertyName in propertyNames)
+        {
+            var value = instance.GetType().GetProperty(propertyName)?.GetValue(instance);
+            if (value is null)
+            {
+                continue;
+            }
+
+            var text = value.ToString();
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                return text;
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static DateTime ReadDateTimeProperty(object instance, params string[] propertyNames)
+    {
+        foreach (var propertyName in propertyNames)
+        {
+            var value = instance.GetType().GetProperty(propertyName)?.GetValue(instance);
+            if (value is DateTime dt && dt != default)
+            {
+                return dt.Kind == DateTimeKind.Utc ? dt : dt.ToUniversalTime();
+            }
+        }
+
+        return DateTime.MinValue;
+    }
+
+    private static int ReadIntProperty(object instance, params string[] propertyNames)
+    {
+        foreach (var propertyName in propertyNames)
+        {
+            var value = instance.GetType().GetProperty(propertyName)?.GetValue(instance);
+            if (value is null)
+            {
+                continue;
+            }
+
+            try
+            {
+                return Convert.ToInt32(value);
+            }
+            catch
+            {
+                // Ignore conversion failures and continue trying fallback properties.
+            }
+        }
+
+        return 0;
+    }
+
+    private static string DetermineComputerStatus(object target, DateTime lastSyncUtc, DateTime nowUtc)
+    {
+        var syncResult = ReadStringProperty(target, "LastSyncResult");
+        if (syncResult.Contains("fail", StringComparison.OrdinalIgnoreCase) ||
+            syncResult.Contains("error", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Error";
+        }
+
+        if (lastSyncUtc == DateTime.MinValue)
+        {
+            return "Offline";
+        }
+
+        var age = nowUtc - lastSyncUtc;
+        return age <= TimeSpan.FromHours(1) ? "Online" : "Offline";
+    }
 }

@@ -5,6 +5,15 @@ All notable changes to WSUS Manager will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.5.4] - 2026-02-23
+
+### Fixed
+- Restored dark title bar behavior on older Windows Server/Windows 10 builds by adding DWM attribute fallback handling.
+
+### Changed
+- Switched Computers panel data source from Phase 29 mock hosts to live WSUS API computer targets (no fake fallback rows).
+- Updated dashboard wiring and tests to validate live WSUS computer inventory flow.
+
 ## [4.5.3] - 2026-02-23
 
 ### Fixed
@@ -218,7 +227,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - MaxAutoApproveCount increased to 200
 
-[Unreleased]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.3...HEAD
+[Unreleased]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.4...HEAD
+[4.5.4]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.3...v4.5.4
 [4.5.3]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.2...v4.5.3
 [4.5.2]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.1...v4.5.2
 [4.5.1]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.0...v4.5.1
