@@ -1340,7 +1340,7 @@
                         <TextBlock Text="{Binding PageTitle}" FontSize="20"
                                    Foreground="{DynamicResource TextSecondary}"
                                    HorizontalAlignment="Center"/>
-                        <TextBlock Text="This operation will be available in a future update."
+                        <TextBlock Text="Use the left menu to run this operation. Output appears in the log panel below."
                                    Foreground="{DynamicResource TextMuted}" FontSize="13"
                                    Margin="0,8,0,0" HorizontalAlignment="Center"/>
                     </StackPanel>

@@ -5,6 +5,16 @@ All notable changes to WSUS Manager will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.5.5] - 2026-02-23
+
+### Fixed
+- Prevented main window title bar from reverting to system white on startup by reapplying active theme colors after window initialization.
+- Reapplied title bar theme colors on window activate/deactivate to improve caption consistency after opening/closing Settings.
+
+### Changed
+- Updated generic operation panel guidance text to indicate operations run from sidebar and stream output in the log panel.
+- Bumped in-app version display to `v4.5.5`.
+
 ## [4.5.4] - 2026-02-23
 
 ### Fixed
@@ -227,7 +237,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - MaxAutoApproveCount increased to 200
 
-[Unreleased]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.4...HEAD
+[Unreleased]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.5...HEAD
+[4.5.5]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.4...v4.5.5
 [4.5.4]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.3...v4.5.4
 [4.5.3]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.2...v4.5.3
 [4.5.2]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.1...v4.5.2

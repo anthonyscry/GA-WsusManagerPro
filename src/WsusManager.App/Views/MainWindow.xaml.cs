@@ -18,13 +18,15 @@ public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
     private readonly ISettingsService _settingsService;
+    private readonly IThemeService _themeService;
     private AppSettings _settings;
 
-    public MainWindow(MainViewModel viewModel, ISettingsService settingsService)
+    public MainWindow(MainViewModel viewModel, ISettingsService settingsService, IThemeService themeService)
     {
         InitializeComponent();
         _viewModel = viewModel;
         _settingsService = settingsService;
+        _themeService = themeService;
         _settings = _settingsService.Current;
         DataContext = viewModel;
 
@@ -32,6 +34,8 @@ public partial class MainWindow : Window
         LoadIcon();
 
         Loaded += MainWindow_Loaded;
+        Activated += MainWindow_Activated;
+        Deactivated += MainWindow_Deactivated;
         Closing += MainWindow_Closing;
         Closed += MainWindow_Closed;
     }
@@ -60,8 +64,9 @@ public partial class MainWindow : Window
         // Unsubscribe immediately (before any await) to prevent memory leak and re-entry
         Loaded -= MainWindow_Loaded;
 
-        // Apply title bar colors now that the HWND exists
-        TitleBarService.SetTitleBarColors(this, null, null);
+        // Re-apply current theme title bar colors now that HWND exists.
+        // Do NOT reset to system defaults here; that causes white caption flash on startup.
+        ApplyCurrentTitleBarTheme();
 
         // Restore window bounds if enabled and valid
         if (_settings.PersistWindowState && _settings.WindowBounds != null)
@@ -85,6 +90,22 @@ public partial class MainWindow : Window
         }
 
         await _viewModel.InitializeAsync().ConfigureAwait(false);
+    }
+
+    private void MainWindow_Activated(object? sender, EventArgs e)
+    {
+        ApplyCurrentTitleBarTheme();
+    }
+
+    private void MainWindow_Deactivated(object? sender, EventArgs e)
+    {
+        ApplyCurrentTitleBarTheme();
+    }
+
+    private void ApplyCurrentTitleBarTheme()
+    {
+        var selectedTheme = _settingsService.Current.SelectedTheme;
+        _themeService.ApplyTitleBarColorsToWindow(this, selectedTheme);
     }
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -114,6 +135,9 @@ public partial class MainWindow : Window
 
     private void MainWindow_Closed(object? sender, EventArgs e)
     {
+        Activated -= MainWindow_Activated;
+        Deactivated -= MainWindow_Deactivated;
+
         // Cleanup ViewModel resources (timer, CTS, log builder)
         _viewModel.Dispose();
     }
