@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text.RegularExpressions;
 using WsusManager.Core.Logging;
 using WsusManager.Core.Models;
 
@@ -12,8 +11,6 @@ namespace WsusManager.Core.Infrastructure;
 /// </summary>
 public class ProcessRunner : IProcessRunner
 {
-    private static readonly Regex SensitiveArgToken = new("(?i)(-SaPassword\\b|-Password\\b|/RP\\b)");
-
     private readonly ILogService _logService;
 
     public ProcessRunner(ILogService logService)
@@ -27,8 +24,7 @@ public class ProcessRunner : IProcessRunner
         IProgress<string>? progress = null,
         CancellationToken ct = default)
     {
-        var safeArguments = RedactArguments(arguments);
-        _logService.Debug("Running: {Executable} {Arguments}", executable, safeArguments);
+        _logService.Debug("Running: {Executable} [arguments hidden]", executable);
 
         using var proc = new Process
         {
@@ -99,20 +95,5 @@ public class ProcessRunner : IProcessRunner
         }
 
         return result;
-    }
-
-    private static string RedactArguments(string arguments)
-    {
-        if (string.IsNullOrWhiteSpace(arguments))
-        {
-            return arguments;
-        }
-
-        if (SensitiveArgToken.IsMatch(arguments))
-        {
-            return "[REDACTED SENSITIVE ARGUMENTS]";
-        }
-
-        return arguments;
     }
 }
