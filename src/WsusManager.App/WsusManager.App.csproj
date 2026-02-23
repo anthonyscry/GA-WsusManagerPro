@@ -36,4 +36,13 @@
     <ProjectReference Include="..\WsusManager.Core\WsusManager.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="general_atomics_logo_big.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="general_atomics_logo_small.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

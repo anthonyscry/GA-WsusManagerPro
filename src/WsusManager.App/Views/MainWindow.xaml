@@ -43,42 +43,58 @@
 
                 <!-- SETUP Category -->
                 <TextBlock DockPanel.Dock="Top" Text="SETUP" Style="{StaticResource CategoryLabel}"/>
-                <Button DockPanel.Dock="Top" Content="Install WSUS"
-                        ToolTip="Install WSUS with SQL Server Express"
+                <Button DockPanel.Dock="Top" ToolTip="Install WSUS with SQL Server Express"
                         Style="{StaticResource NavBtn}" x:Name="BtnInstall"
                         automation:AutomationProperties.AutomationId="InstallButton"
-                        Command="{Binding RunInstallWsusCommand}"/>
-                <Button DockPanel.Dock="Top" Content="Create GPO"
-                        ToolTip="Copy GPO templates for domain deployment"
+                        Command="{Binding RunInstallWsusCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="⬇" Width="22" TextAlignment="Center" Foreground="{DynamicResource TextSecondary}"/>
+                        <TextBlock Text="Install WSUS"/>
+                    </StackPanel>
+                </Button>
+                <Button DockPanel.Dock="Top" ToolTip="Copy GPO templates for domain deployment"
                         Style="{StaticResource NavBtn}" x:Name="BtnGpo"
                         automation:AutomationProperties.AutomationId="CreateGpoButton"
-                        Command="{Binding RunCreateGpoCommand}"/>
+                        Command="{Binding RunCreateGpoCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="📋" Width="22" TextAlignment="Center"/>
+                        <TextBlock Text="Create GPO"/>
+                    </StackPanel>
+                </Button>
 
-                <!-- TRANSFER Category -->
-                <TextBlock DockPanel.Dock="Top" Text="TRANSFER" Style="{StaticResource CategoryLabel}"/>
-                <Button DockPanel.Dock="Top" Content="Export / Import"
-                        ToolTip="Export metadata to USB or import from external media"
-                        Style="{StaticResource NavBtn}" x:Name="BtnTransfer"
-                        automation:AutomationProperties.AutomationId="TransferButton"
-                        Command="{Binding RunTransferCommand}"/>
-
-                <!-- MAINTENANCE Category -->
-                <TextBlock DockPanel.Dock="Top" Text="MAINTENANCE" Style="{StaticResource CategoryLabel}"/>
-                <Button DockPanel.Dock="Top" Content="Online Sync"
-                        ToolTip="Synchronize with Microsoft Update servers"
+                <!-- OPERATIONS Category -->
+                <TextBlock DockPanel.Dock="Top" Text="OPERATIONS" Style="{StaticResource CategoryLabel}"/>
+                <Button DockPanel.Dock="Top" ToolTip="Synchronize with Microsoft Update servers"
                         Style="{StaticResource NavBtn}" x:Name="BtnSync"
                         automation:AutomationProperties.AutomationId="OnlineSyncButton"
-                        Command="{Binding RunOnlineSyncCommand}"/>
-                <Button DockPanel.Dock="Top" Content="Schedule Task"
-                        ToolTip="Create scheduled task for automated operations"
+                        Command="{Binding RunOnlineSyncCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="🔄" Width="22" TextAlignment="Center"/>
+                        <TextBlock Text="Online Sync"/>
+                    </StackPanel>
+                </Button>
+                <Button DockPanel.Dock="Top" ToolTip="Export metadata to USB or import from external media"
+                        Style="{StaticResource NavBtn}" x:Name="BtnTransfer"
+                        automation:AutomationProperties.AutomationId="TransferButton"
+                        Command="{Binding RunTransferCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="📤" Width="22" TextAlignment="Center"/>
+                        <TextBlock Text="Export / Import"/>
+                    </StackPanel>
+                </Button>
+                <Button DockPanel.Dock="Top" ToolTip="Create scheduled task for automated operations"
                         Style="{StaticResource NavBtn}" x:Name="BtnSchedule"
                         automation:AutomationProperties.AutomationId="ScheduleTaskButton"
-                        Command="{Binding RunScheduleTaskCommand}"/>
+                        Command="{Binding RunScheduleTaskCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="📅" Width="22" TextAlignment="Center"/>
+                        <TextBlock Text="Schedule Task"/>
+                    </StackPanel>
+                </Button>
 
-                <!-- DIAGNOSTICS Category -->
-                <TextBlock DockPanel.Dock="Top" Text="DIAGNOSTICS" Style="{StaticResource CategoryLabel}"/>
-                <Button DockPanel.Dock="Top" Content="Diagnostics"
-                        ToolTip="Run health checks and auto-repair"
+                <!-- TOOLS Category -->
+                <TextBlock DockPanel.Dock="Top" Text="TOOLS" Style="{StaticResource CategoryLabel}"/>
+                <Button DockPanel.Dock="Top" ToolTip="Run health checks and auto-repair"
                         x:Name="BtnDiagnostics"
                         automation:AutomationProperties.AutomationId="DiagnosticsButton"
                         Command="{Binding NavigateCommand}" CommandParameter="Diagnostics">
@@ -94,33 +110,12 @@
                             </Style.Triggers>
                         </Style>
                     </Button.Style>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="🔍" Width="22" TextAlignment="Center"/>
+                        <TextBlock Text="Diagnostics"/>
+                    </StackPanel>
                 </Button>
-
-                <!-- CLIENT TOOLS Category -->
-                <TextBlock DockPanel.Dock="Top" Text="CLIENT TOOLS" Style="{StaticResource CategoryLabel}"/>
-                <Button DockPanel.Dock="Top" Content="Client Tools"
-                        ToolTip="Remote client management and diagnostics"
-                        x:Name="BtnClientTools"
-                        automation:AutomationProperties.AutomationId="ClientToolsButton"
-                        Command="{Binding NavigateCommand}" CommandParameter="ClientTools">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource NavBtn}">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding CurrentPanel}" Value="ClientTools">
-                                    <Setter Property="Background" Value="{DynamicResource NavActiveBackground}"/>
-                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                                    <Setter Property="BorderThickness" Value="3,0,0,0"/>
-                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
-
-                <!-- DATABASE Category -->
-                <TextBlock DockPanel.Dock="Top" Text="DATABASE" Style="{StaticResource CategoryLabel}"/>
-                <Button DockPanel.Dock="Top" Content="Database"
-                        ToolTip="Backup, restore, and cleanup operations"
+                <Button DockPanel.Dock="Top" ToolTip="Backup, restore, and cleanup operations"
                         x:Name="BtnDatabase"
                         automation:AutomationProperties.AutomationId="DatabaseButton"
                         Command="{Binding NavigateCommand}" CommandParameter="Database">
@@ -136,25 +131,27 @@
                             </Style.Triggers>
                         </Style>
                     </Button.Style>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="🗄" Width="22" TextAlignment="Center"/>
+                        <TextBlock Text="Database"/>
+                    </StackPanel>
                 </Button>
-
-                <!-- DATA Category -->
-                <TextBlock DockPanel.Dock="Top" Text="DATA" Style="{StaticResource CategoryLabel}"/>
-                <Button DockPanel.Dock="Top"
-                        ToolTip="Coming Soon — Work in Progress"
-                        x:Name="BtnComputers"
-                        automation:AutomationProperties.AutomationId="ComputersButton"
-                        Style="{StaticResource NavBtn}"
-                        IsEnabled="False">
-                    <StackPanel Orientation="Horizontal"><TextBlock Text="&#x25A3;" Width="22" TextAlignment="Left"/><TextBlock Text="Computers (WIP)"/></StackPanel>
-                </Button>
-                <Button DockPanel.Dock="Top"
-                        ToolTip="Coming Soon — Work in Progress"
-                        x:Name="BtnUpdates"
-                        automation:AutomationProperties.AutomationId="UpdatesButton"
-                        Style="{StaticResource NavBtn}"
-                        IsEnabled="False">
-                    <StackPanel Orientation="Horizontal"><TextBlock Text="&#x25CF;" Width="22" TextAlignment="Left"/><TextBlock Text="Updates (WIP)"/></StackPanel>
+                <Button DockPanel.Dock="Top" ToolTip="Remote client management and diagnostics"
+                        x:Name="BtnClientTools"
+                        automation:AutomationProperties.AutomationId="ClientToolsButton"
+                        Command="{Binding NavigateCommand}" CommandParameter="ClientTools">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource NavBtn}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CurrentPanel}" Value="ClientTools">
+                                    <Setter Property="Background" Value="{DynamicResource NavActiveBackground}"/>
+                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                    <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
                 </Button>
 
                 <!-- Bottom utility buttons -->
@@ -174,17 +171,35 @@
                                 </Style.Triggers>
                             </Style>
                         </Button.Style>
-                        Dashboard
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📊" Width="22" TextAlignment="Center"/>
+                            <TextBlock Text="Dashboard"/>
+                        </StackPanel>
                     </Button>
-                    <Button Content="Settings" automation:AutomationProperties.AutomationId="SettingsButton"
+                    <Button automation:AutomationProperties.AutomationId="SettingsButton"
                             Style="{StaticResource NavBtn}"
-                            Command="{Binding NavigateCommand}" CommandParameter="Settings"/>
-                    <Button Content="Help" automation:AutomationProperties.AutomationId="HelpButton"
+                            Command="{Binding NavigateCommand}" CommandParameter="Settings">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="⚙" Width="22" TextAlignment="Center" Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBlock Text="Settings"/>
+                        </StackPanel>
+                    </Button>
+                    <Button automation:AutomationProperties.AutomationId="HelpButton"
                             Style="{StaticResource NavBtn}"
-                            Command="{Binding NavigateCommand}" CommandParameter="Help"/>
-                    <Button Content="About" automation:AutomationProperties.AutomationId="AboutButton"
+                            Command="{Binding NavigateCommand}" CommandParameter="Help">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="❓" Width="22" TextAlignment="Center"/>
+                            <TextBlock Text="Help"/>
+                        </StackPanel>
+                    </Button>
+                    <Button automation:AutomationProperties.AutomationId="AboutButton"
                             Style="{StaticResource NavBtn}"
-                            Command="{Binding NavigateCommand}" CommandParameter="About"/>
+                            Command="{Binding NavigateCommand}" CommandParameter="About">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="ℹ" Width="22" TextAlignment="Center" Foreground="{DynamicResource TextSecondary}"/>
+                            <TextBlock Text="About"/>
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
             </DockPanel>
         </Border>
@@ -1125,6 +1140,152 @@
                     </ScrollViewer>
                 </Border>
 
+                <!-- Help Panel -->
+                <Border x:Name="HelpPanel"
+                        automation:AutomationProperties.AutomationId="HelpPanel"
+                        Visibility="{Binding IsHelpPanelVisible}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+                        <StackPanel>
+                            <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
+                                    Padding="16" Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="Help &amp; Documentation" FontSize="14" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,12"/>
+                                    <TextBlock TextWrapping="Wrap" FontSize="12"
+                                               Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,12"
+                                               Text="WSUS Manager is a comprehensive tool for managing Windows Server Update Services. Use the sidebar navigation to access different features."/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
+                                    Padding="16" Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="Keyboard Shortcuts" FontSize="14" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="140"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="F1" Foreground="{DynamicResource TextSecondary}" FontSize="12" Margin="0,0,0,6" FontFamily="Consolas"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="Open Help" Foreground="{DynamicResource TextPrimary}" FontSize="12" Margin="0,0,0,6"/>
+
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="F5" Foreground="{DynamicResource TextSecondary}" FontSize="12" Margin="0,0,0,6" FontFamily="Consolas"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="Refresh Dashboard" Foreground="{DynamicResource TextPrimary}" FontSize="12" Margin="0,0,0,6"/>
+
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Ctrl+S" Foreground="{DynamicResource TextSecondary}" FontSize="12" Margin="0,0,0,6" FontFamily="Consolas"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="Open Settings" Foreground="{DynamicResource TextPrimary}" FontSize="12" Margin="0,0,0,6"/>
+
+                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Ctrl+Q" Foreground="{DynamicResource TextSecondary}" FontSize="12" Margin="0,0,0,6" FontFamily="Consolas"/>
+                                        <TextBlock Grid.Row="3" Grid.Column="1" Text="Quit Application" Foreground="{DynamicResource TextPrimary}" FontSize="12" Margin="0,0,0,6"/>
+
+                                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Escape" Foreground="{DynamicResource TextSecondary}" FontSize="12" FontFamily="Consolas"/>
+                                        <TextBlock Grid.Row="4" Grid.Column="1" Text="Cancel Operation" Foreground="{DynamicResource TextPrimary}" FontSize="12"/>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
+                                    Padding="16" Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="Quick Actions" FontSize="14" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
+                                    <TextBlock TextWrapping="Wrap" FontSize="12"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Text="• Diagnostics — Run health checks and auto-repair WSUS components&#x0a;• Deep Cleanup — Remove obsolete updates and optimize database&#x0a;• Online Sync — Synchronize with Microsoft Update (online mode only)&#x0a;• Start Services — Start SQL, WSUS, and IIS services&#x0a;• Toggle Mode — Switch between Online and Air-Gap modes"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
+                                    Padding="16">
+                                <StackPanel>
+                                    <TextBlock Text="Air-Gap Support" FontSize="14" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
+                                    <TextBlock TextWrapping="Wrap" FontSize="12"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Text="For air-gapped networks, use Export/Import to transfer WSUS metadata via USB. The app automatically detects network connectivity and adjusts available features."/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+
+                <!-- About Panel -->
+                <Border x:Name="AboutPanel"
+                        automation:AutomationProperties.AutomationId="AboutPanel"
+                        Visibility="{Binding IsAboutPanelVisible}">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+                        <StackPanel>
+                            <!-- Branding Header -->
+                            <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
+                                    Padding="16" Margin="0,0,0,12">
+                                <StackPanel Orientation="Horizontal">
+                                    <Image Width="56" Height="56" Margin="0,0,16,0" VerticalAlignment="Center"
+                                           Source="general_atomics_logo_big.ico" Stretch="Uniform"/>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="WSUS Manager" FontSize="18" FontWeight="Bold"
+                                                   Foreground="{DynamicResource TextPrimary}"/>
+                                        <TextBlock Text="{Binding VersionText}" FontSize="12"
+                                                   Foreground="{DynamicResource TextSecondary}" Margin="0,4,0,0"/>
+                                        <TextBlock Text="Windows Server Update Services Management Tool"
+                                                   FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                                   Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Author Info -->
+                            <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
+                                    Padding="16" Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="Author" FontSize="13" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
+                                    <TextBlock Text="Tony Tran" FontSize="13" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource AccentBrush}"/>
+                                    <TextBlock Text="ISSO, Classified Computing, GA-ASI" FontSize="11"
+                                               Foreground="{DynamicResource TextSecondary}" Margin="0,2,0,0"/>
+                                    <TextBlock Text="tony.tran@ga-asi.com" FontSize="11"
+                                               Foreground="{DynamicResource AccentBrush}" Margin="0,6,0,0"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Features -->
+                            <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
+                                    Padding="16" Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="Features" FontSize="13" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
+                                    <TextBlock TextWrapping="Wrap" FontSize="11"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Text="• Automated WSUS + SQL Express installation&#x0a;• Database backup/restore operations&#x0a;• Air-gapped network export/import&#x0a;• Monthly maintenance automation&#x0a;• Health diagnostics with auto-repair&#x0a;• Deep cleanup and optimization&#x0a;• Remote client management&#x0a;• CSV export for computers and updates"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Requirements -->
+                            <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
+                                    Padding="16">
+                                <StackPanel>
+                                    <TextBlock Text="Requirements" FontSize="13" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
+                                    <TextBlock TextWrapping="Wrap" FontSize="11"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Text="• Windows Server 2019+&#x0a;• .NET 8.0 Runtime&#x0a;• SQL Server Express 2022&#x0a;• 50GB+ disk space"/>
+                                    <TextBlock Text="© 2026 GA-ASI. Internal use only." FontSize="10"
+                                               Foreground="{DynamicResource TextMuted}" Margin="0,12,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+
                 <!-- Generic Operation Panel (placeholder for other panels) -->
                 <Border x:Name="OperationPanel"
                         automation:AutomationProperties.AutomationId="OperationPanel"
@@ -1148,7 +1309,8 @@
                     BorderBrush="{DynamicResource BorderPrimary}" BorderThickness="0,1,0,0">
                 <DockPanel>
                     <!-- Log Header -->
-                    <Border DockPanel.Dock="Top" Background="{DynamicResource NavBackground}"
+                    <Border DockPanel.Dock="Top" Background="{DynamicResource CardBackground}"
+                            BorderBrush="{DynamicResource BorderPrimary}" BorderThickness="0,0,0,1"
                             Padding="12,6">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -1207,7 +1369,7 @@
                             Padding="12,5"
                             Visibility="{Binding StatusBannerVisibility}">
                         <TextBlock Text="{Binding StatusBannerText}"
-                                   Foreground="White" FontSize="12"
+                                   Foreground="{DynamicResource ButtonTextPrimary}" FontSize="12"
                                    FontWeight="SemiBold"/>
                     </Border>
 

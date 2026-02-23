@@ -51,4 +51,12 @@ public interface IThemeService
     /// Sets the main window reference for title bar theming.
     /// </summary>
     void SetMainWindow(Window mainWindow);
+
+    /// <summary>
+    /// Applies title bar colors for the specified theme to any window.
+    /// Used by dialogs to match the main window's title bar theming.
+    /// </summary>
+    /// <param name="window">The window to apply title bar colors to.</param>
+    /// <param name="themeName">The theme name to get colors for.</param>
+    void ApplyTitleBarColorsToWindow(Window window, string themeName);
 }

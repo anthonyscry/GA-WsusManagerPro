@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
+using System.Windows.Media.Imaging;
 using WsusManager.App.Services;
 using WsusManager.App.ViewModels;
 using WsusManager.Core.Infrastructure;
@@ -27,9 +28,31 @@ public partial class MainWindow : Window
         _settings = _settingsService.Current;
         DataContext = viewModel;
 
+        // Load GA logo as window icon
+        LoadIcon();
+
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
         Closed += MainWindow_Closed;
+    }
+
+    private void LoadIcon()
+    {
+        try
+        {
+            var iconPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "general_atomics_logo_small.ico");
+            if (System.IO.File.Exists(iconPath))
+            {
+                var uri = new Uri(iconPath);
+                var bitmap = new BitmapImage(uri);
+                bitmap.Freeze();
+                Icon = bitmap;
+            }
+        }
+        catch
+        {
+            // Icon load failed, use default
+        }
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)

@@ -44,6 +44,12 @@ public partial class SettingsDialog : Window
         _entryTheme = themeService.CurrentTheme;
         _previewTheme = _entryTheme;
 
+        // Apply title bar theming using ThemeService for consistency with main window
+        Loaded += (s, e) =>
+        {
+            _themeService.ApplyTitleBarColorsToWindow(this, _previewTheme);
+        };
+
         // Pre-populate fields from current settings
         // ComboBox: select by matching string content
         foreach (var item in CboServerMode.Items)
@@ -207,6 +213,9 @@ public partial class SettingsDialog : Window
     {
         _previewTheme = themeName;
         _themeService.ApplyTheme(themeName);
+
+        // Update this dialog's title bar to match the new theme
+        _themeService.ApplyTitleBarColorsToWindow(this, themeName);
 
         // Refresh swatch borders to show new selection
         BuildThemeSwatches();

@@ -66,6 +66,9 @@
     <Color x:Key="ColorButtonDangerHover">#F85149</Color>
     <SolidColorBrush x:Key="ButtonDangerHover" Color="{StaticResource ColorButtonDangerHover}"/>
 
+    <Color x:Key="ColorButtonTextPrimary">#FFFFFF</Color>
+    <SolidColorBrush x:Key="ButtonTextPrimary" Color="{StaticResource ColorButtonTextPrimary}"/>
+
     <!-- Nav Active State -->
     <Color x:Key="ColorNavActiveBackground">#1C252E</Color>
     <SolidColorBrush x:Key="NavActiveBackground" Color="{StaticResource ColorNavActiveBackground}"/>

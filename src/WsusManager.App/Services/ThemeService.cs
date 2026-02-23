@@ -143,6 +143,17 @@ public class ThemeService : IThemeService
         }
     }
 
+    /// <inheritdoc/>
+    public void ApplyTitleBarColorsToWindow(Window window, string themeName)
+    {
+        if (window == null) return;
+
+        if (_titleBarColors.TryGetValue(themeName, out var colors))
+        {
+            TitleBarService.SetTitleBarColors(window, colors.Background, colors.Foreground);
+        }
+    }
+
     /// <summary>
     /// Pre-loads all theme ResourceDictionaries into memory to enable instant theme switching.
     /// Call this during application startup to avoid first-swap delay.

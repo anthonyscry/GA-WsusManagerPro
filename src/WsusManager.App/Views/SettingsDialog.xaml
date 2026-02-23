@@ -42,8 +42,8 @@
             <StackPanel>
                 <ComboBox x:Name="CboServerMode"
                           automation:AutomationProperties.AutomationId="ServerModeComboBox"
-                          Background="{DynamicResource InputBackground}" Foreground="{DynamicResource TextPrimary}"
-                          BorderBrush="{DynamicResource BorderPrimary}" Padding="6,4" FontSize="12"
+                          
+                          
                           KeyboardNavigation.DirectionalNavigation="Cycle">
                     <ComboBoxItem>Online</ComboBoxItem>
                     <ComboBoxItem>Air-Gap</ComboBoxItem>
@@ -345,8 +345,8 @@
                            VerticalAlignment="Center" Margin="0,0,0,12"/>
                 <TextBox x:Name="TxtRefreshInterval" Grid.Row="0" Grid.Column="1"
                          automation:AutomationProperties.AutomationId="RefreshIntervalTextBox"
-                         Background="{DynamicResource InputBackground}" Foreground="{DynamicResource TextPrimary}"
-                         BorderBrush="{DynamicResource BorderPrimary}" Padding="6,4" FontSize="12"
+                         
+                         
                          Margin="0,0,0,12"/>
 
                 <!-- Row 1: Content Path -->
@@ -355,8 +355,8 @@
                            VerticalAlignment="Center" Margin="0,0,0,12"/>
                 <TextBox x:Name="TxtContentPath" Grid.Row="1" Grid.Column="1"
                          automation:AutomationProperties.AutomationId="ContentPathTextBox"
-                         Background="{DynamicResource InputBackground}" Foreground="{DynamicResource TextPrimary}"
-                         BorderBrush="{DynamicResource BorderPrimary}" Padding="6,4" FontSize="12"
+                         
+                         
                          Margin="0,0,0,12"/>
 
                 <!-- Row 2: SQL Instance -->
@@ -365,8 +365,8 @@
                            VerticalAlignment="Center"/>
                 <TextBox x:Name="TxtSqlInstance" Grid.Row="2" Grid.Column="1"
                          automation:AutomationProperties.AutomationId="SqlInstanceTextBox"
-                         Background="{DynamicResource InputBackground}" Foreground="{DynamicResource TextPrimary}"
-                         BorderBrush="{DynamicResource BorderPrimary}" Padding="6,4" FontSize="12"/>
+                         
+                         />
             </Grid>
         </GroupBox>
 

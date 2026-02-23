@@ -164,9 +164,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public Visibility IsUpdatesPanelVisible => string.Equals(CurrentPanel, "Updates", StringComparison.Ordinal) ? Visibility.Visible : Visibility.Collapsed;
 
-    public Visibility IsOperationPanelVisible => !string.Equals(CurrentPanel, "Dashboard", StringComparison.Ordinal) && !string.Equals(CurrentPanel, "Diagnostics", StringComparison.Ordinal) && !string.Equals(CurrentPanel, "Database", StringComparison.Ordinal) && !string.Equals(CurrentPanel, "ClientTools"
-, StringComparison.Ordinal) && !string.Equals(CurrentPanel, "Computers", StringComparison.Ordinal) && !string.Equals(CurrentPanel, "Updates", StringComparison.Ordinal) ? Visibility.Visible
-            : Visibility.Collapsed;
+    public Visibility IsHelpPanelVisible => string.Equals(CurrentPanel, "Help", StringComparison.Ordinal) ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility IsAboutPanelVisible => string.Equals(CurrentPanel, "About", StringComparison.Ordinal) ? Visibility.Visible : Visibility.Collapsed;
+
+    public Visibility IsOperationPanelVisible => !string.Equals(CurrentPanel, "Dashboard", StringComparison.Ordinal) && !string.Equals(CurrentPanel, "Diagnostics", StringComparison.Ordinal) && !string.Equals(CurrentPanel, "Database", StringComparison.Ordinal) && !string.Equals(CurrentPanel, "ClientTools", StringComparison.Ordinal) && !string.Equals(CurrentPanel, "Computers", StringComparison.Ordinal) && !string.Equals(CurrentPanel, "Updates", StringComparison.Ordinal) && !string.Equals(CurrentPanel, "Help", StringComparison.Ordinal) && !string.Equals(CurrentPanel, "About", StringComparison.Ordinal) ? Visibility.Visible : Visibility.Collapsed;
 
     [RelayCommand]
     private async Task Navigate(string panel)
@@ -1392,6 +1394,23 @@ public partial class MainViewModel : ObservableObject, IDisposable
     partial void OnMassHostnamesChanged(string value)
     {
         RunMassGpUpdateCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>
+    /// Called automatically by CommunityToolkit.Mvvm when CurrentPanel changes.
+    /// Notifies all panel visibility properties to re-evaluate.
+    /// </summary>
+    partial void OnCurrentPanelChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsDashboardVisible));
+        OnPropertyChanged(nameof(IsDiagnosticsPanelVisible));
+        OnPropertyChanged(nameof(IsDatabasePanelVisible));
+        OnPropertyChanged(nameof(IsClientToolsPanelVisible));
+        OnPropertyChanged(nameof(IsComputersPanelVisible));
+        OnPropertyChanged(nameof(IsUpdatesPanelVisible));
+        OnPropertyChanged(nameof(IsHelpPanelVisible));
+        OnPropertyChanged(nameof(IsAboutPanelVisible));
+        OnPropertyChanged(nameof(IsOperationPanelVisible));
     }
 
     [RelayCommand(CanExecute = nameof(CanExecuteClientOperation))]
