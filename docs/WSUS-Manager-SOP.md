@@ -699,7 +699,8 @@ SESSION START: 2026-01-19 10:30:00
 | WSUS Configuration | [Microsoft Learn - Configure WSUS](https://learn.microsoft.com/en-us/windows-server/administration/windows-server-update-services/deploy/2-configure-wsus) |
 | SQL Server Installation Guide | [Microsoft Learn - Install SQL Server](https://learn.microsoft.com/en-us/sql/database-engine/install-windows/install-sql-server) |
 | SQL Server Network Configuration | [Microsoft Learn - Server Network Configuration](https://learn.microsoft.com/en-us/sql/database-engine/configure-windows/server-network-configuration) |
-| SQL Server 2022 Express Download | [Microsoft Download Center](https://www.microsoft.com/en-us/sql-server/sql-server-downloads) |
+| SQL Server 2022 Express Download (offline) | [Microsoft Download Center](https://www.microsoft.com/en-us/download/details.aspx?id=104781) |
+| SQL Server Management Studio Download (SSMS 20) | [Microsoft Learn - Download SSMS](https://learn.microsoft.com/en-us/sql/ssms/download-sql-server-management-studio-ssms) |
 
 ### Additional Resources
 

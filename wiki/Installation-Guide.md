@@ -42,10 +42,10 @@ Download these files and save to `C:\WSUS\SQLDB\` (or select their folder when p
 
 | File | Download Link |
 |------|---------------|
-| SQL Server Express 2022 | [Microsoft Download Center](https://www.microsoft.com/en-us/download/details.aspx?id=104781) |
-| SQL Server Management Studio | [SSMS Download](https://learn.microsoft.com/en-us/sql/ssms/download-sql-server-management-studio-ssms) |
+| SQL Server Express 2022 (offline Advanced Services) | [Microsoft Download Center](https://www.microsoft.com/en-us/download/details.aspx?id=104781) |
+| SQL Server Management Studio (SSMS 20) | [Microsoft Learn - Download SSMS](https://learn.microsoft.com/en-us/sql/ssms/download-sql-server-management-studio-ssms) |
 
-> **Important**: Download `SQLEXPRADV_x64_ENU.exe` (SQL Express with Advanced Services)
+> **Important**: Download `SQLEXPRADV_x64_ENU.exe` and `SSMS-Setup-ENU.exe`.
 
 ---
 
@@ -291,6 +291,6 @@ Use WSUS Manager's Health Check to verify all components:
 | Resource | URL |
 |----------|-----|
 | WSUS Deployment Guide | https://learn.microsoft.com/en-us/windows-server/administration/windows-server-update-services/deploy/deploy-windows-server-update-services |
-| SQL Express Download | https://www.microsoft.com/en-us/download/details.aspx?id=104781 |
-| SSMS Download | https://learn.microsoft.com/en-us/sql/ssms/download-sql-server-management-studio-ssms |
+| SQL Server 2022 Express (offline) | https://www.microsoft.com/en-us/download/details.aspx?id=104781 |
+| SQL Server Management Studio (SSMS 20) | https://learn.microsoft.com/en-us/sql/ssms/download-sql-server-management-studio-ssms |
 | WSUS Best Practices | https://learn.microsoft.com/en-us/windows-server/administration/windows-server-update-services/plan/plan-your-wsus-deployment |

@@ -13,6 +13,8 @@ Welcome to the WSUS Manager documentation! This wiki provides comprehensive guid
 | [[Developer Guide]] | Building from source and contributing |
 | [[Module Reference]] | PowerShell module documentation |
 
+For offline SQL installer setup (`SQLEXPRADV_x64_ENU.exe` and `SSMS-Setup-ENU.exe`), see **Required Installers** in [[Installation Guide]].
+
 ---
 
 ## What is WSUS Manager?

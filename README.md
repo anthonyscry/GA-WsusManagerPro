@@ -187,6 +187,12 @@ dotnet publish src/WsusManager.App/WsusManager.App.csproj \
 - **Administrator Privileges:** Required for WSUS operations
 - **WSUS Components:** SQL Server Express 2022 (installed by Install WSUS feature)
 
+## Offline Installer Downloads
+
+- **SQL Server 2022 Express (offline Advanced Services):** [Microsoft Download Center](https://www.microsoft.com/en-us/download/details.aspx?id=104781)
+- **SQL Server Management Studio (SSMS 20):** [Microsoft Learn - Download SSMS](https://learn.microsoft.com/en-us/sql/ssms/download-sql-server-management-studio-ssms)
+- Place `SQLEXPRADV_x64_ENU.exe` and `SSMS-Setup-ENU.exe` in `SQLDB/` (repository) or `C:\WSUS\SQLDB\` (target host).
+
 ## Screenshots
 
 ### Dashboard
