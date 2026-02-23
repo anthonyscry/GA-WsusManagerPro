@@ -17,6 +17,7 @@ public class HttpsConfigurationService : IHttpsConfigurationService
     private const string WsusUtilPath = @"C:\Program Files\Update Services\Tools\wsusutil.exe";
     private const string SslIpPort = "0.0.0.0:8531";
     private const string AppId = "{9f55f098-16f9-4f85-b6f9-7241f8b9e26a}";
+    private const int ThumbprintLength = 40;
 
     public HttpsConfigurationService(
         IProcessRunner processRunner,
@@ -34,14 +35,16 @@ public class HttpsConfigurationService : IHttpsConfigurationService
         IProgress<string>? progress = null,
         CancellationToken ct = default)
     {
+        var normalizedThumbprint = NormalizeThumbprint(certificateThumbprint);
+        var validation = ValidateThumbprint(normalizedThumbprint);
+        if (!validation.Success)
+        {
+            progress?.Report($"[FAIL] {validation.Message}");
+            return validation;
+        }
+
         try
         {
-            var normalizedThumbprint = NormalizeThumbprint(certificateThumbprint);
-            if (string.IsNullOrWhiteSpace(normalizedThumbprint))
-            {
-                throw new InvalidOperationException("Certificate thumbprint is required for native HTTPS configuration.");
-            }
-
             progress?.Report("Starting native HTTPS configuration...");
             progress?.Report("[Step 1/3] Applying SSL certificate binding on port 8531...");
 
@@ -101,7 +104,7 @@ public class HttpsConfigurationService : IHttpsConfigurationService
             progress?.Report(fallbackLine);
             _logService.Warning(fallbackLine);
 
-            return await _fallback.ConfigureAsync(certificateThumbprint, progress, ct).ConfigureAwait(false);
+            return await _fallback.ConfigureAsync(normalizedThumbprint, progress, ct).ConfigureAwait(false);
         }
     }
 
@@ -112,6 +115,33 @@ public class HttpsConfigurationService : IHttpsConfigurationService
             return null;
         }
 
-        return thumbprint.Replace(" ", string.Empty, StringComparison.Ordinal).Trim();
+        return thumbprint.Replace(" ", string.Empty, StringComparison.Ordinal).Trim().ToUpperInvariant();
+    }
+
+    private static OperationResult ValidateThumbprint(string? normalizedThumbprint)
+    {
+        if (string.IsNullOrWhiteSpace(normalizedThumbprint))
+        {
+            return OperationResult.Fail("Certificate thumbprint is required.");
+        }
+
+        if (normalizedThumbprint.Length != ThumbprintLength)
+        {
+            return OperationResult.Fail($"Certificate thumbprint must be {ThumbprintLength} hexadecimal characters.");
+        }
+
+        if (!normalizedThumbprint.All(IsHexCharacter))
+        {
+            return OperationResult.Fail("Certificate thumbprint format is invalid. Only hexadecimal characters are allowed.");
+        }
+
+        return OperationResult.Ok();
+    }
+
+    private static bool IsHexCharacter(char c)
+    {
+        return (c >= '0' && c <= '9')
+            || (c >= 'A' && c <= 'F')
+            || (c >= 'a' && c <= 'f');
     }
 }

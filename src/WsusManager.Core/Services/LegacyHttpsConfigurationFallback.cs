@@ -57,9 +57,15 @@ public class LegacyHttpsConfigurationFallback
                 progress,
                 ct).ConfigureAwait(false);
 
-            return result.Success
-                ? OperationResult.Ok("HTTPS configuration completed via legacy fallback.")
-                : OperationResult.Fail($"Legacy HTTPS fallback failed with exit code {result.ExitCode}.");
+            if (result.Success)
+            {
+                return OperationResult.Ok("HTTPS configuration completed via legacy fallback.");
+            }
+
+            var outputSummary = BuildSafeOutputSummary(result);
+            var message = $"Legacy HTTPS fallback failed with exit code {result.ExitCode}.{outputSummary}";
+            _logService.Warning(message);
+            return OperationResult.Fail(message);
         }
         catch (OperationCanceledException)
         {
@@ -98,5 +104,24 @@ public class LegacyHttpsConfigurationFallback
             Path.Combine(appDir, "Scripts", ScriptName),
             Path.Combine(appDir, ScriptName)
         ];
+    }
+
+    private static string BuildSafeOutputSummary(ProcessResult result)
+    {
+        var firstLine = result.OutputLines
+            .FirstOrDefault(line => !string.IsNullOrWhiteSpace(line));
+
+        if (string.IsNullOrWhiteSpace(firstLine))
+        {
+            return string.Empty;
+        }
+
+        var sanitized = firstLine.Replace('\r', ' ').Replace('\n', ' ').Trim();
+        if (sanitized.Length > 200)
+        {
+            sanitized = sanitized[..200];
+        }
+
+        return $" Output: {sanitized}";
     }
 }
