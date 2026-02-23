@@ -84,4 +84,18 @@ public sealed class OperationTranscriptServiceTests : IDisposable
         Assert.True(File.Exists(firstPath));
         Assert.True(File.Exists(secondPath));
     }
+
+    [Fact]
+    public void StartOperation_ShouldApplyRetentionPolicy()
+    {
+        using var service = new OperationTranscriptService(_tempDirectory, maxTranscriptFiles: 2);
+
+        service.StartOperation("Operation One");
+        service.StartOperation("Operation Two");
+        service.StartOperation("Operation Three");
+        service.EndOperation();
+
+        var transcripts = Directory.GetFiles(_tempDirectory, "*.log", SearchOption.TopDirectoryOnly);
+        Assert.Equal(2, transcripts.Length);
+    }
 }

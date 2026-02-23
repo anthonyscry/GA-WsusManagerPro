@@ -459,7 +459,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         try
         {
-            _operationTranscriptService.StartOperation(operationName);
+            TryStartOperationTranscript(operationName);
             AppendLog($"=== {operationName} ===");
 
             var success = await operation(progress, _operationCts.Token).ConfigureAwait(false);
@@ -525,7 +525,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
         finally
         {
-            _operationTranscriptService.EndOperation();
+            TryEndOperationTranscript();
             IsOperationRunning = false;
             CurrentOperationName = string.Empty;
             OperationStepText = string.Empty;
@@ -548,7 +548,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// </summary>
     public void AppendLog(string line)
     {
-        _operationTranscriptService.WriteLine(line);
+        TryWriteTranscriptLine(line);
 
         // Add to batch queue
         lock (_logBatchQueue)
@@ -565,6 +565,45 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 // Start timer on first queued item
                 StartLogBatchTimer();
             }
+        }
+    }
+
+    private void TryStartOperationTranscript(string operationName)
+    {
+        try
+        {
+            _operationTranscriptService.StartOperation(operationName);
+        }
+        catch (Exception ex)
+        {
+            _logService.Warning(
+                "Operation transcript start failed for {Operation}: {Message}",
+                operationName,
+                ex.Message);
+        }
+    }
+
+    private void TryWriteTranscriptLine(string line)
+    {
+        try
+        {
+            _operationTranscriptService.WriteLine(line);
+        }
+        catch (Exception ex)
+        {
+            _logService.Debug("Operation transcript write skipped: {Message}", ex.Message);
+        }
+    }
+
+    private void TryEndOperationTranscript()
+    {
+        try
+        {
+            _operationTranscriptService.EndOperation();
+        }
+        catch (Exception ex)
+        {
+            _logService.Debug("Operation transcript end skipped: {Message}", ex.Message);
         }
     }
 

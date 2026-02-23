@@ -10,19 +10,28 @@ namespace WsusManager.Core.Services;
 public sealed class OperationTranscriptService : IOperationTranscriptService, IDisposable
 {
     private const string DefaultTranscriptDirectory = @"C:\WSUS\Logs\Transcripts";
+    private const int DefaultMaxTranscriptFiles = 200;
 
     private readonly string _transcriptDirectory;
+    private readonly int _maxTranscriptFiles;
     private readonly object _sync = new();
+    private long _operationCounter;
     private StreamWriter? _writer;
 
     public OperationTranscriptService()
-        : this(DefaultTranscriptDirectory)
+        : this(DefaultTranscriptDirectory, DefaultMaxTranscriptFiles)
     {
     }
 
     public OperationTranscriptService(string transcriptDirectory)
+        : this(transcriptDirectory, DefaultMaxTranscriptFiles)
+    {
+    }
+
+    public OperationTranscriptService(string transcriptDirectory, int maxTranscriptFiles)
     {
         _transcriptDirectory = transcriptDirectory;
+        _maxTranscriptFiles = maxTranscriptFiles < 1 ? 1 : maxTranscriptFiles;
     }
 
     public string? CurrentTranscriptPath { get; private set; }
@@ -30,8 +39,9 @@ public sealed class OperationTranscriptService : IOperationTranscriptService, ID
     public string StartOperation(string operationName)
     {
         var safeOperationName = SanitizeFileName(operationName);
-        var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss-fff");
-        var fileName = $"{timestamp}-{safeOperationName}-{Guid.NewGuid():N}.log";
+        var timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff");
+        var sequence = Interlocked.Increment(ref _operationCounter);
+        var fileName = $"{timestamp}-{sequence:D6}-{safeOperationName}.log";
 
         lock (_sync)
         {
@@ -43,6 +53,8 @@ public sealed class OperationTranscriptService : IOperationTranscriptService, ID
             _writer = new StreamWriter(transcriptPath, append: false, new UTF8Encoding(false));
             CurrentTranscriptPath = transcriptPath;
             _writer.Flush();
+
+            CleanupOldTranscripts();
 
             return transcriptPath;
         }
@@ -97,5 +109,25 @@ public sealed class OperationTranscriptService : IOperationTranscriptService, ID
 
         var sanitized = new string(chars).Replace(' ', '-');
         return string.IsNullOrWhiteSpace(sanitized) ? "operation" : sanitized;
+    }
+
+    private void CleanupOldTranscripts()
+    {
+        try
+        {
+            var transcriptFiles = Directory
+                .GetFiles(_transcriptDirectory, "*.log", SearchOption.TopDirectoryOnly)
+                .OrderByDescending(Path.GetFileName, StringComparer.Ordinal)
+                .ToArray();
+
+            foreach (var oldFile in transcriptFiles.Skip(_maxTranscriptFiles))
+            {
+                File.Delete(oldFile);
+            }
+        }
+        catch
+        {
+            // Retention cleanup is best-effort and must not block transcript creation.
+        }
     }
 }

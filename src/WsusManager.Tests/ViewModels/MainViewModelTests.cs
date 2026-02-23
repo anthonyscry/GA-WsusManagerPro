@@ -146,7 +146,7 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public async Task RunOperationAsync_WhenTranscriptStartThrows_ShouldKeepCleanupSemantics()
+    public async Task RunOperationAsync_WhenTranscriptStartThrows_ShouldContinueOperation()
     {
         _mockOperationTranscriptService
             .Setup(s => s.StartOperation("TranscriptFail"))
@@ -161,13 +161,40 @@ public class MainViewModelTests
             return true;
         });
 
-        Assert.False(result);
-        Assert.False(operationBodyExecuted);
+        Assert.True(result);
+        Assert.True(operationBodyExecuted);
         Assert.False(_vm.IsOperationRunning);
         Assert.Equal(string.Empty, _vm.CurrentOperationName);
-        Assert.Contains("failed", _vm.StatusMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("completed", _vm.StatusMessage, StringComparison.OrdinalIgnoreCase);
 
+        _mockLog.Verify(l => l.Warning(
+            It.Is<string>(m => m.Contains("transcript start failed", StringComparison.OrdinalIgnoreCase)),
+            It.IsAny<object[]>()),
+            Times.Once);
         _mockOperationTranscriptService.Verify(s => s.EndOperation(), Times.Once);
+    }
+
+    [Fact]
+    public async Task RunOperationAsync_WhenTranscriptWriteThrows_ShouldContinueOperation()
+    {
+        _mockOperationTranscriptService
+            .Setup(s => s.WriteLine(It.IsAny<string>()))
+            .Throws(new IOException("transcript write failed"));
+
+        var result = await _vm.RunOperationAsync("TranscriptWriteFail", async (progress, ct) =>
+        {
+            progress.Report("line from operation");
+            await Task.Delay(25, ct);
+            return true;
+        });
+
+        Assert.True(result);
+        Assert.False(_vm.IsOperationRunning);
+
+        _mockLog.Verify(l => l.Debug(
+            It.Is<string>(m => m.Contains("transcript write skipped", StringComparison.OrdinalIgnoreCase)),
+            It.IsAny<object[]>()),
+            Times.AtLeastOnce);
     }
 
     [Fact]
