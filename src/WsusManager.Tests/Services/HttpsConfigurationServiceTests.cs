@@ -55,6 +55,35 @@ public sealed class HttpsConfigurationServiceTests : IDisposable
             Times.Never);
     }
 
+    [Theory]
+    [InlineData("wsus\"; whoami")]
+    [InlineData("wsus && whoami")]
+    [InlineData("wsus|powershell")]
+    [InlineData("wsus$(calc)")]
+    public async Task ConfigureHttpsAsync_WhenServerNameContainsUnsafeCharacters_ShouldFailWithoutProcessExecution(string serverName)
+    {
+        var fallbackScriptPath = Path.Combine(_tempDirectory, "Set-WsusHttps.ps1");
+        File.WriteAllText(fallbackScriptPath, "# mock fallback script");
+
+        var fallback = new LegacyHttpsConfigurationFallback(
+            _processRunner.Object,
+            _logService.Object,
+            fallbackScriptPath);
+        var sut = new HttpsConfigurationService(_processRunner.Object, fallback, _logService.Object);
+
+        var result = await sut.ConfigureHttpsAsync(serverName, "00112233445566778899AABBCCDDEEFF00112233").ConfigureAwait(false);
+
+        Assert.False(result.Success);
+        Assert.Contains("server name", result.Message, StringComparison.OrdinalIgnoreCase);
+
+        _processRunner.Verify(r => r.RunAsync(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<IProgress<string>>(),
+            It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     [Fact]
     public async Task ConfigureHttpsAsync_WhenNativeSucceeds_ShouldNotUseFallback()
     {

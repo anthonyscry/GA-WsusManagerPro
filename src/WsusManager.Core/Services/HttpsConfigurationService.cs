@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using WsusManager.Core.Infrastructure;
 using WsusManager.Core.Logging;
 using WsusManager.Core.Models;
@@ -18,6 +19,9 @@ public class HttpsConfigurationService : IHttpsConfigurationService
     private const string SslIpPort = "0.0.0.0:8531";
     private const string AppId = "{9f55f098-16f9-4f85-b6f9-7241f8b9e26a}";
     private const int ThumbprintLength = 40;
+    private static readonly Regex SafeServerNameRegex = new(
+        "^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,253}[A-Za-z0-9])?$",
+        RegexOptions.Compiled);
 
     public HttpsConfigurationService(
         IProcessRunner processRunner,
@@ -126,9 +130,17 @@ public class HttpsConfigurationService : IHttpsConfigurationService
 
     private static OperationResult ValidateServerName(string? normalizedServerName)
     {
-        return string.IsNullOrWhiteSpace(normalizedServerName)
-            ? OperationResult.Fail("WSUS server name is required.")
-            : OperationResult.Ok();
+        if (string.IsNullOrWhiteSpace(normalizedServerName))
+        {
+            return OperationResult.Fail("WSUS server name is required.");
+        }
+
+        if (!SafeServerNameRegex.IsMatch(normalizedServerName))
+        {
+            return OperationResult.Fail("WSUS server name format is invalid. Use letters, numbers, dots, and hyphens only.");
+        }
+
+        return OperationResult.Ok();
     }
 
     private static string? NormalizeThumbprint(string? thumbprint)
