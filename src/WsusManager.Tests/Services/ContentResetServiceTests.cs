@@ -145,13 +145,15 @@ public class ContentResetServiceTests
                 .ReturnsAsync(SuccessResult());
 
             var messages = new List<string>();
-            var progress = new Progress<string>(msg => messages.Add(msg));
+            var progress = new InlineProgress(msg => messages.Add(msg));
 
             await mockService.ResetContentAsync(progress).ConfigureAwait(false);
 
             // At least the startup messages should appear
             Assert.True(messages.Count >= 2,
                 $"Expected at least 2 progress messages, got {messages.Count}");
+            Assert.Contains(messages, m => m.StartsWith("Starting wsusutil reset", StringComparison.Ordinal));
+            Assert.Contains(messages, m => m.StartsWith("Executable:", StringComparison.Ordinal));
         }
         finally
         {
@@ -322,5 +324,12 @@ public class ContentResetServiceTests
                 return OperationResult.Fail($"Content reset failed: {ex.Message}", ex);
             }
         }
+    }
+
+    private sealed class InlineProgress(Action<string> onReport) : IProgress<string>
+    {
+        private readonly Action<string> _onReport = onReport;
+
+        public void Report(string value) => _onReport(value);
     }
 }

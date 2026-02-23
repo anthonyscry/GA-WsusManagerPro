@@ -5,6 +5,12 @@ All notable changes to WSUS Manager will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.5.3] - 2026-02-23
+
+### Fixed
+- Stabilized progress-reporting unit tests by using synchronous `IProgress<string>` test doubles instead of `Progress<T>` callback scheduling.
+- Eliminated intermittent Linux/CI failures in `ContentResetServiceTests` and `WinRmExecutorTests` caused by asynchronous progress callback timing.
+
 ## [4.5.2] - 2026-02-22
 
 ### Fixed
@@ -212,7 +218,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - MaxAutoApproveCount increased to 200
 
-[Unreleased]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.2...HEAD
+[Unreleased]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.3...HEAD
+[4.5.3]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.2...v4.5.3
 [4.5.2]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.1...v4.5.2
 [4.5.1]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.0...v4.5.1
 [4.5.0]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.4.0...v4.5.0

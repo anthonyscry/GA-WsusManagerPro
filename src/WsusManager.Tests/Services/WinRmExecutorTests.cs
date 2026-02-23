@@ -32,6 +32,13 @@ public class WinRmExecutorTests
 
     private WinRmExecutor CreateExecutor() => new(_mockRunner.Object, _mockLog.Object);
 
+    private sealed class InlineProgress(Action<string> onReport) : IProgress<string>
+    {
+        private readonly Action<string> _onReport = onReport;
+
+        public void Report(string value) => _onReport(value);
+    }
+
     // ─── Constructor Tests ─────────────────────────────────────────────────────
 
     [Fact]
@@ -66,7 +73,7 @@ public class WinRmExecutorTests
     {
         var executor = CreateExecutor();
         var progressMessages = new List<string>();
-        var progress = new Progress<string>(m => progressMessages.Add(m));
+        var progress = new InlineProgress(m => progressMessages.Add(m));
 
         var result = await executor.ExecuteRemoteAsync(null!, "Get-Service", progress);
 
@@ -81,7 +88,7 @@ public class WinRmExecutorTests
     {
         var executor = CreateExecutor();
         var progressMessages = new List<string>();
-        var progress = new Progress<string>(m => progressMessages.Add(m));
+        var progress = new InlineProgress(m => progressMessages.Add(m));
 
         var result = await executor.ExecuteRemoteAsync("", "Get-Service", progress);
 
@@ -94,7 +101,7 @@ public class WinRmExecutorTests
     {
         var executor = CreateExecutor();
         var progressMessages = new List<string>();
-        var progress = new Progress<string>(m => progressMessages.Add(m));
+        var progress = new InlineProgress(m => progressMessages.Add(m));
 
         var result = await executor.ExecuteRemoteAsync("   ", "Get-Service", progress);
 
@@ -107,7 +114,7 @@ public class WinRmExecutorTests
     {
         var executor = CreateExecutor();
         var progressMessages = new List<string>();
-        var progress = new Progress<string>(m => progressMessages.Add(m));
+        var progress = new InlineProgress(m => progressMessages.Add(m));
 
         var result = await executor.ExecuteRemoteAsync("bad@host#name!", "Get-Service", progress);
 
@@ -121,7 +128,7 @@ public class WinRmExecutorTests
     {
         var executor = CreateExecutor();
         var progressMessages = new List<string>();
-        var progress = new Progress<string>(m => progressMessages.Add(m));
+        var progress = new InlineProgress(m => progressMessages.Add(m));
 
         // Hostname max length is 253 characters
         var longHostname = new string('a', 254);
@@ -138,7 +145,7 @@ public class WinRmExecutorTests
     {
         var executor = CreateExecutor();
         var progressMessages = new List<string>();
-        var progress = new Progress<string>(m => progressMessages.Add(m));
+        var progress = new InlineProgress(m => progressMessages.Add(m));
 
         // Simulate WinRM connection error output
         _mockRunner
@@ -162,7 +169,7 @@ public class WinRmExecutorTests
     {
         var executor = CreateExecutor();
         var progressMessages = new List<string>();
-        var progress = new Progress<string>(m => progressMessages.Add(m));
+        var progress = new InlineProgress(m => progressMessages.Add(m));
 
         // Simulate access denied error
         _mockRunner
@@ -279,7 +286,7 @@ public class WinRmExecutorTests
     {
         var executor = CreateExecutor();
         var progressMessages = new List<string>();
-        var progress = new Progress<string>(m => progressMessages.Add(m));
+        var progress = new InlineProgress(m => progressMessages.Add(m));
 
         // Simulate a non-WinRM error (e.g., script error, not connection error)
         _mockRunner
@@ -305,7 +312,7 @@ public class WinRmExecutorTests
     {
         var executor = CreateExecutor();
         var progressMessages = new List<string>();
-        var progress = new Progress<string>(m => progressMessages.Add(m));
+        var progress = new InlineProgress(m => progressMessages.Add(m));
 
         // Simulate WSManFault error
         _mockRunner
