@@ -42,6 +42,7 @@ public class DiContainerTests
         services.AddSingleton<IImportService, ImportService>();
 
         // Phase 6: Installation and Scheduling
+        services.AddSingleton<INativeInstallationService, NativeInstallationService>();
         services.AddSingleton<IInstallationService, InstallationService>();
         services.AddSingleton<IScheduledTaskService, ScheduledTaskService>();
         services.AddSingleton<IGpoDeploymentService, GpoDeploymentService>();
@@ -290,10 +291,12 @@ public class DiContainerTests
         var sp = BuildTestContainer();
 
         var installation = sp.GetRequiredService<IInstallationService>();
+        var nativeInstallation = sp.GetRequiredService<INativeInstallationService>();
         var scheduledTask = sp.GetRequiredService<IScheduledTaskService>();
         var gpo = sp.GetRequiredService<IGpoDeploymentService>();
 
         Assert.NotNull(installation);
+        Assert.NotNull(nativeInstallation);
         Assert.NotNull(scheduledTask);
         Assert.NotNull(gpo);
     }
@@ -341,6 +344,7 @@ public class DiContainerTests
         Assert.NotNull(sp.GetRequiredService<IRobocopyService>());
         Assert.NotNull(sp.GetRequiredService<IExportService>());
         Assert.NotNull(sp.GetRequiredService<IImportService>());
+        Assert.NotNull(sp.GetRequiredService<INativeInstallationService>());
         Assert.NotNull(sp.GetRequiredService<IInstallationService>());
         Assert.NotNull(sp.GetRequiredService<IScheduledTaskService>());
         Assert.NotNull(sp.GetRequiredService<IGpoDeploymentService>());

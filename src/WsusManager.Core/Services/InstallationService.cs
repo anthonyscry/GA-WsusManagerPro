@@ -7,15 +7,16 @@ using WsusManager.Core.Services.Interfaces;
 namespace WsusManager.Core.Services;
 
 /// <summary>
-/// Validates installation prerequisites and launches the legacy
-/// Install-WsusWithSqlExpress.ps1 script via IProcessRunner in non-interactive mode.
-/// This is the only operation that deliberately shells out to PowerShell --
-/// the install script is complex and re-implementing in C# provides no benefit.
+/// Validates installation prerequisites, attempts native C# installation first,
+/// and falls back to the legacy Install-WsusWithSqlExpress.ps1 path when native
+/// orchestration fails.
 /// </summary>
 public class InstallationService : IInstallationService
 {
     private readonly IProcessRunner _processRunner;
     private readonly ILogService _logService;
+    private readonly INativeInstallationService _nativeInstallationService;
+    private readonly string? _scriptPathOverride;
 
     /// <summary>Required SQL Express installer filename.</summary>
     public const string RequiredInstallerExe = "SQLEXPRADV_x64_ENU.exe";
@@ -26,10 +27,24 @@ public class InstallationService : IInstallationService
     /// <summary>Minimum SA password length.</summary>
     public const int MinPasswordLength = 15;
 
-    public InstallationService(IProcessRunner processRunner, ILogService logService)
+    internal InstallationService(
+        IProcessRunner processRunner,
+        ILogService logService,
+        INativeInstallationService nativeInstallationService,
+        string? scriptPathOverride)
     {
         _processRunner = processRunner;
         _logService = logService;
+        _nativeInstallationService = nativeInstallationService;
+        _scriptPathOverride = scriptPathOverride;
+    }
+
+    public InstallationService(
+        IProcessRunner processRunner,
+        ILogService logService,
+        INativeInstallationService nativeInstallationService)
+        : this(processRunner, logService, nativeInstallationService, scriptPathOverride: null)
+    {
     }
 
     /// <inheritdoc/>
@@ -88,49 +103,13 @@ public class InstallationService : IInstallationService
     {
         try
         {
-            // Locate the PowerShell install script
-            var scriptPath = LocateScript();
-            if (scriptPath is null)
+            var nativeResult = await TryNativeInstallAsync(options, progress, ct).ConfigureAwait(false);
+            if (nativeResult.Success)
             {
-                var msg = $"Install script not found. Searched for '{InstallScriptName}' in:\n" +
-                          $"  {GetSearchPaths()[0]}\n  {GetSearchPaths()[1]}";
-                _logService.Warning(msg);
-                progress?.Report(msg);
-                return OperationResult.Fail(msg);
+                return nativeResult;
             }
 
-            _logService.Info("Starting WSUS installation via {Script}", scriptPath);
-            progress?.Report($"Script: {scriptPath}");
-            progress?.Report($"Installer path: {options.InstallerPath}");
-            progress?.Report($"SA Username: {options.SaUsername}");
-            progress?.Report("Starting installation (this may take 30+ minutes)...");
-            progress?.Report("");
-
-            // Build PowerShell arguments
-            var arguments = $"-ExecutionPolicy Bypass -File \"{scriptPath}\" " +
-                            $"-NonInteractive " +
-                            $"-InstallerPath \"{options.InstallerPath}\" " +
-                            $"-SaUsername \"{options.SaUsername}\" " +
-                            $"-SaPassword \"{options.SaPassword}\"";
-
-            var result = await _processRunner.RunAsync(
-                "powershell.exe",
-                arguments,
-                progress,
-                ct).ConfigureAwait(false);
-
-            if (result.Success)
-            {
-                _logService.Info("WSUS installation completed successfully");
-                return OperationResult.Ok("WSUS installation completed successfully.");
-            }
-            else
-            {
-                var msg = $"Installation failed with exit code {result.ExitCode}. Check output log for details.";
-
-                _logService.Warning(msg);
-                return OperationResult.Fail(msg);
-            }
+            return await RunLegacyInstallAsync(options, progress, ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -144,12 +123,99 @@ public class InstallationService : IInstallationService
         }
     }
 
+    private async Task<OperationResult> TryNativeInstallAsync(
+        InstallOptions options,
+        IProgress<string>? progress,
+        CancellationToken ct)
+    {
+        try
+        {
+            var nativeResult = await _nativeInstallationService
+                .InstallAsync(options, progress, ct)
+                .ConfigureAwait(false);
+
+            if (nativeResult.Success)
+            {
+                _logService.Info("WSUS installation completed successfully via native orchestrator");
+                return nativeResult;
+            }
+
+            var fallbackLine = $"[FALLBACK] Native installation failed: {nativeResult.Message}. " +
+                               "Switching to legacy Install-WsusWithSqlExpress.ps1 path.";
+            progress?.Report(fallbackLine);
+            _logService.Warning(fallbackLine);
+            return nativeResult;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            var fallbackLine = $"[FALLBACK] Native installation failed with exception: {ex.Message}. " +
+                               "Switching to legacy Install-WsusWithSqlExpress.ps1 path.";
+            progress?.Report(fallbackLine);
+            _logService.Warning(fallbackLine);
+            return OperationResult.Fail(ex.Message, ex);
+        }
+    }
+
+    private async Task<OperationResult> RunLegacyInstallAsync(
+        InstallOptions options,
+        IProgress<string>? progress,
+        CancellationToken ct)
+    {
+        var scriptPath = LocateScript();
+        if (scriptPath is null)
+        {
+            var msg = $"Install script not found. Searched for '{InstallScriptName}' in:\n" +
+                      $"  {GetSearchPaths()[0]}\n  {GetSearchPaths()[1]}";
+            _logService.Warning(msg);
+            progress?.Report(msg);
+            return OperationResult.Fail(msg);
+        }
+
+        _logService.Info("Starting legacy WSUS installation via {Script}", scriptPath);
+        progress?.Report($"Script: {scriptPath}");
+        progress?.Report($"Installer path: {options.InstallerPath}");
+        progress?.Report($"SA Username: {options.SaUsername}");
+        progress?.Report("Starting installation (this may take 30+ minutes)...");
+        progress?.Report("");
+
+        var arguments = $"-ExecutionPolicy Bypass -File \"{scriptPath}\" " +
+                        $"-NonInteractive " +
+                        $"-InstallerPath \"{options.InstallerPath}\" " +
+                        $"-SaUsername \"{options.SaUsername}\" " +
+                        $"-SaPassword \"{options.SaPassword}\"";
+
+        var result = await _processRunner.RunAsync(
+            "powershell.exe",
+            arguments,
+            progress,
+            ct).ConfigureAwait(false);
+
+        if (result.Success)
+        {
+            _logService.Info("WSUS installation completed successfully via legacy path");
+            return OperationResult.Ok("WSUS installation completed successfully via legacy fallback.");
+        }
+
+        var failMsg = $"Installation failed with exit code {result.ExitCode}. Check output log for details.";
+        _logService.Warning(failMsg);
+        return OperationResult.Fail(failMsg);
+    }
+
     /// <summary>
     /// Locates the install script relative to the current executable directory.
     /// Checks: {AppDir}\Scripts\Install-WsusWithSqlExpress.ps1, then {AppDir}\Install-WsusWithSqlExpress.ps1.
     /// </summary>
     internal string? LocateScript()
     {
+        if (!string.IsNullOrWhiteSpace(_scriptPathOverride) && File.Exists(_scriptPathOverride))
+        {
+            return _scriptPathOverride;
+        }
+
         foreach (var path in GetSearchPaths())
         {
             if (File.Exists(path))
