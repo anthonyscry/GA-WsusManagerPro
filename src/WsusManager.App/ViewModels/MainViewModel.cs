@@ -432,9 +432,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
             telemetryContext.OperationName,
             telemetryContext.OperationId);
 
-        _operationTranscriptService.StartOperation(operationName);
-        AppendLog($"=== {operationName} ===");
-
         var progress = new Progress<string>(line =>
         {
             AppendLog(line);
@@ -462,6 +459,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         try
         {
+            _operationTranscriptService.StartOperation(operationName);
+            AppendLog($"=== {operationName} ===");
+
             var success = await operation(progress, _operationCts.Token).ConfigureAwait(false);
 
             if (success)

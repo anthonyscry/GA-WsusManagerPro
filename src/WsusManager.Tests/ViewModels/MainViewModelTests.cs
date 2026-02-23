@@ -146,6 +146,31 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task RunOperationAsync_WhenTranscriptStartThrows_ShouldKeepCleanupSemantics()
+    {
+        _mockOperationTranscriptService
+            .Setup(s => s.StartOperation("TranscriptFail"))
+            .Throws(new IOException("transcript start failed"));
+
+        var operationBodyExecuted = false;
+
+        var result = await _vm.RunOperationAsync("TranscriptFail", async (progress, ct) =>
+        {
+            operationBodyExecuted = true;
+            await Task.CompletedTask;
+            return true;
+        });
+
+        Assert.False(result);
+        Assert.False(operationBodyExecuted);
+        Assert.False(_vm.IsOperationRunning);
+        Assert.Equal(string.Empty, _vm.CurrentOperationName);
+        Assert.Contains("failed", _vm.StatusMessage, StringComparison.OrdinalIgnoreCase);
+
+        _mockOperationTranscriptService.Verify(s => s.EndOperation(), Times.Once);
+    }
+
+    [Fact]
     public async Task RunOperationAsync_Blocks_Concurrent_Operations()
     {
         var tcs = new TaskCompletionSource<bool>();

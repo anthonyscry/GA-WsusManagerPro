@@ -30,8 +30,8 @@ public sealed class OperationTranscriptService : IOperationTranscriptService, ID
     public string StartOperation(string operationName)
     {
         var safeOperationName = SanitizeFileName(operationName);
-        var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
-        var fileName = $"{timestamp}-{safeOperationName}.log";
+        var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss-fff");
+        var fileName = $"{timestamp}-{safeOperationName}-{Guid.NewGuid():N}.log";
 
         lock (_sync)
         {

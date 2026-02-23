@@ -71,4 +71,17 @@ public sealed class OperationTranscriptServiceTests : IDisposable
         Assert.DoesNotContain("cleanup line", firstContent);
         Assert.Contains("cleanup line", secondContent);
     }
+
+    [Fact]
+    public void StartOperation_SameOperationWithinSameSecond_ShouldStillCreateUniquePath()
+    {
+        using var service = new OperationTranscriptService(_tempDirectory);
+
+        var firstPath = service.StartOperation("Diagnostics");
+        var secondPath = service.StartOperation("Diagnostics");
+
+        Assert.NotEqual(firstPath, secondPath);
+        Assert.True(File.Exists(firstPath));
+        Assert.True(File.Exists(secondPath));
+    }
 }
