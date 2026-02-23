@@ -106,16 +106,9 @@ public class ProcessRunner : IProcessRunner
             return arguments;
         }
 
-        var redacted = arguments;
-
-        redacted = Regex.Replace(redacted, "(?i)(-SaPassword\\s+)\"[^\"]*\"", "$1\"***\"");
-        redacted = Regex.Replace(redacted, "(?i)(-Password\\s+)\"[^\"]*\"", "$1\"***\"");
-        redacted = Regex.Replace(redacted, "(?i)(/RP\\s+)\"[^\"]*\"", "$1\"***\"");
-
-        redacted = Regex.Replace(redacted, "(?i)(-SaPassword\\s+)(?!\")\\S+", "$1***");
-        redacted = Regex.Replace(redacted, "(?i)(-Password\\s+)(?!\")\\S+", "$1***");
-        redacted = Regex.Replace(redacted, "(?i)(/RP\\s+)(?!\")\\S+", "$1***");
-
-        return redacted;
+        return Regex.Replace(
+            arguments,
+            "(?i)(-SaPassword|-Password|/RP)(\\s+|=|:)(\"[^\"]*\"|'[^']*'|\\S+)",
+            "$1$2***");
     }
 }

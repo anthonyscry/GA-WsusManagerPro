@@ -95,7 +95,7 @@ public class InstallationService : IInstallationService
                 var msg = $"Install script not found. Searched for '{InstallScriptName}' in:\n" +
                           $"  {GetSearchPaths()[0]}\n  {GetSearchPaths()[1]}";
                 _logService.Warning(msg);
-                progress?.Report($"[FAIL] {msg}");
+                progress?.Report(msg);
                 return OperationResult.Fail(msg);
             }
 
