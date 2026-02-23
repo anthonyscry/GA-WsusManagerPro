@@ -21,4 +21,17 @@ public interface IProcessRunner
         string arguments,
         IProgress<string>? progress = null,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Runs an external process in a visible terminal window. Output is not captured,
+    /// so this is only appropriate for callers that do not parse stdout/stderr.
+    /// </summary>
+    /// <param name="executable">Path to the executable.</param>
+    /// <param name="arguments">Command-line arguments.</param>
+    /// <param name="ct">Cancellation token — kills the process on cancellation.</param>
+    /// <returns>Process result with exit code and no captured output.</returns>
+    Task<ProcessResult> RunVisibleAsync(
+        string executable,
+        string arguments,
+        CancellationToken ct = default);
 }

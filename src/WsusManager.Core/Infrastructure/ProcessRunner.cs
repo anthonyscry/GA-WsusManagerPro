@@ -21,16 +21,14 @@ public class ProcessRunner : IProcessRunner
         _settingsService = settingsService;
     }
 
-    internal ProcessStartInfo CreateStartInfo(string executable, string arguments)
+    internal ProcessStartInfo CreateStartInfo(string executable, string arguments, bool useVisibleTerminal = false)
     {
-        var liveTerminalMode = _settingsService.Current.LiveTerminalMode;
-
         return new ProcessStartInfo(executable, arguments)
         {
-            RedirectStandardOutput = !liveTerminalMode,
-            RedirectStandardError = !liveTerminalMode,
-            UseShellExecute = liveTerminalMode,
-            CreateNoWindow = !liveTerminalMode
+            RedirectStandardOutput = !useVisibleTerminal,
+            RedirectStandardError = !useVisibleTerminal,
+            UseShellExecute = useVisibleTerminal,
+            CreateNoWindow = !useVisibleTerminal
         };
     }
 
@@ -40,36 +38,58 @@ public class ProcessRunner : IProcessRunner
         IProgress<string>? progress = null,
         CancellationToken ct = default)
     {
+        return await RunCoreAsync(executable, arguments, progress, useVisibleTerminal: false, ct).ConfigureAwait(false);
+    }
+
+    public async Task<ProcessResult> RunVisibleAsync(
+        string executable,
+        string arguments,
+        CancellationToken ct = default)
+    {
+        _logService.Debug("Visible terminal execution requested (setting: {LiveTerminalMode})", _settingsService.Current.LiveTerminalMode);
+        return await RunCoreAsync(executable, arguments, progress: null, useVisibleTerminal: true, ct).ConfigureAwait(false);
+    }
+
+    private async Task<ProcessResult> RunCoreAsync(
+        string executable,
+        string arguments,
+        IProgress<string>? progress,
+        bool useVisibleTerminal,
+        CancellationToken ct)
+    {
         _logService.Debug("Running: {Executable} [arguments hidden]", executable);
 
         using var proc = new Process
         {
-            StartInfo = CreateStartInfo(executable, arguments)
+            StartInfo = CreateStartInfo(executable, arguments, useVisibleTerminal)
         };
 
         var outputLines = new List<string>();
         var outputLock = new object();
 
-        proc.OutputDataReceived += (_, e) =>
+        if (!useVisibleTerminal)
         {
-            if (e.Data is null) return;
-            lock (outputLock)
+            proc.OutputDataReceived += (_, e) =>
             {
-                outputLines.Add(e.Data);
-            }
-            progress?.Report(e.Data);
-        };
+                if (e.Data is null) return;
+                lock (outputLock)
+                {
+                    outputLines.Add(e.Data);
+                }
+                progress?.Report(e.Data);
+            };
 
-        proc.ErrorDataReceived += (_, e) =>
-        {
-            if (e.Data is null) return;
-            var line = $"[ERR] {e.Data}";
-            lock (outputLock)
+            proc.ErrorDataReceived += (_, e) =>
             {
-                outputLines.Add(line);
-            }
-            progress?.Report(line);
-        };
+                if (e.Data is null) return;
+                var line = $"[ERR] {e.Data}";
+                lock (outputLock)
+                {
+                    outputLines.Add(line);
+                }
+                progress?.Report(line);
+            };
+        }
 
         proc.Start();
         if (proc.StartInfo.RedirectStandardOutput)

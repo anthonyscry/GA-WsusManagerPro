@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Moq;
 using WsusManager.Core.Infrastructure;
 using WsusManager.Core.Logging;
@@ -9,11 +10,24 @@ namespace WsusManager.Tests.Services;
 public class ProcessRunnerTests
 {
     [Fact]
-    public void CreateStartInfo_WhenLiveTerminalModeEnabled_UsesVisibleConsoleSemantics()
+    public async Task RunAsync_WhenLiveTerminalModeEnabledInSettings_StillCapturesOutput()
     {
         var runner = CreateRunner(liveTerminalMode: true);
 
-        var startInfo = runner.CreateStartInfo("pwsh", "-NoLogo");
+        var command = GetEchoCommand("process-runner-capture");
+
+        var result = await runner.RunAsync(command.Executable, command.Arguments).ConfigureAwait(false);
+
+        Assert.True(result.Success);
+        Assert.Contains(result.OutputLines, line => line.Contains("process-runner-capture", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CreateStartInfo_WhenExplicitVisibleOptInEnabled_UsesVisibleConsoleSemantics()
+    {
+        var runner = CreateRunner(liveTerminalMode: true);
+
+        var startInfo = runner.CreateStartInfo("pwsh", "-NoLogo", useVisibleTerminal: true);
 
         Assert.True(startInfo.UseShellExecute);
         Assert.False(startInfo.RedirectStandardOutput);
@@ -22,16 +36,14 @@ public class ProcessRunnerTests
     }
 
     [Fact]
-    public void CreateStartInfo_WhenLiveTerminalModeDisabled_PreservesHiddenRedirectedMode()
+    public async Task RunVisibleAsync_WhenCancelled_ThrowsOperationCanceledException()
     {
         var runner = CreateRunner(liveTerminalMode: false);
+        var command = GetSleepCommand(30);
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
 
-        var startInfo = runner.CreateStartInfo("pwsh", "-NoLogo");
-
-        Assert.False(startInfo.UseShellExecute);
-        Assert.True(startInfo.RedirectStandardOutput);
-        Assert.True(startInfo.RedirectStandardError);
-        Assert.True(startInfo.CreateNoWindow);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            runner.RunVisibleAsync(command.Executable, command.Arguments, cts.Token)).ConfigureAwait(false);
     }
 
     [Fact]
@@ -92,5 +104,25 @@ public class ProcessRunnerTests
         mockSettings.SetupGet(s => s.Current).Returns(new AppSettings { LiveTerminalMode = liveTerminalMode });
 
         return new ProcessRunner(logService ?? Mock.Of<ILogService>(), mockSettings.Object);
+    }
+
+    private static (string Executable, string Arguments) GetEchoCommand(string message)
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return ("cmd.exe", $"/c echo {message}");
+        }
+
+        return ("/bin/sh", $"-c \"printf '{message}\\n'\"");
+    }
+
+    private static (string Executable, string Arguments) GetSleepCommand(int seconds)
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return ("cmd.exe", $"/c timeout /t {seconds} /nobreak >nul");
+        }
+
+        return ("/bin/sh", $"-c \"sleep {seconds}\"");
     }
 }
