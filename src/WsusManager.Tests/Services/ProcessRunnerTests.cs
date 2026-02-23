@@ -29,7 +29,7 @@ public class ProcessRunnerTests
 
         Assert.NotNull(capturedArgs);
         Assert.DoesNotContain("SuperSecret123!", capturedArgs, StringComparison.Ordinal);
-        Assert.Contains("-SaPassword ***", capturedArgs, StringComparison.Ordinal);
+        Assert.Equal("[REDACTED SENSITIVE ARGUMENTS]", capturedArgs);
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public class ProcessRunnerTests
 
         Assert.NotNull(capturedArgs);
         Assert.DoesNotContain("P@ssw0rd!", capturedArgs, StringComparison.Ordinal);
-        Assert.Contains("/RP ***", capturedArgs, StringComparison.Ordinal);
+        Assert.Equal("[REDACTED SENSITIVE ARGUMENTS]", capturedArgs);
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public class ProcessRunnerTests
 
         Assert.NotNull(capturedArgs);
         Assert.DoesNotContain("SuperSecret!", capturedArgs, StringComparison.Ordinal);
-        Assert.Contains("-Password=***", capturedArgs, StringComparison.Ordinal);
+        Assert.Equal("[REDACTED SENSITIVE ARGUMENTS]", capturedArgs);
     }
 
     [Fact]
@@ -107,6 +107,30 @@ public class ProcessRunnerTests
 
         Assert.NotNull(capturedArgs);
         Assert.DoesNotContain("P@ssw0rd!", capturedArgs, StringComparison.Ordinal);
-        Assert.Contains("/RP:***", capturedArgs, StringComparison.Ordinal);
+        Assert.Equal("[REDACTED SENSITIVE ARGUMENTS]", capturedArgs);
+    }
+
+    [Fact]
+    public async Task RunAsync_Does_Not_Redact_NonSensitive_Arguments()
+    {
+        var mockLog = new Mock<ILogService>();
+        string? capturedArgs = null;
+
+        mockLog
+            .Setup(l => l.Debug(It.IsAny<string>(), It.IsAny<object[]>()))
+            .Callback<string, object[]>((_, values) =>
+            {
+                if (values.Length >= 2 && values[1] is string args)
+                {
+                    capturedArgs = args;
+                }
+            });
+
+        var runner = new ProcessRunner(mockLog.Object);
+
+        _ = await Assert.ThrowsAnyAsync<Exception>(() =>
+            runner.RunAsync("__not_a_real_executable__", "-ExecutionPolicy Bypass -File script.ps1")).ConfigureAwait(false);
+
+        Assert.Equal("-ExecutionPolicy Bypass -File script.ps1", capturedArgs);
     }
 }

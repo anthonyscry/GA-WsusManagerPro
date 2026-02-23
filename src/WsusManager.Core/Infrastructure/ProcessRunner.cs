@@ -12,6 +12,8 @@ namespace WsusManager.Core.Infrastructure;
 /// </summary>
 public class ProcessRunner : IProcessRunner
 {
+    private static readonly Regex SensitiveArgToken = new("(?i)(-SaPassword\\b|-Password\\b|/RP\\b)");
+
     private readonly ILogService _logService;
 
     public ProcessRunner(ILogService logService)
@@ -106,9 +108,11 @@ public class ProcessRunner : IProcessRunner
             return arguments;
         }
 
-        return Regex.Replace(
-            arguments,
-            "(?i)(-SaPassword|-Password|/RP)(\\s+|=|:)(\"[^\"]*\"|'[^']*'|\\S+)",
-            "$1$2***");
+        if (SensitiveArgToken.IsMatch(arguments))
+        {
+            return "[REDACTED SENSITIVE ARGUMENTS]";
+        }
+
+        return arguments;
     }
 }
