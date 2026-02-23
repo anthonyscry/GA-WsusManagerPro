@@ -1,5 +1,7 @@
 using Serilog;
 using Serilog.Events;
+using WsusManager.Core.Models;
+using AppLogLevel = WsusManager.Core.Models.LogLevel;
 
 namespace WsusManager.Core.Logging;
 
@@ -12,17 +14,28 @@ public class LogService : ILogService, IDisposable
 {
     private const string DefaultLogDirectory = @"C:\WSUS\Logs";
     private const string LogFileTemplate = "WsusManager-.log";
+    private const int MinRetentionDays = 1;
+    private const int MaxRetentionDays = 365;
+    private const int MinFileSizeMb = 1;
+    private const int MaxFileSizeMb = 1000;
 
     private readonly Serilog.Core.Logger _logger;
     private bool _disposed;
 
     public LogService()
-        : this(DefaultLogDirectory)
+        : this(DefaultLogDirectory, settings: null)
     {
     }
 
     public LogService(string logDirectory)
+        : this(logDirectory, settings: null)
     {
+    }
+
+    public LogService(string logDirectory, AppSettings? settings)
+    {
+        var configuredSettings = settings ?? new AppSettings();
+
         // Ensure log directory exists
         try
         {
@@ -37,18 +50,34 @@ public class LogService : ILogService, IDisposable
         }
 
         var logPath = Path.Combine(logDirectory, LogFileTemplate);
+        var minimumLevel = ToSerilogLevel(configuredSettings.LogLevel);
+        var retainedFileCountLimit = Math.Clamp(configuredSettings.LogRetentionDays, MinRetentionDays, MaxRetentionDays);
+        var fileSizeLimitMb = Math.Clamp(configuredSettings.LogMaxFileSizeMb, MinFileSizeMb, MaxFileSizeMb);
+        var fileSizeLimitBytes = fileSizeLimitMb * 1024L * 1024L;
 
         _logger = new LoggerConfiguration()
-            .MinimumLevel.Debug()
+            .MinimumLevel.Is(minimumLevel)
             .WriteTo.File(
                 logPath,
                 rollingInterval: RollingInterval.Day,
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}",
-                retainedFileCountLimit: 30,
-                fileSizeLimitBytes: 50 * 1024 * 1024, // 50MB per file
+                retainedFileCountLimit: retainedFileCountLimit,
+                fileSizeLimitBytes: fileSizeLimitBytes,
+                rollOnFileSizeLimit: true,
                 shared: true)
             .CreateLogger();
     }
+
+    private static LogEventLevel ToSerilogLevel(AppLogLevel level)
+        => level switch
+        {
+            AppLogLevel.Debug => LogEventLevel.Debug,
+            AppLogLevel.Info => LogEventLevel.Information,
+            AppLogLevel.Warning => LogEventLevel.Warning,
+            AppLogLevel.Error => LogEventLevel.Error,
+            AppLogLevel.Fatal => LogEventLevel.Fatal,
+            _ => LogEventLevel.Information
+        };
 
     public void Info(string messageTemplate, params object[] propertyValues)
         => _logger.Information(messageTemplate, propertyValues);

@@ -1,4 +1,5 @@
 using WsusManager.Core.Logging;
+using WsusManager.Core.Models;
 
 namespace WsusManager.Tests.Services;
 
@@ -87,5 +88,62 @@ public class LogServiceTests : IDisposable
         var ex = Record.Exception(() => svc.Flush());
 
         Assert.Null(ex);
+    }
+
+    [Fact]
+    public void Warning_Log_Level_Suppresses_Debug_Entries()
+    {
+        var settings = new AppSettings
+        {
+            LogLevel = LogLevel.Warning,
+            LogRetentionDays = 30,
+            LogMaxFileSizeMb = 10
+        };
+
+        using var svc = new LogService(_tempDir, settings);
+
+        svc.Debug("Debug should be suppressed");
+        svc.Warning("Warning should be present");
+        svc.Flush();
+
+        var logFiles = Directory.GetFiles(_tempDir, "WsusManager-*.log", SearchOption.TopDirectoryOnly);
+        Assert.NotEmpty(logFiles);
+
+        var logContents = string.Join(Environment.NewLine, logFiles.Select(File.ReadAllText));
+        Assert.DoesNotContain("Debug should be suppressed", logContents);
+        Assert.Contains("Warning should be present", logContents);
+    }
+
+    [Fact]
+    public void Retention_And_File_Size_Use_AppSettings_Values()
+    {
+        var settings = new AppSettings
+        {
+            LogLevel = LogLevel.Debug,
+            LogRetentionDays = 2,
+            LogMaxFileSizeMb = 1
+        };
+
+        using var svc = new LogService(_tempDir, settings);
+
+        var payload = new string('X', 200_000);
+        for (var i = 0; i < 120; i++)
+        {
+            svc.Info("{Index} {Payload}", i, payload);
+        }
+
+        svc.Flush();
+
+        var logFiles = Directory.GetFiles(_tempDir, "WsusManager-*.log", SearchOption.TopDirectoryOnly);
+        Assert.NotEmpty(logFiles);
+        Assert.True(logFiles.Length <= settings.LogRetentionDays);
+
+        var maxBytes = settings.LogMaxFileSizeMb * 1024 * 1024;
+        var sizeAllowanceBytes = 256 * 1024;
+        Assert.All(logFiles, file =>
+        {
+            var length = new FileInfo(file).Length;
+            Assert.True(length <= maxBytes + sizeAllowanceBytes, $"File '{file}' length {length} exceeded configured max {maxBytes}");
+        });
     }
 }

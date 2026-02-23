@@ -1,17 +1,21 @@
 using System.Diagnostics;
 using System.IO;
+using System.Text.Json;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
+using Serilog.Events;
 using WsusManager.App.Services;
 using WsusManager.App.ViewModels;
 using WsusManager.App.Views;
 using WsusManager.Core.Infrastructure;
 using WsusManager.Core.Logging;
+using WsusManager.Core.Models;
 using WsusManager.Core.Services;
 using WsusManager.Core.Services.Interfaces;
+using AppLogLevel = WsusManager.Core.Models.LogLevel;
 
 namespace WsusManager.App;
 
@@ -23,16 +27,21 @@ public static class Program
 {
     public const string AppVersion = "4.5.9";
     private const string LogDirectory = @"C:\WSUS\Logs";
+    private const int MinRetentionDays = 1;
+    private const int MaxRetentionDays = 365;
+    private const int MinFileSizeMb = 1;
+    private const int MaxFileSizeMb = 1000;
 
     [STAThread]
     public static void Main(string[] args)
     {
         var startupTimer = Stopwatch.StartNew();
+        var loggingSettings = LoadLoggingSettings();
 
         // Create structured logger early so all startup activity is captured
-        var logService = new LogService(LogDirectory);
+        var logService = new LogService(LogDirectory, loggingSettings);
 
-        var host = CreateHost(args, logService);
+        var host = CreateHost(args, logService, loggingSettings);
 
         var app = new App();
         app.InitializeComponent();
@@ -72,18 +81,24 @@ public static class Program
     /// Creates the DI host with all services registered.
     /// Exposed as internal for integration testing.
     /// </summary>
-    internal static IHost CreateHost(string[] args, LogService logService)
+    internal static IHost CreateHost(string[] args, LogService logService, AppSettings loggingSettings)
     {
         var builder = Host.CreateApplicationBuilder(args);
+        var retainedFileCountLimit = Math.Clamp(loggingSettings.LogRetentionDays, MinRetentionDays, MaxRetentionDays);
+        var fileSizeLimitMb = Math.Clamp(loggingSettings.LogMaxFileSizeMb, MinFileSizeMb, MaxFileSizeMb);
+        var fileSizeLimitBytes = fileSizeLimitMb * 1024L * 1024L;
+        var minimumLevel = ToSerilogLevel(loggingSettings.LogLevel);
 
         // Configure Serilog as the logging provider for Microsoft.Extensions.Logging
         var serilogLogger = new LoggerConfiguration()
-            .MinimumLevel.Debug()
+            .MinimumLevel.Is(minimumLevel)
             .WriteTo.File(
                 Path.Combine(LogDirectory, "WsusManager-.log"),
                 rollingInterval: Serilog.RollingInterval.Day,
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}",
-                retainedFileCountLimit: 30,
+                retainedFileCountLimit: retainedFileCountLimit,
+                fileSizeLimitBytes: fileSizeLimitBytes,
+                rollOnFileSizeLimit: true,
                 shared: true)
             .CreateLogger();
 
@@ -147,4 +162,36 @@ public static class Program
 
         return builder.Build();
     }
+
+    private static AppSettings LoadLoggingSettings()
+    {
+        try
+        {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var settingsPath = Path.Combine(appData, "WsusManager", "settings.json");
+
+            if (!File.Exists(settingsPath))
+            {
+                return new AppSettings();
+            }
+
+            var json = File.ReadAllText(settingsPath);
+            return JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+        }
+        catch
+        {
+            return new AppSettings();
+        }
+    }
+
+    private static LogEventLevel ToSerilogLevel(AppLogLevel level)
+        => level switch
+        {
+            AppLogLevel.Debug => LogEventLevel.Debug,
+            AppLogLevel.Info => LogEventLevel.Information,
+            AppLogLevel.Warning => LogEventLevel.Warning,
+            AppLogLevel.Error => LogEventLevel.Error,
+            AppLogLevel.Fatal => LogEventLevel.Fatal,
+            _ => LogEventLevel.Information
+        };
 }
