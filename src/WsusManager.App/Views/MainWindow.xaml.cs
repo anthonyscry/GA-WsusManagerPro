@@ -33,6 +33,7 @@ public partial class MainWindow : Window
         // Load GA logo as window icon
         LoadIcon();
 
+        SourceInitialized += MainWindow_SourceInitialized;
         Loaded += MainWindow_Loaded;
         Activated += MainWindow_Activated;
         Deactivated += MainWindow_Deactivated;
@@ -57,6 +58,11 @@ public partial class MainWindow : Window
         {
             // Icon load failed, use default
         }
+    }
+
+    private void MainWindow_SourceInitialized(object? sender, EventArgs e)
+    {
+        ApplyCurrentTitleBarTheme();
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -137,6 +143,7 @@ public partial class MainWindow : Window
     {
         Activated -= MainWindow_Activated;
         Deactivated -= MainWindow_Deactivated;
+        SourceInitialized -= MainWindow_SourceInitialized;
 
         // Cleanup ViewModel resources (timer, CTS, log builder)
         _viewModel.Dispose();

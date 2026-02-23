@@ -11,12 +11,33 @@ namespace WsusManager.App.Services;
 /// </summary>
 public static class TitleBarService
 {
+    private const int WmNCACTIVATE = 0x0086;
+    private const int WmActivate = 0x0006;
+    private const uint SwpNoSize = 0x0001;
+    private const uint SwpNoMove = 0x0002;
+    private const uint SwpNoZOrder = 0x0004;
+    private const uint SwpNoActivate = 0x0010;
+    private const uint SwpFrameChanged = 0x0020;
+
+    private static readonly Dictionary<nint, (Color? Background, Color? Foreground)> AppliedColors = new();
+    private static readonly HashSet<nint> HookedWindows = [];
+
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(
         IntPtr hwnd,
         DwmWindowAttribute attr,
         ref int attrValue,
         int attrSize);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(
+        IntPtr hWnd,
+        IntPtr hWndInsertAfter,
+        int X,
+        int Y,
+        int cx,
+        int cy,
+        uint uFlags);
 
     private enum DwmWindowAttribute
     {
@@ -62,41 +83,32 @@ public static class TitleBarService
 
         if (hwnd == IntPtr.Zero)
         {
-            // Window not yet created, set up loaded handler
-            window.Loaded += (s, e) => SetTitleBarColors(window, backgroundColor, foregroundColor);
+            // Window handle not yet created. Apply at SourceInitialized (earlier than Loaded)
+            // to avoid startup white caption flash.
+            void OnSourceInitialized(object? s, EventArgs e)
+            {
+                window.SourceInitialized -= OnSourceInitialized;
+                SetTitleBarColors(window, backgroundColor, foregroundColor);
+            }
+
+            window.SourceInitialized += OnSourceInitialized;
             return;
         }
 
-        // Enable immersive dark mode for title bar.
-        // Windows Server 2019 / older Win10 builds use attribute 19.
-        _ = TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_USE_IMMERSIVE_DARK_MODE, 1)
-            || TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1, 1);
+        AppliedColors[hwnd] = (backgroundColor, foregroundColor);
+        EnsureHook(window, hwnd);
 
-        // Set background color if provided
-        if (backgroundColor.HasValue)
-        {
-            int color = ColorToAbgr(backgroundColor.Value);
-            _ = TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_CAPTION_COLOR, color);
-        }
+        ApplyToHwnd(hwnd, backgroundColor, foregroundColor);
 
-        // Set text color if provided
-        if (foregroundColor.HasValue)
-        {
-            int color = ColorToArgb(foregroundColor.Value);
-            _ = TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_TEXT_COLOR, color);
-        }
-
-        // Set border color with slight offset for contrast
-        if (backgroundColor.HasValue)
-        {
-            var bg = backgroundColor.Value;
-            var borderCol = Color.FromRgb(
-                (byte)Math.Min(255, bg.R + 30),
-                (byte)Math.Min(255, bg.G + 30),
-                (byte)Math.Min(255, bg.B + 30));
-            int borderColor = ColorToAbgr(borderCol);
-            _ = TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_BORDER_COLOR, borderColor);
-        }
+        // Force non-client repaint so caption state stays consistent across focus changes.
+        _ = SetWindowPos(
+            hwnd,
+            IntPtr.Zero,
+            0,
+            0,
+            0,
+            0,
+            SwpNoSize | SwpNoMove | SwpNoZOrder | SwpNoActivate | SwpFrameChanged);
     }
 
     /// <summary>
@@ -131,6 +143,69 @@ public static class TitleBarService
         catch
         {
             return false;
+        }
+    }
+
+    private static void EnsureHook(Window window, nint hwnd)
+    {
+        if (!HookedWindows.Add(hwnd))
+        {
+            return;
+        }
+
+        if (HwndSource.FromHwnd(hwnd) is not HwndSource source)
+        {
+            return;
+        }
+
+        source.AddHook(WndProc);
+        window.Closed += (_, _) =>
+        {
+            AppliedColors.Remove(hwnd);
+            HookedWindows.Remove(hwnd);
+            source.RemoveHook(WndProc);
+        };
+    }
+
+    private static nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
+    {
+        if (msg != WmNCACTIVATE && msg != WmActivate)
+        {
+            return IntPtr.Zero;
+        }
+
+        if (!AppliedColors.TryGetValue(hwnd, out var colors))
+        {
+            return IntPtr.Zero;
+        }
+
+        ApplyToHwnd(hwnd, colors.Background, colors.Foreground);
+        return IntPtr.Zero;
+    }
+
+    private static void ApplyToHwnd(nint hwnd, Color? backgroundColor, Color? foregroundColor)
+    {
+        _ = TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_USE_IMMERSIVE_DARK_MODE, 1)
+            || TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1, 1);
+
+        if (backgroundColor.HasValue)
+        {
+            int color = ColorToAbgr(backgroundColor.Value);
+            _ = TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_CAPTION_COLOR, color);
+
+            var bg = backgroundColor.Value;
+            var borderCol = Color.FromRgb(
+                (byte)Math.Min(255, bg.R + 30),
+                (byte)Math.Min(255, bg.G + 30),
+                (byte)Math.Min(255, bg.B + 30));
+            int borderColor = ColorToAbgr(borderCol);
+            _ = TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_BORDER_COLOR, borderColor);
+        }
+
+        if (foregroundColor.HasValue)
+        {
+            int color = ColorToArgb(foregroundColor.Value);
+            _ = TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_TEXT_COLOR, color);
         }
     }
 
