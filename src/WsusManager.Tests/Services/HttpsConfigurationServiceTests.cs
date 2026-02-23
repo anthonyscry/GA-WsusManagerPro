@@ -257,4 +257,39 @@ public sealed class HttpsConfigurationServiceTests : IDisposable
         Assert.Contains("Output:", result.Message, StringComparison.Ordinal);
         Assert.Contains("Legacy failed at binding step", result.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task ConfigureHttpsAsync_WhenNativeFailsAndFallbackScriptMissing_ShouldReturnScriptNotFound()
+    {
+        _processRunner
+            .Setup(r => r.RunAsync(
+                It.Is<string>(e => !string.Equals(e, "powershell.exe", StringComparison.OrdinalIgnoreCase)),
+                It.IsAny<string>(),
+                It.IsAny<IProgress<string>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProcessResult(0, ["ok"]));
+
+        _processRunner
+            .Setup(r => r.RunAsync(
+                "netsh",
+                It.Is<string>(a => a.Contains("add sslcert", StringComparison.OrdinalIgnoreCase)),
+                It.IsAny<IProgress<string>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProcessResult(5, ["Native failed"]));
+
+        var fallback = new LegacyHttpsConfigurationFallback(_processRunner.Object, _logService.Object);
+        var sut = new HttpsConfigurationService(_processRunner.Object, fallback, _logService.Object);
+
+        var result = await sut.ConfigureHttpsAsync("00112233445566778899AABBCCDDEEFF00112233").ConfigureAwait(false);
+
+        Assert.False(result.Success);
+        Assert.Contains("script not found", result.Message, StringComparison.OrdinalIgnoreCase);
+
+        _processRunner.Verify(r => r.RunAsync(
+            "powershell.exe",
+            It.IsAny<string>(),
+            It.IsAny<IProgress<string>>(),
+            It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
 }
