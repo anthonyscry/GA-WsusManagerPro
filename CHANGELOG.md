@@ -5,6 +5,16 @@ All notable changes to WSUS Manager will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.5.2] - 2026-02-22
+
+### Fixed
+- Restored Computers and Updates navigation button behavior in the main UI.
+- Made EXE validation tests cross-platform and size-aware to reduce false failures.
+
+### Changed
+- Updated offline installer references and preserved `SQLDB/` in source control with `.gitkeep`.
+- Checkpointed ongoing UI refactor work to keep the repository in a releasable state.
+
 ## [4.5.0] - 2026-02-21
 
 ### Added
@@ -202,7 +212,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - MaxAutoApproveCount increased to 200
 
-[Unreleased]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.0...HEAD
+[Unreleased]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.2...HEAD
+[4.5.2]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.1...v4.5.2
+[4.5.1]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.0...v4.5.1
 [4.5.0]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.4.0...v4.5.0
 [4.4.0]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.3.0...v4.4.0
 [4.3.0]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.2.0...v4.3.0
