@@ -162,3 +162,6 @@ Tests/Screenshots/
 *.benchmark.r
 *-benchmark.csv
 *-report.csv
+
+# Local git worktrees
+/.worktrees/
