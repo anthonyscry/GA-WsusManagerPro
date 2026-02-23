@@ -6,7 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
-using Serilog.Events;
 using WsusManager.App.Services;
 using WsusManager.App.ViewModels;
 using WsusManager.App.Views;
@@ -15,7 +14,6 @@ using WsusManager.Core.Logging;
 using WsusManager.Core.Models;
 using WsusManager.Core.Services;
 using WsusManager.Core.Services.Interfaces;
-using AppLogLevel = WsusManager.Core.Models.LogLevel;
 
 namespace WsusManager.App;
 
@@ -27,10 +25,6 @@ public static class Program
 {
     public const string AppVersion = "4.5.9";
     private const string LogDirectory = @"C:\WSUS\Logs";
-    private const int MinRetentionDays = 1;
-    private const int MaxRetentionDays = 365;
-    private const int MinFileSizeMb = 1;
-    private const int MaxFileSizeMb = 1000;
 
     [STAThread]
     public static void Main(string[] args)
@@ -84,22 +78,10 @@ public static class Program
     internal static IHost CreateHost(string[] args, LogService logService, AppSettings loggingSettings)
     {
         var builder = Host.CreateApplicationBuilder(args);
-        var retainedFileCountLimit = Math.Clamp(loggingSettings.LogRetentionDays, MinRetentionDays, MaxRetentionDays);
-        var fileSizeLimitMb = Math.Clamp(loggingSettings.LogMaxFileSizeMb, MinFileSizeMb, MaxFileSizeMb);
-        var fileSizeLimitBytes = fileSizeLimitMb * 1024L * 1024L;
-        var minimumLevel = ToSerilogLevel(loggingSettings.LogLevel);
 
         // Configure Serilog as the logging provider for Microsoft.Extensions.Logging
-        var serilogLogger = new LoggerConfiguration()
-            .MinimumLevel.Is(minimumLevel)
-            .WriteTo.File(
-                Path.Combine(LogDirectory, "WsusManager-.log"),
-                rollingInterval: Serilog.RollingInterval.Day,
-                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}",
-                retainedFileCountLimit: retainedFileCountLimit,
-                fileSizeLimitBytes: fileSizeLimitBytes,
-                rollOnFileSizeLimit: true,
-                shared: true)
+        var serilogLogger = LogConfiguration
+            .CreateFileLoggerConfiguration(Path.Combine(LogDirectory, "WsusManager-.log"), loggingSettings)
             .CreateLogger();
 
         builder.Logging.ClearProviders();
@@ -183,15 +165,4 @@ public static class Program
             return new AppSettings();
         }
     }
-
-    private static LogEventLevel ToSerilogLevel(AppLogLevel level)
-        => level switch
-        {
-            AppLogLevel.Debug => LogEventLevel.Debug,
-            AppLogLevel.Info => LogEventLevel.Information,
-            AppLogLevel.Warning => LogEventLevel.Warning,
-            AppLogLevel.Error => LogEventLevel.Error,
-            AppLogLevel.Fatal => LogEventLevel.Fatal,
-            _ => LogEventLevel.Information
-        };
 }

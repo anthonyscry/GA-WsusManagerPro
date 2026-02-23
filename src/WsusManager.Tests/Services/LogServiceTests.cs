@@ -126,8 +126,8 @@ public class LogServiceTests : IDisposable
 
         using var svc = new LogService(_tempDir, settings);
 
-        var payload = new string('X', 200_000);
-        for (var i = 0; i < 120; i++)
+        var payload = new string('X', 300_000);
+        for (var i = 0; i < 300; i++)
         {
             svc.Info("{Index} {Payload}", i, payload);
         }
@@ -136,7 +136,9 @@ public class LogServiceTests : IDisposable
 
         var logFiles = Directory.GetFiles(_tempDir, "WsusManager-*.log", SearchOption.TopDirectoryOnly);
         Assert.NotEmpty(logFiles);
-        Assert.True(logFiles.Length <= settings.LogRetentionDays);
+        Assert.True(
+            logFiles.Length > settings.LogRetentionDays,
+            $"Expected more than {settings.LogRetentionDays} files because retention is time-based (days), but found {logFiles.Length}.");
 
         var maxBytes = settings.LogMaxFileSizeMb * 1024 * 1024;
         var sizeAllowanceBytes = 256 * 1024;
@@ -145,5 +147,22 @@ public class LogServiceTests : IDisposable
             var length = new FileInfo(file).Length;
             Assert.True(length <= maxBytes + sizeAllowanceBytes, $"File '{file}' length {length} exceeded configured max {maxBytes}");
         });
+    }
+
+    [Fact]
+    public void ToOptions_Maps_LogLevel_RetentionDays_And_FileSize_From_Settings()
+    {
+        var settings = new AppSettings
+        {
+            LogLevel = LogLevel.Warning,
+            LogRetentionDays = 45,
+            LogMaxFileSizeMb = 7
+        };
+
+        var options = LogConfiguration.ToOptions(settings);
+
+        Assert.Equal(Serilog.Events.LogEventLevel.Warning, options.MinimumLevel);
+        Assert.Equal(TimeSpan.FromDays(45), options.Retention);
+        Assert.Equal(7L * 1024L * 1024L, options.FileSizeLimitBytes);
     }
 }
