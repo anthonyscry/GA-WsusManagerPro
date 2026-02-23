@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved legacy Windows title bar behavior by applying immersive dark mode only on pre-20H1 builds to reduce active/inactive color oscillation on Server 2019.
 
 ### Security
-- Redacted sensitive command-line arguments (`-SaPassword`, `-Password`, `/RP`) from process execution debug logs.
+- Stopped logging external process command-line arguments in debug logs to prevent credential leakage.
 
 ### Changed
 - Bumped in-app version display to `v4.5.7`.
