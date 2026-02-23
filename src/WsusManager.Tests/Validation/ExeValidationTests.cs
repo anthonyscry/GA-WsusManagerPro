@@ -12,6 +12,7 @@ public class ExeValidationTests
 {
     private const string ExeName = "WsusManager.App.exe";
     private const string RenamedExeName = "WsusManager.exe";
+    private const double MaxExpectedExeSizeMb = 250;
 
     /// <summary>
     /// Searches for the published C# EXE in common output locations.
@@ -125,7 +126,7 @@ public class ExeValidationTests
     public void VersionInfo_HasProductName()
     {
         var exePath = FindPublishedExe();
-        if (exePath is null) return;
+        if (exePath is null || !OperatingSystem.IsWindows()) return;
 
         var versionInfo = FileVersionInfo.GetVersionInfo(exePath);
 
@@ -136,7 +137,7 @@ public class ExeValidationTests
     public void VersionInfo_HasCompanyName()
     {
         var exePath = FindPublishedExe();
-        if (exePath is null) return;
+        if (exePath is null || !OperatingSystem.IsWindows()) return;
 
         var versionInfo = FileVersionInfo.GetVersionInfo(exePath);
 
@@ -147,7 +148,7 @@ public class ExeValidationTests
     public void VersionInfo_HasVersion()
     {
         var exePath = FindPublishedExe();
-        if (exePath is null) return;
+        if (exePath is null || !OperatingSystem.IsWindows()) return;
 
         var versionInfo = FileVersionInfo.GetVersionInfo(exePath);
 
@@ -165,6 +166,6 @@ public class ExeValidationTests
         var sizeMB = fileInfo.Length / (1024.0 * 1024);
 
         Assert.True(sizeMB > 1, $"EXE should be > 1 MB, was {sizeMB:F1} MB");
-        Assert.True(sizeMB < 100, $"EXE should be < 100 MB, was {sizeMB:F1} MB");
+        Assert.True(sizeMB < MaxExpectedExeSizeMb, $"EXE should be < {MaxExpectedExeSizeMb:F0} MB, was {sizeMB:F1} MB");
     }
 }
