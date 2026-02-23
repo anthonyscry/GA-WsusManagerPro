@@ -1,0 +1,117 @@
+using WsusManager.Core.Infrastructure;
+using WsusManager.Core.Logging;
+using WsusManager.Core.Models;
+using WsusManager.Core.Services.Interfaces;
+
+namespace WsusManager.Core.Services;
+
+/// <summary>
+/// C#-first HTTPS configuration workflow with automatic legacy fallback on failure.
+/// </summary>
+public class HttpsConfigurationService : IHttpsConfigurationService
+{
+    private readonly IProcessRunner _processRunner;
+    private readonly LegacyHttpsConfigurationFallback _fallback;
+    private readonly ILogService _logService;
+
+    private const string WsusUtilPath = @"C:\Program Files\Update Services\Tools\wsusutil.exe";
+    private const string SslIpPort = "0.0.0.0:8531";
+    private const string AppId = "{9f55f098-16f9-4f85-b6f9-7241f8b9e26a}";
+
+    public HttpsConfigurationService(
+        IProcessRunner processRunner,
+        LegacyHttpsConfigurationFallback fallback,
+        ILogService logService)
+    {
+        _processRunner = processRunner;
+        _fallback = fallback;
+        _logService = logService;
+    }
+
+    /// <inheritdoc />
+    public async Task<OperationResult> ConfigureHttpsAsync(
+        string? certificateThumbprint,
+        IProgress<string>? progress = null,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            var normalizedThumbprint = NormalizeThumbprint(certificateThumbprint);
+            if (string.IsNullOrWhiteSpace(normalizedThumbprint))
+            {
+                throw new InvalidOperationException("Certificate thumbprint is required for native HTTPS configuration.");
+            }
+
+            progress?.Report("Starting native HTTPS configuration...");
+            progress?.Report("[Step 1/3] Applying SSL certificate binding on port 8531...");
+
+            await _processRunner.RunAsync(
+                "netsh",
+                $"http delete sslcert ipport={SslIpPort}",
+                progress,
+                ct).ConfigureAwait(false);
+
+            var addBindingResult = await _processRunner.RunAsync(
+                "netsh",
+                $"http add sslcert ipport={SslIpPort} certhash={normalizedThumbprint} appid={AppId} certstorename=MY",
+                progress,
+                ct).ConfigureAwait(false);
+
+            if (!addBindingResult.Success)
+            {
+                throw new InvalidOperationException($"Native SSL binding failed: {addBindingResult.Output}");
+            }
+
+            progress?.Report("[Step 2/3] Configuring WSUS SSL mode via wsusutil...");
+
+            var wsusResult = await _processRunner.RunAsync(
+                WsusUtilPath,
+                $"configuressl {Environment.MachineName}",
+                progress,
+                ct).ConfigureAwait(false);
+
+            if (!wsusResult.Success)
+            {
+                throw new InvalidOperationException($"Native wsusutil configuressl failed: {wsusResult.Output}");
+            }
+
+            progress?.Report("[Step 3/3] Verifying HTTPS binding...");
+
+            var verifyBindingResult = await _processRunner.RunAsync(
+                "netsh",
+                $"http show sslcert ipport={SslIpPort}",
+                progress,
+                ct).ConfigureAwait(false);
+
+            if (!verifyBindingResult.Success)
+            {
+                throw new InvalidOperationException($"Native HTTPS binding verification failed: {verifyBindingResult.Output}");
+            }
+
+            progress?.Report("[OK] HTTPS configuration completed using native C# workflow.");
+            return OperationResult.Ok("HTTPS configuration completed successfully.");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            var fallbackLine = $"[FALLBACK] Native HTTPS configuration failed: {ex.Message}. Switching to legacy Set-WsusHttps.ps1 path.";
+            progress?.Report(fallbackLine);
+            _logService.Warning(fallbackLine);
+
+            return await _fallback.ConfigureAsync(certificateThumbprint, progress, ct).ConfigureAwait(false);
+        }
+    }
+
+    private static string? NormalizeThumbprint(string? thumbprint)
+    {
+        if (string.IsNullOrWhiteSpace(thumbprint))
+        {
+            return null;
+        }
+
+        return thumbprint.Replace(" ", string.Empty, StringComparison.Ordinal).Trim();
+    }
+}

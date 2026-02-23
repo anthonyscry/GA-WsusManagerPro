@@ -142,6 +142,10 @@ public static class Program
         // Task 3: Per-operation transcript writer
         builder.Services.AddSingleton<IOperationTranscriptService, OperationTranscriptService>();
 
+        // Task 5: HTTPS configuration (C#-first + fallback)
+        builder.Services.AddSingleton<LegacyHttpsConfigurationFallback>();
+        builder.Services.AddSingleton<IHttpsConfigurationService, HttpsConfigurationService>();
+
         // ViewModels
         builder.Services.AddSingleton<MainViewModel>();
 
