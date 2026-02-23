@@ -60,7 +60,7 @@ public sealed class CsvExportService : ICsvExportService
                 count += batch.Count;
             }
 
-            await writer.FlushAsync().ConfigureAwait(false);
+            await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {
@@ -118,7 +118,7 @@ public sealed class CsvExportService : ICsvExportService
                 count += batch.Count;
             }
 
-            await writer.FlushAsync().ConfigureAwait(false);
+            await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
         {

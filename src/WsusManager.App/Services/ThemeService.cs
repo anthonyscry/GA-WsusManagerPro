@@ -15,7 +15,6 @@ public class ThemeService : IThemeService
 {
     private readonly ILogService _logService;
     private readonly Dictionary<string, ResourceDictionary> _themeCache = new(StringComparer.OrdinalIgnoreCase);
-    private Window? _mainWindow;
 
     /// <summary>
     /// Maps theme names to their XAML resource paths (relative to the App project).
@@ -55,6 +54,8 @@ public class ThemeService : IThemeService
         ["Rose"] = (Color.FromRgb(0x22, 0x18, 0x20), Color.FromRgb(0xFC, 0xE4, 0xEC)),
         ["ClassicBlue"] = (Color.FromRgb(0x11, 0x1B, 0x2E), Color.FromRgb(0xE3, 0xF2, 0xFD))
     };
+
+    private Window? _mainWindow;
 
     public ThemeService(ISettingsService settingsService, ILogService logService)
     {

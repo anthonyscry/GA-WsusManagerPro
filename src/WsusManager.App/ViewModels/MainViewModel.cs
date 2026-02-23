@@ -231,9 +231,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// F1 - Opens Help dialog (same as Help button in sidebar).
     /// </summary>
     [RelayCommand]
-    private void ShowHelp()
+    private async Task ShowHelp()
     {
-        Navigate("Help");
+        await Navigate("Help").ConfigureAwait(false);
     }
 
     /// <summary>
@@ -913,7 +913,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanExecuteWsusOperation))]
     private async Task RunDiagnostics()
     {
-        Navigate("Diagnostics");
+        await Navigate("Diagnostics").ConfigureAwait(false);
 
         await RunOperationAsync("Diagnostics", async (progress, ct) =>
         {
@@ -937,7 +937,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (!ConfirmDestructiveOperation("Content Reset"))
             return;
 
-        Navigate("Diagnostics");
+        await Navigate("Diagnostics").ConfigureAwait(false);
 
         await RunOperationAsync("Content Reset", async (progress, ct) =>
         {
@@ -987,7 +987,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (!ConfirmDestructiveOperation("Deep Cleanup"))
             return;
 
-        Navigate("Database");
+        await Navigate("Database").ConfigureAwait(false);
 
         await RunOperationAsync("Deep Cleanup", async (progress, ct) =>
         {
@@ -1016,7 +1016,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (dialog.ShowDialog() != true) return;
 
         var backupPath = dialog.FileName;
-        Navigate("Database");
+        await Navigate("Database").ConfigureAwait(false);
 
         await RunOperationAsync("Backup Database", async (progress, ct) =>
         {
@@ -1066,7 +1066,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (!ConfirmDestructiveOperation("Restore Database"))
             return;
 
-        Navigate("Database");
+        await Navigate("Database").ConfigureAwait(false);
 
         await RunOperationAsync("Restore Database", async (progress, ct) =>
         {
@@ -1141,7 +1141,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (dialog.ShowDialog() != true) return;
 
         var profile = dialog.SelectedProfile;
-        Navigate("Sync");
+        await Navigate("Sync").ConfigureAwait(false);
 
         await RunOperationAsync("Online Sync", async (progress, ct) =>
         {
@@ -1161,7 +1161,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         if (dialog.ShowDialog() != true) return;
 
-        Navigate("Transfer");
+        await Navigate("Transfer").ConfigureAwait(false);
 
         if (dialog.IsExportMode && dialog.ExportResult is not null)
         {
@@ -1198,7 +1198,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (dialog.ShowDialog() != true || dialog.Options is null) return;
 
         var options = dialog.Options;
-        Navigate("Install");
+        await Navigate("Install").ConfigureAwait(false);
 
         await RunOperationAsync("Install WSUS", async (progress, ct) =>
         {
@@ -1240,7 +1240,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (dialog.ShowDialog() != true || dialog.Options is null) return;
 
         var options = dialog.Options;
-        Navigate("Schedule");
+        await Navigate("Schedule").ConfigureAwait(false);
 
         await RunOperationAsync("Schedule Task", async (progress, ct) =>
         {
@@ -1303,11 +1303,19 @@ public partial class MainViewModel : ObservableObject, IDisposable
             System.Windows.Controls.Grid.SetRow(btnPanel, 5);
 
             var cancelBtn = new System.Windows.Controls.Button { Content = "Cancel", Padding = new Thickness(20, 8, 20, 8), Margin = new Thickness(0, 0, 8, 0) };
-            cancelBtn.Click += (s, e) => { dialog.DialogResult = false; dialog.Close(); };
+            cancelBtn.Click += (s, e) =>
+            {
+                dialog.DialogResult = false;
+                dialog.Close();
+            };
             btnPanel.Children.Add(cancelBtn);
 
             var okBtn = new System.Windows.Controls.Button { Content = "Create GPO", Padding = new Thickness(20, 8, 20, 8) };
-            okBtn.Click += (s, e) => { dialog.DialogResult = true; dialog.Close(); };
+            okBtn.Click += (s, e) =>
+            {
+                dialog.DialogResult = true;
+                dialog.Close();
+            };
             btnPanel.Children.Add(okBtn);
 
             grid.Children.Add(btnPanel);
@@ -1326,7 +1334,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (string.IsNullOrWhiteSpace(wsusHostname))
             return;
 
-        Navigate("Install");
+        await Navigate("Install").ConfigureAwait(false);
 
         await RunOperationAsync("Create GPO", async (progress, ct) =>
         {
@@ -1421,7 +1429,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanExecuteClientOperation))]
     private async Task RunClientCancelStuckJobs()
     {
-        Navigate("ClientTools");
+        await Navigate("ClientTools").ConfigureAwait(false);
 
         await RunOperationAsync("Cancel Stuck Jobs", async (progress, ct) =>
         {
@@ -1434,7 +1442,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanExecuteClientOperation))]
     private async Task RunClientForceCheckIn()
     {
-        Navigate("ClientTools");
+        await Navigate("ClientTools").ConfigureAwait(false);
 
         await RunOperationAsync("Force Check-In", async (progress, ct) =>
         {
@@ -1447,7 +1455,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanExecuteClientOperation))]
     private async Task RunClientTestConnectivity()
     {
-        Navigate("ClientTools");
+        await Navigate("ClientTools").ConfigureAwait(false);
 
         await RunOperationAsync("Test Connectivity", async (progress, ct) =>
         {
@@ -1461,7 +1469,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanExecuteClientOperation))]
     private async Task RunClientDiagnostics()
     {
-        Navigate("ClientTools");
+        await Navigate("ClientTools").ConfigureAwait(false);
 
         await RunOperationAsync("Client Diagnostics", async (progress, ct) =>
         {
@@ -1516,7 +1524,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             .Where(h => !string.IsNullOrWhiteSpace(h))
             .ToList();
 
-        Navigate("ClientTools");
+        await Navigate("ClientTools").ConfigureAwait(false);
 
         await RunOperationAsync("Mass GPUpdate", async (progress, ct) =>
         {
@@ -2142,9 +2150,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
             if (!string.IsNullOrWhiteSpace(ComputerSearchText))
             {
                 var search = ComputerSearchText.ToLowerInvariant();
-                var match = computer.Hostname.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                           computer.IpAddress.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                           computer.Status.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0;
+                var match = computer.Hostname.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                           computer.IpAddress.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                           computer.Status.Contains(search, StringComparison.OrdinalIgnoreCase);
                 if (!match) return false;
             }
 
@@ -2189,11 +2197,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
             if (!string.Equals(UpdateClassificationFilter, "All", StringComparison.Ordinal))
             {
                 // Handle both classification string formats
-                var classification = update.Classification?.ToLowerInvariant() ?? "";
-                var filter = UpdateClassificationFilter.ToLowerInvariant();
+                var classification = update.Classification ?? string.Empty;
+                var filter = UpdateClassificationFilter;
 
                 // Exact match or partial match (e.g., "Critical" matches "Critical Updates")
-                if (!classification.Contains(filter))
+                if (!classification.Contains(filter, StringComparison.OrdinalIgnoreCase))
                     return false;
             }
 
@@ -2204,8 +2212,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 var match = (update.Title?.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0) ||
                            (update.KbArticle?.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0) ||
                            (update.Classification?.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0) ||
-                           (update.IsApproved && "approved".IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0) ||
-                           (update.IsDeclined && "declined".IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0);
+                           (update.IsApproved && "approved".Contains(search, StringComparison.OrdinalIgnoreCase)) ||
+                           (update.IsDeclined && "declined".Contains(search, StringComparison.OrdinalIgnoreCase));
                 if (!match) return false;
             }
 

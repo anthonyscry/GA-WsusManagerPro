@@ -35,8 +35,8 @@ public static class TitleBarService
     private static extern bool SetWindowPos(
         IntPtr hWnd,
         IntPtr hWndInsertAfter,
-        int X,
-        int Y,
+        int x,
+        int y,
         int cx,
         int cy,
         uint uFlags);

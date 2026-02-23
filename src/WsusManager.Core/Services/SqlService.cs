@@ -242,7 +242,7 @@ public class SqlService : ISqlService
         var updateId = reader.GetGuid(0);
         var title = reader.GetString(1);
         var kbArticle = reader.IsDBNull(2) ? null : reader.GetString(2);
-        var classification = reader.IsDBNull(3) ? null : reader.GetString(3);
+        var classification = reader.IsDBNull(3) ? "Unknown" : reader.GetString(3);
         var createdDate = reader.GetDateTime(4);
         var isApproved = reader.GetBoolean(5);
         var isDeclined = reader.GetBoolean(6);

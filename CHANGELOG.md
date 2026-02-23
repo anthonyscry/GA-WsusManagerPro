@@ -5,6 +5,17 @@ All notable changes to WSUS Manager will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.5.8] - 2026-02-23
+
+### Fixed
+- Eliminated publish-time analyzer warnings in CSV export by forwarding cancellation tokens to async stream flush operations.
+- Removed nullable classification mapping risk in SQL update projection by defaulting missing classifications to `Unknown`.
+- Resolved async fire-and-forget navigation warnings by awaiting panel navigation command paths in the main view model.
+
+### Changed
+- Improved filter readability/perf by replacing `IndexOf` checks with `Contains(..., StringComparison.OrdinalIgnoreCase)` where equivalent.
+- Bumped in-app version display to `v4.5.8`.
+
 ## [4.5.7] - 2026-02-23
 
 ### Fixed

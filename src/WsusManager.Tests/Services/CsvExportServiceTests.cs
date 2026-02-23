@@ -261,6 +261,37 @@ public class CsvExportServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ExportComputersAsync_EmptyList_WithCanceledToken_ShouldThrowOperationCanceledException()
+    {
+        // Arrange
+        var computers = new List<ComputerInfo>();
+        var exportDirectory = GetExportDirectory();
+        var filesBefore = Directory
+            .GetFiles(exportDirectory, "WsusManager-Computers-*.csv")
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        try
+        {
+            // Act / Assert
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+                await _service.ExportComputersAsync(computers, null, cts.Token).ConfigureAwait(false)).ConfigureAwait(false);
+        }
+        finally
+        {
+            var filesAfter = Directory.GetFiles(exportDirectory, "WsusManager-Computers-*.csv");
+            foreach (var file in filesAfter)
+            {
+                if (!filesBefore.Contains(file) && File.Exists(file))
+                {
+                    File.Delete(file);
+                }
+            }
+        }
+    }
+
+    [Fact]
     public async Task ExportUpdatesAsync_ShouldHandleSpecialCharacters()
     {
         // Arrange
@@ -324,6 +355,37 @@ public class CsvExportServiceTests : IDisposable
         File.Delete(filePath);
     }
 
+    [Fact]
+    public async Task ExportUpdatesAsync_EmptyList_WithCanceledToken_ShouldThrowOperationCanceledException()
+    {
+        // Arrange
+        var updates = new List<UpdateInfo>();
+        var exportDirectory = GetExportDirectory();
+        var filesBefore = Directory
+            .GetFiles(exportDirectory, "WsusManager-Updates-*.csv")
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        try
+        {
+            // Act / Assert
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+                await _service.ExportUpdatesAsync(updates, null, cts.Token).ConfigureAwait(false)).ConfigureAwait(false);
+        }
+        finally
+        {
+            var filesAfter = Directory.GetFiles(exportDirectory, "WsusManager-Updates-*.csv");
+            foreach (var file in filesAfter)
+            {
+                if (!filesBefore.Contains(file) && File.Exists(file))
+                {
+                    File.Delete(file);
+                }
+            }
+        }
+    }
+
     private static List<ComputerInfo> CreateMockComputers(int count)
     {
         var computers = new List<ComputerInfo>(count);
@@ -338,6 +400,12 @@ public class CsvExportServiceTests : IDisposable
                 "Windows Server 2022"));
         }
         return computers;
+    }
+
+    private static string GetExportDirectory()
+    {
+        var documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        return string.IsNullOrWhiteSpace(documentsPath) ? Directory.GetCurrentDirectory() : documentsPath;
     }
 
     private static List<UpdateInfo> CreateMockUpdates(int count)

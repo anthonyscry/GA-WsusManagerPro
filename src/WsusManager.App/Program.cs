@@ -21,7 +21,7 @@ namespace WsusManager.App;
 /// </summary>
 public static class Program
 {
-    public const string AppVersion = "4.5.7";
+    public const string AppVersion = "4.5.8";
     private const string LogDirectory = @"C:\WSUS\Logs";
 
     [STAThread]
