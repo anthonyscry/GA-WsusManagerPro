@@ -23,27 +23,49 @@ public class ProcessRunnerTests
     }
 
     [Fact]
-    public void CreateStartInfo_WhenExplicitVisibleOptInEnabled_UsesVisibleConsoleSemantics()
+    public async Task RunAsync_WhenOptInAndLiveTerminalEnabled_UsesVisibleModeWithoutCapture()
     {
         var runner = CreateRunner(liveTerminalMode: true);
+        var command = GetEchoCommand("process-runner-visible");
 
-        var startInfo = runner.CreateStartInfo("pwsh", "-NoLogo", useVisibleTerminal: true);
+        var result = await runner.RunAsync(
+            command.Executable,
+            command.Arguments,
+            allowVisibleTerminal: true).ConfigureAwait(false);
 
-        Assert.True(startInfo.UseShellExecute);
-        Assert.False(startInfo.RedirectStandardOutput);
-        Assert.False(startInfo.RedirectStandardError);
-        Assert.False(startInfo.CreateNoWindow);
+        Assert.True(result.Success);
+        Assert.Empty(result.OutputLines);
     }
 
     [Fact]
-    public async Task RunVisibleAsync_WhenCancelled_ThrowsOperationCanceledException()
+    public async Task RunAsync_WhenOptInAndLiveTerminalDisabled_RemainsHiddenAndCapturesOutput()
     {
         var runner = CreateRunner(liveTerminalMode: false);
+
+        var command = GetEchoCommand("process-runner-hidden");
+
+        var result = await runner.RunAsync(
+            command.Executable,
+            command.Arguments,
+            allowVisibleTerminal: true).ConfigureAwait(false);
+
+        Assert.True(result.Success);
+        Assert.Contains(result.OutputLines, line => line.Contains("process-runner-hidden", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenOptInAndLiveTerminalEnabledAndCancelled_ThrowsOperationCanceledException()
+    {
+        var runner = CreateRunner(liveTerminalMode: true);
         var command = GetSleepCommand(30);
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            runner.RunVisibleAsync(command.Executable, command.Arguments, cts.Token)).ConfigureAwait(false);
+            runner.RunAsync(
+                command.Executable,
+                command.Arguments,
+                allowVisibleTerminal: true,
+                ct: cts.Token)).ConfigureAwait(false);
     }
 
     [Fact]

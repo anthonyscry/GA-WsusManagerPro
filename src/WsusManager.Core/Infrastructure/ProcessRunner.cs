@@ -38,7 +38,18 @@ public class ProcessRunner : IProcessRunner
         IProgress<string>? progress = null,
         CancellationToken ct = default)
     {
-        return await RunCoreAsync(executable, arguments, progress, useVisibleTerminal: false, ct).ConfigureAwait(false);
+        return await RunAsync(executable, arguments, allowVisibleTerminal: false, progress, ct).ConfigureAwait(false);
+    }
+
+    public async Task<ProcessResult> RunAsync(
+        string executable,
+        string arguments,
+        bool allowVisibleTerminal,
+        IProgress<string>? progress = null,
+        CancellationToken ct = default)
+    {
+        var useVisibleTerminal = allowVisibleTerminal && _settingsService.Current.LiveTerminalMode;
+        return await RunCoreAsync(executable, arguments, progress, useVisibleTerminal, ct).ConfigureAwait(false);
     }
 
     public async Task<ProcessResult> RunVisibleAsync(
@@ -47,7 +58,7 @@ public class ProcessRunner : IProcessRunner
         CancellationToken ct = default)
     {
         _logService.Debug("Visible terminal execution requested (setting: {LiveTerminalMode})", _settingsService.Current.LiveTerminalMode);
-        return await RunCoreAsync(executable, arguments, progress: null, useVisibleTerminal: true, ct).ConfigureAwait(false);
+        return await RunAsync(executable, arguments, allowVisibleTerminal: true, progress: null, ct).ConfigureAwait(false);
     }
 
     private async Task<ProcessResult> RunCoreAsync(
