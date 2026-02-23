@@ -35,6 +35,7 @@ public class MainViewModelTests
     private readonly Mock<IBenchmarkTimingService> _mockBenchmarkTimingService = new();
     private readonly Mock<ISettingsValidationService> _mockValidationService = new();
     private readonly Mock<ICsvExportService> _mockCsvExportService = new();
+    private readonly Mock<IOperationTranscriptService> _mockOperationTranscriptService = new();
     private readonly MainViewModel _vm;
 
     public MainViewModelTests()
@@ -62,7 +63,8 @@ public class MainViewModelTests
             _mockThemeService.Object,
             _mockBenchmarkTimingService.Object,
             _mockValidationService.Object,
-            _mockCsvExportService.Object);
+            _mockCsvExportService.Object,
+            _mockOperationTranscriptService.Object);
     }
 
     // ═══════════════════════════════════════════════════════════════

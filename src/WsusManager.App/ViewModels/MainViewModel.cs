@@ -46,6 +46,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly IBenchmarkTimingService _benchmarkTimingService;
     private readonly ISettingsValidationService _validationService;
     private readonly ICsvExportService _csvExportService;
+    private readonly IOperationTranscriptService _operationTranscriptService;
     private readonly StringBuilder _logBuilder = new();
     private readonly Queue<string> _logBatchQueue = new();
     private DispatcherTimer? _logBatchTimer;
@@ -112,7 +113,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         IThemeService themeService,
         IBenchmarkTimingService benchmarkTimingService,
         ISettingsValidationService validationService,
-        ICsvExportService csvExportService)
+        ICsvExportService csvExportService,
+        IOperationTranscriptService operationTranscriptService)
     {
         _logService = logService;
         _settingsService = settingsService;
@@ -134,6 +136,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _benchmarkTimingService = benchmarkTimingService;
         _validationService = validationService;
         _csvExportService = csvExportService;
+        _operationTranscriptService = operationTranscriptService;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -428,6 +431,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
             "Starting operation: {Operation} [OperationId: {OperationId}]",
             telemetryContext.OperationName,
             telemetryContext.OperationId);
+
+        _operationTranscriptService.StartOperation(operationName);
         AppendLog($"=== {operationName} ===");
 
         var progress = new Progress<string>(line =>
@@ -520,6 +525,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
         finally
         {
+            _operationTranscriptService.EndOperation();
             IsOperationRunning = false;
             CurrentOperationName = string.Empty;
             OperationStepText = string.Empty;
@@ -542,6 +548,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// </summary>
     public void AppendLog(string line)
     {
+        _operationTranscriptService.WriteLine(line);
+
         // Add to batch queue
         lock (_logBatchQueue)
         {

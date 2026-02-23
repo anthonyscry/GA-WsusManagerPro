@@ -139,6 +139,9 @@ public static class Program
         // Phase 30: Data Export
         builder.Services.AddSingleton<ICsvExportService, CsvExportService>();
 
+        // Task 3: Per-operation transcript writer
+        builder.Services.AddSingleton<IOperationTranscriptService, OperationTranscriptService>();
+
         // ViewModels
         builder.Services.AddSingleton<MainViewModel>();
 
