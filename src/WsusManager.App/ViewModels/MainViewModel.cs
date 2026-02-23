@@ -423,7 +423,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
         // Auto-expand log panel when operation starts
         IsLogPanelExpanded = true;
 
-        _logService.Info("Starting operation: {Operation}", operationName);
+        var telemetryContext = OperationTelemetryContext.Start(operationName);
+        _logService.Info(
+            "Starting operation: {Operation} [OperationId: {OperationId}]",
+            telemetryContext.OperationName,
+            telemetryContext.OperationId);
         AppendLog($"=== {operationName} ===");
 
         var progress = new Progress<string>(line =>
@@ -457,40 +461,61 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
             if (success)
             {
+                var elapsed = telemetryContext.GetElapsed();
                 StatusMessage = $"{operationName} completed successfully.";
                 StatusBannerText = $"✓ {operationName} completed successfully.";
                 StatusBannerColor = GetThemeBrush("StatusSuccess", Color.FromRgb(0x3F, 0xB9, 0x50));
                 AppendLog($"=== ✓ {operationName} completed ===");
-                _logService.Info("Operation completed: {Operation}", operationName);
+                _logService.Info(
+                    "Operation completed: {Operation} [OperationId: {OperationId}] [ElapsedMs: {ElapsedMs}]",
+                    telemetryContext.OperationName,
+                    telemetryContext.OperationId,
+                    (long)elapsed.TotalMilliseconds);
             }
             else
             {
+                var elapsed = telemetryContext.GetElapsed();
                 StatusMessage = $"{operationName} failed.";
                 StatusBannerText = $"✗ {operationName} failed.";
                 StatusBannerColor = GetThemeBrush("StatusError", Color.FromRgb(0xF8, 0x51, 0x49));
                 AppendLog($"=== ✗ {operationName} FAILED ===");
-                _logService.Warning("Operation failed: {Operation}", operationName);
+                _logService.Warning(
+                    "Operation failed: {Operation} [OperationId: {OperationId}] [ElapsedMs: {ElapsedMs}]",
+                    telemetryContext.OperationName,
+                    telemetryContext.OperationId,
+                    (long)elapsed.TotalMilliseconds);
             }
 
             return success;
         }
         catch (OperationCanceledException)
         {
+            var elapsed = telemetryContext.GetElapsed();
             StatusMessage = $"{operationName} cancelled.";
             StatusBannerText = $"⚠ {operationName} cancelled.";
             StatusBannerColor = GetThemeBrush("StatusWarning", Color.FromRgb(0xD2, 0x99, 0x22));
             AppendLog($"=== ⚠ {operationName} CANCELLED ===");
-            _logService.Info("Operation cancelled: {Operation}", operationName);
+            _logService.Info(
+                "Operation cancelled: {Operation} [OperationId: {OperationId}] [ElapsedMs: {ElapsedMs}]",
+                telemetryContext.OperationName,
+                telemetryContext.OperationId,
+                (long)elapsed.TotalMilliseconds);
             return false;
         }
         catch (Exception ex)
         {
+            var elapsed = telemetryContext.GetElapsed();
             StatusMessage = $"{operationName} failed with error.";
             StatusBannerText = $"✗ {operationName} failed.";
             StatusBannerColor = GetThemeBrush("StatusError", Color.FromRgb(0xF8, 0x51, 0x49));
             AppendLog($"[ERROR] {ex.Message}");
             AppendLog($"=== ✗ {operationName} FAILED ===");
-            _logService.Error(ex, "Operation error: {Operation}", operationName);
+            _logService.Error(
+                ex,
+                "Operation error: {Operation} [OperationId: {OperationId}] [ElapsedMs: {ElapsedMs}]",
+                telemetryContext.OperationName,
+                telemetryContext.OperationId,
+                (long)elapsed.TotalMilliseconds);
             return false;
         }
         finally

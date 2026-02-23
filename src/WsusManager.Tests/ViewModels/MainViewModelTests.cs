@@ -1,5 +1,6 @@
 using Moq;
 using System.Windows.Data;
+using WsusManager.App.Services;
 using WsusManager.App.ViewModels;
 using WsusManager.Core.Logging;
 using WsusManager.Core.Models;
@@ -28,6 +29,12 @@ public class MainViewModelTests
     private readonly Mock<IInstallationService> _mockInstall = new();
     private readonly Mock<IScheduledTaskService> _mockScheduledTask = new();
     private readonly Mock<IGpoDeploymentService> _mockGpo = new();
+    private readonly Mock<IClientService> _mockClient = new();
+    private readonly Mock<IScriptGeneratorService> _mockScriptGenerator = new();
+    private readonly Mock<IThemeService> _mockThemeService = new();
+    private readonly Mock<IBenchmarkTimingService> _mockBenchmarkTimingService = new();
+    private readonly Mock<ISettingsValidationService> _mockValidationService = new();
+    private readonly Mock<ICsvExportService> _mockCsvExportService = new();
     private readonly MainViewModel _vm;
 
     public MainViewModelTests()
@@ -49,7 +56,13 @@ public class MainViewModelTests
             _mockImport.Object,
             _mockInstall.Object,
             _mockScheduledTask.Object,
-            _mockGpo.Object);
+            _mockGpo.Object,
+            _mockClient.Object,
+            _mockScriptGenerator.Object,
+            _mockThemeService.Object,
+            _mockBenchmarkTimingService.Object,
+            _mockValidationService.Object,
+            _mockCsvExportService.Object);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -198,6 +211,60 @@ public class MainViewModelTests
 
         Assert.Contains("Step 1 done", _vm.LogOutput);
         Assert.Contains("Step 2 done", _vm.LogOutput);
+    }
+
+    [Fact]
+    public async Task RunOperationAsync_Logs_Same_OperationId_On_Start_And_Success_Finish()
+    {
+        await _vm.RunOperationAsync("TelemetrySuccess", async (progress, ct) =>
+        {
+            await Task.CompletedTask;
+            return true;
+        });
+
+        var startInvocation = _mockLog.Invocations.Single(i =>
+            string.Equals(i.Method.Name, nameof(ILogService.Info), StringComparison.Ordinal) &&
+            string.Equals(i.Arguments[0] as string, "Starting operation: {Operation} [OperationId: {OperationId}]", StringComparison.Ordinal));
+
+        var finishInvocation = _mockLog.Invocations.Single(i =>
+            string.Equals(i.Method.Name, nameof(ILogService.Info), StringComparison.Ordinal) &&
+            string.Equals(i.Arguments[0] as string, "Operation completed: {Operation} [OperationId: {OperationId}] [ElapsedMs: {ElapsedMs}]", StringComparison.Ordinal));
+
+        var startValues = Assert.IsType<object[]>(startInvocation.Arguments[1]);
+        var finishValues = Assert.IsType<object[]>(finishInvocation.Arguments[1]);
+
+        var startOperationId = Assert.IsType<Guid>(startValues[1]);
+        var finishOperationId = Assert.IsType<Guid>(finishValues[1]);
+
+        Assert.NotEqual(Guid.Empty, startOperationId);
+        Assert.Equal(startOperationId, finishOperationId);
+    }
+
+    [Fact]
+    public async Task RunOperationAsync_Logs_Same_OperationId_On_Start_And_Failure_Finish()
+    {
+        await _vm.RunOperationAsync("TelemetryFailure", async (progress, ct) =>
+        {
+            await Task.CompletedTask;
+            return false;
+        });
+
+        var startInvocation = _mockLog.Invocations.Single(i =>
+            string.Equals(i.Method.Name, nameof(ILogService.Info), StringComparison.Ordinal) &&
+            string.Equals(i.Arguments[0] as string, "Starting operation: {Operation} [OperationId: {OperationId}]", StringComparison.Ordinal));
+
+        var finishInvocation = _mockLog.Invocations.Single(i =>
+            string.Equals(i.Method.Name, nameof(ILogService.Warning), StringComparison.Ordinal) &&
+            string.Equals(i.Arguments[0] as string, "Operation failed: {Operation} [OperationId: {OperationId}] [ElapsedMs: {ElapsedMs}]", StringComparison.Ordinal));
+
+        var startValues = Assert.IsType<object[]>(startInvocation.Arguments[1]);
+        var finishValues = Assert.IsType<object[]>(finishInvocation.Arguments[1]);
+
+        var startOperationId = Assert.IsType<Guid>(startValues[1]);
+        var finishOperationId = Assert.IsType<Guid>(finishValues[1]);
+
+        Assert.NotEqual(Guid.Empty, startOperationId);
+        Assert.Equal(startOperationId, finishOperationId);
     }
 
     // ═══════════════════════════════════════════════════════════════
