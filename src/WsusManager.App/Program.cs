@@ -76,12 +76,15 @@ public static class Program
     /// Exposed as internal for integration testing.
     /// </summary>
     internal static IHost CreateHost(string[] args, LogService logService, AppSettings loggingSettings)
+        => CreateHost(args, logService, loggingSettings, LogDirectory);
+
+    internal static IHost CreateHost(string[] args, LogService logService, AppSettings loggingSettings, string hostLogDirectory)
     {
         var builder = Host.CreateApplicationBuilder(args);
 
         // Configure Serilog as the logging provider for Microsoft.Extensions.Logging
         var serilogLogger = LogConfiguration
-            .CreateFileLoggerConfiguration(Path.Combine(LogDirectory, "WsusManager-.log"), loggingSettings)
+            .CreateFileLoggerConfiguration(Path.Combine(hostLogDirectory, "WsusManager-.log"), loggingSettings)
             .CreateLogger();
 
         builder.Logging.ClearProviders();

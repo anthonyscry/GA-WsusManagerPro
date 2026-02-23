@@ -32,6 +32,7 @@
   <ItemGroup Condition="'$(OS)' != 'Windows_NT'">
     <Compile Remove="ViewModels\**" />
     <Compile Remove="Services\ThemeServiceTests.cs" />
+    <Compile Remove="Integration\ProgramLoggingWiringTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
