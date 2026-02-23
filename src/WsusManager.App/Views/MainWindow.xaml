@@ -152,6 +152,52 @@
                             </Style.Triggers>
                         </Style>
                     </Button.Style>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="💻" Width="22" TextAlignment="Center"/>
+                        <TextBlock Text="Client Tools"/>
+                    </StackPanel>
+                </Button>
+                <Button DockPanel.Dock="Top" ToolTip="View and filter WSUS client computer status"
+                        x:Name="BtnComputers"
+                        automation:AutomationProperties.AutomationId="ComputersButton"
+                        Command="{Binding NavigateCommand}" CommandParameter="Computers">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource NavBtn}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CurrentPanel}" Value="Computers">
+                                    <Setter Property="Background" Value="{DynamicResource NavActiveBackground}"/>
+                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                    <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="🖥" Width="22" TextAlignment="Center"/>
+                        <TextBlock Text="Computers"/>
+                    </StackPanel>
+                </Button>
+                <Button DockPanel.Dock="Top" ToolTip="View and filter WSUS update approvals"
+                        x:Name="BtnUpdates"
+                        automation:AutomationProperties.AutomationId="UpdatesButton"
+                        Command="{Binding NavigateCommand}" CommandParameter="Updates">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource NavBtn}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CurrentPanel}" Value="Updates">
+                                    <Setter Property="Background" Value="{DynamicResource NavActiveBackground}"/>
+                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                    <Setter Property="BorderThickness" Value="3,0,0,0"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="📦" Width="22" TextAlignment="Center"/>
+                        <TextBlock Text="Updates"/>
+                    </StackPanel>
                 </Button>
 
                 <!-- Bottom utility buttons -->
