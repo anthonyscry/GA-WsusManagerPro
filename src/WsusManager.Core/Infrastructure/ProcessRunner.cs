@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using WsusManager.Core.Logging;
 using WsusManager.Core.Models;
+using WsusManager.Core.Services.Interfaces;
 
 namespace WsusManager.Core.Infrastructure;
 
@@ -12,10 +13,25 @@ namespace WsusManager.Core.Infrastructure;
 public class ProcessRunner : IProcessRunner
 {
     private readonly ILogService _logService;
+    private readonly ISettingsService _settingsService;
 
-    public ProcessRunner(ILogService logService)
+    public ProcessRunner(ILogService logService, ISettingsService settingsService)
     {
         _logService = logService;
+        _settingsService = settingsService;
+    }
+
+    internal ProcessStartInfo CreateStartInfo(string executable, string arguments)
+    {
+        var liveTerminalMode = _settingsService.Current.LiveTerminalMode;
+
+        return new ProcessStartInfo(executable, arguments)
+        {
+            RedirectStandardOutput = !liveTerminalMode,
+            RedirectStandardError = !liveTerminalMode,
+            UseShellExecute = liveTerminalMode,
+            CreateNoWindow = !liveTerminalMode
+        };
     }
 
     public async Task<ProcessResult> RunAsync(
@@ -28,13 +44,7 @@ public class ProcessRunner : IProcessRunner
 
         using var proc = new Process
         {
-            StartInfo = new ProcessStartInfo(executable, arguments)
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }
+            StartInfo = CreateStartInfo(executable, arguments)
         };
 
         var outputLines = new List<string>();
@@ -62,8 +72,15 @@ public class ProcessRunner : IProcessRunner
         };
 
         proc.Start();
-        proc.BeginOutputReadLine();
-        proc.BeginErrorReadLine();
+        if (proc.StartInfo.RedirectStandardOutput)
+        {
+            proc.BeginOutputReadLine();
+        }
+
+        if (proc.StartInfo.RedirectStandardError)
+        {
+            proc.BeginErrorReadLine();
+        }
 
         try
         {
