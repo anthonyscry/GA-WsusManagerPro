@@ -47,6 +47,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly ISettingsValidationService _validationService;
     private readonly ICsvExportService _csvExportService;
     private readonly IOperationTranscriptService _operationTranscriptService;
+    private readonly IHttpsConfigurationService _httpsConfigurationService;
     private readonly StringBuilder _logBuilder = new();
     private readonly Queue<string> _logBatchQueue = new();
     private DispatcherTimer? _logBatchTimer;
@@ -114,7 +115,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         IBenchmarkTimingService benchmarkTimingService,
         ISettingsValidationService validationService,
         ICsvExportService csvExportService,
-        IOperationTranscriptService operationTranscriptService)
+        IOperationTranscriptService operationTranscriptService,
+        IHttpsConfigurationService httpsConfigurationService)
     {
         _logService = logService;
         _settingsService = settingsService;
@@ -137,6 +139,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _validationService = validationService;
         _csvExportService = csvExportService;
         _operationTranscriptService = operationTranscriptService;
+        _httpsConfigurationService = httpsConfigurationService;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -191,6 +194,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             "Transfer" => "Export / Import",
             "Sync" => "Online Sync",
             "Schedule" => "Schedule Task",
+            "SetHttps" => "Set HTTPS",
             "Diagnostics" => "Diagnostics",
             "Database" => "Database Operations",
             "Cleanup" => "Deep Cleanup",
@@ -1327,6 +1331,50 @@ public partial class MainViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand(CanExecute = nameof(CanExecuteWsusOperation))]
+    private async Task RunSetHttps()
+    {
+        // Dialog before panel switch (per CLAUDE.md pattern)
+        var dialog = new HttpsDialog();
+        if (Application.Current.MainWindow is not null)
+            dialog.Owner = Application.Current.MainWindow;
+
+        if (dialog.ShowDialog() != true || dialog.Result is null) return;
+
+        await RunSetHttpsWithInputsAsync(
+            dialog.Result.ServerName,
+            dialog.Result.CertificateThumbprint).ConfigureAwait(false);
+    }
+
+    internal async Task<bool> RunSetHttpsWithInputsAsync(string serverName, string certificateThumbprint)
+    {
+        var normalizedServerName = serverName?.Trim() ?? string.Empty;
+        var normalizedThumbprint = certificateThumbprint?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedServerName) || string.IsNullOrWhiteSpace(normalizedThumbprint))
+        {
+            return false;
+        }
+
+        await Navigate("SetHttps").ConfigureAwait(false);
+
+        return await RunOperationAsync("Set HTTPS", async (progress, ct) =>
+        {
+            progress.Report($"Applying HTTPS configuration for WSUS server '{normalizedServerName}'...");
+
+            var result = await _httpsConfigurationService.ConfigureHttpsAsync(
+                normalizedThumbprint,
+                progress,
+                ct).ConfigureAwait(false);
+
+            if (!string.IsNullOrWhiteSpace(result.Message))
+            {
+                progress.Report(result.Success ? $"[OK] {result.Message}" : $"[FAIL] {result.Message}");
+            }
+
+            return result.Success;
+        }).ConfigureAwait(false);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanExecuteWsusOperation))]
     private async Task RunCreateGpo()
     {
         // Show hostname + port input dialog on UI thread before starting operation
@@ -1847,6 +1895,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             // Phase 6: Installation and Scheduling
             RunInstallWsusCommand.NotifyCanExecuteChanged();
             RunScheduleTaskCommand.NotifyCanExecuteChanged();
+            RunSetHttpsCommand.NotifyCanExecuteChanged();
             RunCreateGpoCommand.NotifyCanExecuteChanged();
             // Phase 12: Mode Override + Settings
             ToggleModeCommand.NotifyCanExecuteChanged();

@@ -30,6 +30,7 @@ public class KeyboardNavigationTests
     [InlineData("TransferDialog.xaml")]
     [InlineData("ScheduleTaskDialog.xaml")]
     [InlineData("InstallDialog.xaml")]
+    [InlineData("HttpsDialog.xaml")]
     public void Dialogs_ShouldSupportTabNavigation(string dialogFile)
     {
         var dialogPath = GetXamlPath(dialogFile);
@@ -65,7 +66,8 @@ public class KeyboardNavigationTests
             "SyncProfileDialog.xaml",
             "TransferDialog.xaml",
             "ScheduleTaskDialog.xaml",
-            "InstallDialog.xaml"
+            "InstallDialog.xaml",
+            "HttpsDialog.xaml"
         };
 
         foreach (var dialogFile in dialogFiles)
@@ -110,6 +112,7 @@ public class KeyboardNavigationTests
     [InlineData("ComputersButton")]
     [InlineData("UpdatesButton")]
     [InlineData("DiagnosticsButton")]
+    [InlineData("SetHttpsButton")]
     [InlineData("SettingsButton")]
     [InlineData("HelpButton")]
     public void MainWindow_NavigationButtons_ShouldHaveAutomationId(string automationId)
@@ -125,6 +128,7 @@ public class KeyboardNavigationTests
     [InlineData("TransferDialog.xaml")]
     [InlineData("ScheduleTaskDialog.xaml")]
     [InlineData("InstallDialog.xaml")]
+    [InlineData("HttpsDialog.xaml")]
     public void Dialogs_ShouldUseCenterOwner(string dialogFile)
     {
         var content = File.ReadAllText(GetXamlPath(dialogFile));

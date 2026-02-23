@@ -61,6 +61,15 @@
                         <TextBlock Text="Create GPO"/>
                     </StackPanel>
                 </Button>
+                <Button DockPanel.Dock="Top" ToolTip="Configure WSUS HTTPS on port 8531"
+                        Style="{StaticResource NavBtn}" x:Name="BtnSetHttps"
+                        automation:AutomationProperties.AutomationId="SetHttpsButton"
+                        Command="{Binding RunSetHttpsCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="🔒" Width="22" TextAlignment="Center"/>
+                        <TextBlock Text="Set HTTPS"/>
+                    </StackPanel>
+                </Button>
 
                 <!-- OPERATIONS Category -->
                 <TextBlock DockPanel.Dock="Top" Text="OPERATIONS" Style="{StaticResource CategoryLabel}"/>

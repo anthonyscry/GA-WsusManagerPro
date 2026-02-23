@@ -36,6 +36,7 @@ public class MainViewModelTests
     private readonly Mock<ISettingsValidationService> _mockValidationService = new();
     private readonly Mock<ICsvExportService> _mockCsvExportService = new();
     private readonly Mock<IOperationTranscriptService> _mockOperationTranscriptService = new();
+    private readonly Mock<IHttpsConfigurationService> _mockHttpsConfigurationService = new();
     private readonly MainViewModel _vm;
 
     public MainViewModelTests()
@@ -64,7 +65,8 @@ public class MainViewModelTests
             _mockBenchmarkTimingService.Object,
             _mockValidationService.Object,
             _mockCsvExportService.Object,
-            _mockOperationTranscriptService.Object);
+            _mockOperationTranscriptService.Object,
+            _mockHttpsConfigurationService.Object);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -871,6 +873,39 @@ public class MainViewModelTests
         _vm.IsWsusInstalled = true;
 
         Assert.True(_vm.RunTransferCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void RunSetHttpsCommand_CanExecute_False_When_WsusNotInstalled()
+    {
+        _vm.IsWsusInstalled = false;
+
+        Assert.False(_vm.RunSetHttpsCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task RunSetHttpsWithInputsAsync_Calls_HttpsConfigurationService()
+    {
+        _vm.IsWsusInstalled = true;
+
+        _mockHttpsConfigurationService
+            .Setup(s => s.ConfigureHttpsAsync(
+                "00112233445566778899AABBCCDDEEFF00112233",
+                It.IsAny<IProgress<string>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OperationResult.Ok("HTTPS configured."));
+
+        var success = await _vm.RunSetHttpsWithInputsAsync(
+            "wsus-server01",
+            "00112233445566778899AABBCCDDEEFF00112233");
+
+        Assert.True(success);
+        Assert.Equal("SetHttps", _vm.CurrentPanel);
+        _mockHttpsConfigurationService.Verify(s => s.ConfigureHttpsAsync(
+            "00112233445566778899AABBCCDDEEFF00112233",
+            It.IsAny<IProgress<string>>(),
+            It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     // ═══════════════════════════════════════════════════════════════
