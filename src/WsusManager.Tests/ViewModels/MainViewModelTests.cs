@@ -890,6 +890,7 @@ public class MainViewModelTests
 
         _mockHttpsConfigurationService
             .Setup(s => s.ConfigureHttpsAsync(
+                "wsus-server01",
                 "00112233445566778899AABBCCDDEEFF00112233",
                 It.IsAny<IProgress<string>>(),
                 It.IsAny<CancellationToken>()))
@@ -902,6 +903,7 @@ public class MainViewModelTests
         Assert.True(success);
         Assert.Equal("SetHttps", _vm.CurrentPanel);
         _mockHttpsConfigurationService.Verify(s => s.ConfigureHttpsAsync(
+            "wsus-server01",
             "00112233445566778899AABBCCDDEEFF00112233",
             It.IsAny<IProgress<string>>(),
             It.IsAny<CancellationToken>()),

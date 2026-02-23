@@ -31,6 +31,7 @@ public class LegacyHttpsConfigurationFallback
     }
 
     public async Task<OperationResult> ConfigureAsync(
+        string? serverName,
         string? certificateThumbprint,
         IProgress<string>? progress = null,
         CancellationToken ct = default)
@@ -46,6 +47,11 @@ public class LegacyHttpsConfigurationFallback
             }
 
             var arguments = $"-ExecutionPolicy Bypass -File \"{scriptPath}\"";
+            if (!string.IsNullOrWhiteSpace(serverName))
+            {
+                arguments += $" -ServerName \"{serverName.Trim()}\"";
+            }
+
             if (!string.IsNullOrWhiteSpace(certificateThumbprint))
             {
                 arguments += $" -CertificateThumbprint \"{certificateThumbprint.Trim()}\"";

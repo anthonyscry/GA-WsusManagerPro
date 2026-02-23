@@ -1361,6 +1361,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             progress.Report($"Applying HTTPS configuration for WSUS server '{normalizedServerName}'...");
 
             var result = await _httpsConfigurationService.ConfigureHttpsAsync(
+                normalizedServerName,
                 normalizedThumbprint,
                 progress,
                 ct).ConfigureAwait(false);

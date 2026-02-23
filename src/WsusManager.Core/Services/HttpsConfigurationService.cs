@@ -31,10 +31,19 @@ public class HttpsConfigurationService : IHttpsConfigurationService
 
     /// <inheritdoc />
     public async Task<OperationResult> ConfigureHttpsAsync(
+        string? serverName,
         string? certificateThumbprint,
         IProgress<string>? progress = null,
         CancellationToken ct = default)
     {
+        var normalizedServerName = NormalizeServerName(serverName);
+        var serverValidation = ValidateServerName(normalizedServerName);
+        if (!serverValidation.Success)
+        {
+            progress?.Report($"[FAIL] {serverValidation.Message}");
+            return serverValidation;
+        }
+
         var normalizedThumbprint = NormalizeThumbprint(certificateThumbprint);
         var validation = ValidateThumbprint(normalizedThumbprint);
         if (!validation.Success)
@@ -69,7 +78,7 @@ public class HttpsConfigurationService : IHttpsConfigurationService
 
             var wsusResult = await _processRunner.RunAsync(
                 WsusUtilPath,
-                $"configuressl {Environment.MachineName}",
+                $"configuressl {normalizedServerName}",
                 progress,
                 ct).ConfigureAwait(false);
 
@@ -104,8 +113,22 @@ public class HttpsConfigurationService : IHttpsConfigurationService
             progress?.Report(fallbackLine);
             _logService.Warning(fallbackLine);
 
-            return await _fallback.ConfigureAsync(normalizedThumbprint, progress, ct).ConfigureAwait(false);
+            return await _fallback.ConfigureAsync(normalizedServerName, normalizedThumbprint, progress, ct).ConfigureAwait(false);
         }
+    }
+
+    private static string? NormalizeServerName(string? serverName)
+    {
+        return string.IsNullOrWhiteSpace(serverName)
+            ? null
+            : serverName.Trim();
+    }
+
+    private static OperationResult ValidateServerName(string? normalizedServerName)
+    {
+        return string.IsNullOrWhiteSpace(normalizedServerName)
+            ? OperationResult.Fail("WSUS server name is required.")
+            : OperationResult.Ok();
     }
 
     private static string? NormalizeThumbprint(string? thumbprint)

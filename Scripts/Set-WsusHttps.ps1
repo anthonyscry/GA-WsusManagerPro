@@ -21,6 +21,9 @@ Date: 2026-01-10
 .PARAMETER CertificateThumbprint
     Thumbprint of an existing certificate to use. If not provided, prompts interactively.
 
+.PARAMETER ServerName
+    Optional WSUS server name to use for wsusutil configuressl. Defaults to local hostname.
+
 .EXAMPLE
     .\Set-WsusHttps.ps1
     Interactive mode - prompts for certificate choice.
@@ -28,6 +31,10 @@ Date: 2026-01-10
 .EXAMPLE
     .\Set-WsusHttps.ps1 -CertificateThumbprint "1234567890ABCDEF..."
     Uses the specified existing certificate.
+
+.EXAMPLE
+    .\Set-WsusHttps.ps1 -ServerName "wsus-server01" -CertificateThumbprint "1234567890ABCDEF..."
+    Configures WSUS SSL using the provided server name and certificate.
 
 .NOTES
     Requirements:
@@ -38,7 +45,8 @@ Date: 2026-01-10
 
 [CmdletBinding()]
 param(
-    [string]$CertificateThumbprint
+    [string]$CertificateThumbprint,
+    [string]$ServerName
 )
 
 # Import WsusUtilities for logging
@@ -221,6 +229,8 @@ function Set-WsusSSLConfiguration {
         Configures WSUS to require SSL using wsusutil.exe.
     #>
 
+    param([string]$ServerName)
+
     Write-Host "Configuring WSUS for SSL..." -NoNewline
 
     $wsusutil = "C:\Program Files\Update Services\Tools\wsusutil.exe"
@@ -230,7 +240,7 @@ function Set-WsusSSLConfiguration {
 
     # Configure SSL - this enables SSL for client communication
     # Run command and capture exit code reliably
-    $serverHostname = hostname
+    $serverHostname = if ([string]::IsNullOrWhiteSpace($ServerName)) { hostname } else { $ServerName.Trim() }
     $result = & $wsusutil configuressl $serverHostname 2>&1
     $exitCode = $LASTEXITCODE
 
@@ -360,7 +370,7 @@ try {
     Write-Host "===============================================================" -ForegroundColor Cyan
     Write-Host ""
 
-    $serverName = hostname
+    $serverName = if ([string]::IsNullOrWhiteSpace($ServerName)) { hostname } else { $ServerName.Trim() }
     Write-Host "Server: $serverName"
 
     # Check if WSUS is installed
@@ -420,7 +430,7 @@ try {
     Set-IISHttpsBinding -Certificate $certificate
 
     # Configure WSUS SSL
-    Set-WsusSSLConfiguration
+    Set-WsusSSLConfiguration -ServerName $serverName
 
     # For self-signed certs, add to trusted root and export
     $certExportPath = $null

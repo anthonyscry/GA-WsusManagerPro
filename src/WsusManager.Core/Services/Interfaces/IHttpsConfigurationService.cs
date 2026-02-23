@@ -9,10 +9,11 @@ namespace WsusManager.Core.Services.Interfaces;
 public interface IHttpsConfigurationService
 {
     /// <summary>
-    /// Configures HTTPS for WSUS using the provided certificate thumbprint.
+    /// Configures HTTPS for WSUS using the provided server name and certificate thumbprint.
     /// Native steps are attempted first; fallback may be used automatically.
     /// </summary>
     Task<OperationResult> ConfigureHttpsAsync(
+        string? serverName,
         string? certificateThumbprint,
         IProgress<string>? progress = null,
         CancellationToken ct = default);
