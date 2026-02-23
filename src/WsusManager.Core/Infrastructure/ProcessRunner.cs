@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using WsusManager.Core.Logging;
 using WsusManager.Core.Models;
 
@@ -24,7 +25,8 @@ public class ProcessRunner : IProcessRunner
         IProgress<string>? progress = null,
         CancellationToken ct = default)
     {
-        _logService.Debug("Running: {Executable} {Arguments}", executable, arguments);
+        var safeArguments = RedactArguments(arguments);
+        _logService.Debug("Running: {Executable} {Arguments}", executable, safeArguments);
 
         using var proc = new Process
         {
@@ -95,5 +97,25 @@ public class ProcessRunner : IProcessRunner
         }
 
         return result;
+    }
+
+    private static string RedactArguments(string arguments)
+    {
+        if (string.IsNullOrWhiteSpace(arguments))
+        {
+            return arguments;
+        }
+
+        var redacted = arguments;
+
+        redacted = Regex.Replace(redacted, "(?i)(-SaPassword\\s+)\"[^\"]*\"", "$1\"***\"");
+        redacted = Regex.Replace(redacted, "(?i)(-Password\\s+)\"[^\"]*\"", "$1\"***\"");
+        redacted = Regex.Replace(redacted, "(?i)(/RP\\s+)\"[^\"]*\"", "$1\"***\"");
+
+        redacted = Regex.Replace(redacted, "(?i)(-SaPassword\\s+)(?!\")\\S+", "$1***");
+        redacted = Regex.Replace(redacted, "(?i)(-Password\\s+)(?!\")\\S+", "$1***");
+        redacted = Regex.Replace(redacted, "(?i)(/RP\\s+)(?!\")\\S+", "$1***");
+
+        return redacted;
     }
 }

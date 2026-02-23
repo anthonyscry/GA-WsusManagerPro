@@ -5,6 +5,18 @@ All notable changes to WSUS Manager will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.5.7] - 2026-02-23
+
+### Fixed
+- Added explicit install failure reason reporting in the operation log so failed Install WSUS runs show actionable error details instead of a generic failure banner.
+- Improved legacy Windows title bar behavior by applying immersive dark mode only on pre-20H1 builds to reduce active/inactive color oscillation on Server 2019.
+
+### Security
+- Redacted sensitive command-line arguments (`-SaPassword`, `-Password`, `/RP`) from process execution debug logs.
+
+### Changed
+- Bumped in-app version display to `v4.5.7`.
+
 ## [4.5.6] - 2026-02-23
 
 ### Fixed
@@ -246,7 +258,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - MaxAutoApproveCount increased to 200
 
-[Unreleased]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.6...HEAD
+[Unreleased]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.7...HEAD
+[4.5.7]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.6...v4.5.7
 [4.5.6]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.5...v4.5.6
 [4.5.5]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.4...v4.5.5
 [4.5.4]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.3...v4.5.4

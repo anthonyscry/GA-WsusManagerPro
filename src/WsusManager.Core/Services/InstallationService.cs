@@ -126,7 +126,8 @@ public class InstallationService : IInstallationService
             }
             else
             {
-                var msg = $"Installation failed with exit code {result.ExitCode}.";
+                var msg = $"Installation failed with exit code {result.ExitCode}. Check output log for details.";
+
                 _logService.Warning(msg);
                 return OperationResult.Fail(msg);
             }

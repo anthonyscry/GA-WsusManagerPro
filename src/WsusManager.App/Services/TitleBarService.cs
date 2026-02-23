@@ -11,6 +11,8 @@ namespace WsusManager.App.Services;
 /// </summary>
 public static class TitleBarService
 {
+    private static readonly bool IsPre20H1 = Environment.OSVersion.Version.Build > 0 && Environment.OSVersion.Version.Build < 19041;
+
     private const int WmNCACTIVATE = 0x0086;
     private const int WmActivate = 0x0006;
     private const uint SwpNoSize = 0x0001;
@@ -185,6 +187,14 @@ public static class TitleBarService
 
     private static void ApplyToHwnd(nint hwnd, Color? backgroundColor, Color? foregroundColor)
     {
+        if (IsPre20H1)
+        {
+            // Server 2019 / older Win10 builds are inconsistent with custom caption/text colors.
+            // Apply immersive dark mode only to avoid white startup flash and focus-state flicker.
+            _ = TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1, 1);
+            return;
+        }
+
         _ = TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_USE_IMMERSIVE_DARK_MODE, 1)
             || TrySetIntAttribute(hwnd, DwmWindowAttribute.DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1, 1);
 

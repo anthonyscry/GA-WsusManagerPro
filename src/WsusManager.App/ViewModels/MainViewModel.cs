@@ -1216,6 +1216,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
             // Run installation
             var result = await _installationService.InstallAsync(options, progress, ct).ConfigureAwait(false);
 
+            if (!result.Success && !string.IsNullOrWhiteSpace(result.Message))
+            {
+                progress.Report($"[FAIL] {result.Message}");
+            }
+
             // Refresh dashboard after install to detect WSUS role
             if (result.Success)
                 await RefreshDashboard().ConfigureAwait(false);
