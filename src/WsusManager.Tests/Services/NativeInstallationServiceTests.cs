@@ -22,6 +22,7 @@ public class NativeInstallationServiceTests
         }).ConfigureAwait(false);
 
         Assert.False(result.Success);
+        Assert.True(result.AllowLegacyFallback);
         Assert.Contains("not yet implemented", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 

@@ -19,7 +19,7 @@ public class NativeInstallationService : INativeInstallationService
     }
 
     /// <inheritdoc />
-    public Task<OperationResult> InstallAsync(
+    public Task<NativeInstallationResult> InstallAsync(
         InstallOptions options,
         IProgress<string>? progress = null,
         CancellationToken ct = default)
@@ -31,6 +31,6 @@ public class NativeInstallationService : INativeInstallationService
         const string message = "Native installation orchestrator is not yet implemented for full install execution.";
         _logService.Warning(message);
 
-        return Task.FromResult(OperationResult.Fail(message));
+        return Task.FromResult(NativeInstallationResult.Fail(message, allowLegacyFallback: true));
     }
 }

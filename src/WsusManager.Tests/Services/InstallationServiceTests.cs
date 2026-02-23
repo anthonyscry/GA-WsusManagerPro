@@ -211,7 +211,7 @@ public class InstallationServiceTests
 
         _mockNative
             .Setup(n => n.InstallAsync(options, It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(OperationResult.Ok("Native install complete."));
+            .ReturnsAsync(NativeInstallationResult.Ok("Native install complete."));
 
         var result = await service.InstallAsync(options).ConfigureAwait(false);
 
@@ -246,7 +246,7 @@ public class InstallationServiceTests
 
             _mockNative
                 .Setup(n => n.InstallAsync(options, It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
-                .ReturnsAsync(OperationResult.Fail("Native orchestrator step failed."));
+                .ReturnsAsync(NativeInstallationResult.Fail("Native orchestrator step failed.", allowLegacyFallback: true));
 
             _mockRunner
                 .Setup(r => r.RunAsync(
@@ -280,6 +280,96 @@ public class InstallationServiceTests
         {
             Directory.Delete(tempDir, true);
         }
+    }
+
+    [Fact]
+    public async Task Install_When_Native_Failure_Disallows_Fallback_Does_Not_Invoke_PowerShell()
+    {
+        var service = CreateService();
+        var options = new InstallOptions { SaPassword = "ValidPassword1!@#" };
+
+        _mockNative
+            .Setup(n => n.InstallAsync(options, It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(NativeInstallationResult.Fail("Native failure without fallback permission.", allowLegacyFallback: false));
+
+        var result = await service.InstallAsync(options).ConfigureAwait(false);
+
+        Assert.False(result.Success);
+        Assert.Contains("fallback is disabled", result.Message, StringComparison.OrdinalIgnoreCase);
+
+        _mockRunner.Verify(r => r.RunAsync(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<IProgress<string>>(),
+            It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Install_When_Native_Fails_And_Legacy_Script_Missing_Returns_Missing_Script_Failure()
+    {
+        var service = CreateService();
+        var options = new InstallOptions { SaPassword = "ValidPassword1!@#" };
+
+        _mockNative
+            .Setup(n => n.InstallAsync(options, It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(NativeInstallationResult.Fail("Native failed.", allowLegacyFallback: true));
+
+        var result = await service.InstallAsync(options).ConfigureAwait(false);
+
+        Assert.False(result.Success);
+        Assert.Contains("Install script not found", result.Message, StringComparison.OrdinalIgnoreCase);
+
+        _mockRunner.Verify(r => r.RunAsync(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<IProgress<string>>(),
+            It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Install_When_Native_Throws_Exception_Returns_Failure_And_Does_Not_Fallback()
+    {
+        var service = CreateService();
+        var options = new InstallOptions { SaPassword = "ValidPassword1!@#" };
+
+        _mockNative
+            .Setup(n => n.InstallAsync(options, It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("native boom"));
+
+        var result = await service.InstallAsync(options).ConfigureAwait(false);
+
+        Assert.False(result.Success);
+        Assert.Contains("native installation failed", result.Message, StringComparison.OrdinalIgnoreCase);
+
+        _mockRunner.Verify(r => r.RunAsync(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<IProgress<string>>(),
+            It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Install_When_Native_Throws_Cancellation_Rethrows_And_Does_Not_Fallback()
+    {
+        var service = CreateService();
+        var options = new InstallOptions { SaPassword = "ValidPassword1!@#" };
+
+        _mockNative
+            .Setup(n => n.InstallAsync(options, It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new OperationCanceledException("cancelled"));
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            service.InstallAsync(options)).ConfigureAwait(false);
+
+        _mockRunner.Verify(r => r.RunAsync(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<IProgress<string>>(),
+            It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]

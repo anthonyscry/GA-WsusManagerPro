@@ -10,8 +10,9 @@ public interface INativeInstallationService
 {
     /// <summary>
     /// Executes the native installation workflow.
-    /// Returns a failed result when native execution cannot complete,
-    /// allowing the caller to choose fallback behavior.
+    /// Returns an explicit native result with fallback policy.
+    /// InstallationService may only run legacy fallback when
+    /// <see cref="NativeInstallationResult.AllowLegacyFallback"/> is true.
     /// </summary>
-    Task<OperationResult> InstallAsync(InstallOptions options, IProgress<string>? progress = null, CancellationToken ct = default);
+    Task<NativeInstallationResult> InstallAsync(InstallOptions options, IProgress<string>? progress = null, CancellationToken ct = default);
 }

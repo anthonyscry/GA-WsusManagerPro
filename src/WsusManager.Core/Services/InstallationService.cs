@@ -8,8 +8,8 @@ namespace WsusManager.Core.Services;
 
 /// <summary>
 /// Validates installation prerequisites, attempts native C# installation first,
-/// and falls back to the legacy Install-WsusWithSqlExpress.ps1 path when native
-/// orchestration fails.
+/// and falls back to the legacy Install-WsusWithSqlExpress.ps1 path only when
+/// native orchestration explicitly allows fallback.
 /// </summary>
 public class InstallationService : IInstallationService
 {
@@ -106,8 +106,20 @@ public class InstallationService : IInstallationService
             var nativeResult = await TryNativeInstallAsync(options, progress, ct).ConfigureAwait(false);
             if (nativeResult.Success)
             {
-                return nativeResult;
+                return OperationResult.Ok(nativeResult.Message);
             }
+
+            if (!nativeResult.AllowLegacyFallback)
+            {
+                var noFallbackMessage = $"Native installation failed and fallback is disabled: {nativeResult.Message}";
+                _logService.Warning(noFallbackMessage);
+                return OperationResult.Fail(noFallbackMessage, nativeResult.Exception);
+            }
+
+            var fallbackLine = $"[FALLBACK] Native installation failed: {nativeResult.Message}. " +
+                               "Switching to legacy Install-WsusWithSqlExpress.ps1 path.";
+            progress?.Report(fallbackLine);
+            _logService.Warning(fallbackLine);
 
             return await RunLegacyInstallAsync(options, progress, ct).ConfigureAwait(false);
         }
@@ -123,7 +135,7 @@ public class InstallationService : IInstallationService
         }
     }
 
-    private async Task<OperationResult> TryNativeInstallAsync(
+    private async Task<NativeInstallationResult> TryNativeInstallAsync(
         InstallOptions options,
         IProgress<string>? progress,
         CancellationToken ct)
@@ -139,11 +151,6 @@ public class InstallationService : IInstallationService
                 _logService.Info("WSUS installation completed successfully via native orchestrator");
                 return nativeResult;
             }
-
-            var fallbackLine = $"[FALLBACK] Native installation failed: {nativeResult.Message}. " +
-                               "Switching to legacy Install-WsusWithSqlExpress.ps1 path.";
-            progress?.Report(fallbackLine);
-            _logService.Warning(fallbackLine);
             return nativeResult;
         }
         catch (OperationCanceledException)
@@ -152,11 +159,11 @@ public class InstallationService : IInstallationService
         }
         catch (Exception ex)
         {
-            var fallbackLine = $"[FALLBACK] Native installation failed with exception: {ex.Message}. " +
-                               "Switching to legacy Install-WsusWithSqlExpress.ps1 path.";
-            progress?.Report(fallbackLine);
-            _logService.Warning(fallbackLine);
-            return OperationResult.Fail(ex.Message, ex);
+            _logService.Error(ex, "Native installation failed with unexpected error");
+            return NativeInstallationResult.Fail(
+                $"Native installation failed unexpectedly: {ex.Message}",
+                allowLegacyFallback: false,
+                exception: ex);
         }
     }
 
