@@ -5,6 +5,15 @@ All notable changes to WSUS Manager will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.5.9] - 2026-02-23
+
+### Fixed
+- Prevented CSV export from creating files when cancellation is already requested by checking cancellation before file path and stream setup.
+- Hardened cancellation regression tests to assert no file set mutation instead of deleting newly observed files in the user export directory.
+
+### Changed
+- Bumped in-app version display to `v4.5.9`.
+
 ## [4.5.8] - 2026-02-23
 
 ### Fixed

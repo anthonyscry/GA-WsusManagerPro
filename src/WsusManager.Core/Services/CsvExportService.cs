@@ -20,6 +20,8 @@ public sealed class CsvExportService : ICsvExportService
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var fileName = $"WsusManager-Computers-{DateTime.Now:yyyyMMdd-HHmmss}.csv";
         var documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         var filePath = Path.Combine(documentsPath, fileName);
@@ -78,6 +80,8 @@ public sealed class CsvExportService : ICsvExportService
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var fileName = $"WsusManager-Updates-{DateTime.Now:yyyyMMdd-HHmmss}.csv";
         var documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         var filePath = Path.Combine(documentsPath, fileName);

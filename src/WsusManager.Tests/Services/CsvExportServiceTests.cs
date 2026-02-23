@@ -272,23 +272,14 @@ public class CsvExportServiceTests : IDisposable
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        try
-        {
-            // Act / Assert
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
-                await _service.ExportComputersAsync(computers, null, cts.Token).ConfigureAwait(false)).ConfigureAwait(false);
-        }
-        finally
-        {
-            var filesAfter = Directory.GetFiles(exportDirectory, "WsusManager-Computers-*.csv");
-            foreach (var file in filesAfter)
-            {
-                if (!filesBefore.Contains(file) && File.Exists(file))
-                {
-                    File.Delete(file);
-                }
-            }
-        }
+        // Act / Assert
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await _service.ExportComputersAsync(computers, null, cts.Token).ConfigureAwait(false)).ConfigureAwait(false);
+
+        var filesAfter = Directory
+            .GetFiles(exportDirectory, "WsusManager-Computers-*.csv")
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Assert.True(filesAfter.SetEquals(filesBefore));
     }
 
     [Fact]
@@ -367,23 +358,14 @@ public class CsvExportServiceTests : IDisposable
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        try
-        {
-            // Act / Assert
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
-                await _service.ExportUpdatesAsync(updates, null, cts.Token).ConfigureAwait(false)).ConfigureAwait(false);
-        }
-        finally
-        {
-            var filesAfter = Directory.GetFiles(exportDirectory, "WsusManager-Updates-*.csv");
-            foreach (var file in filesAfter)
-            {
-                if (!filesBefore.Contains(file) && File.Exists(file))
-                {
-                    File.Delete(file);
-                }
-            }
-        }
+        // Act / Assert
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await _service.ExportUpdatesAsync(updates, null, cts.Token).ConfigureAwait(false)).ConfigureAwait(false);
+
+        var filesAfter = Directory
+            .GetFiles(exportDirectory, "WsusManager-Updates-*.csv")
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Assert.True(filesAfter.SetEquals(filesBefore));
     }
 
     private static List<ComputerInfo> CreateMockComputers(int count)
