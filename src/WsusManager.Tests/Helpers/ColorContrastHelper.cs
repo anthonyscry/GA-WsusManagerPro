@@ -47,9 +47,10 @@ public static class ColorContrastHelper
     private static (byte R, byte G, byte B) ParseColor(string hex)
     {
         hex = hex.TrimStart('#');
-        var r = byte.Parse(hex.Substring(0, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
-        var g = byte.Parse(hex.Substring(2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
-        var b = byte.Parse(hex.Substring(4, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+        var hexSpan = hex.AsSpan();
+        var r = byte.Parse(hexSpan.Slice(0, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+        var g = byte.Parse(hexSpan.Slice(2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+        var b = byte.Parse(hexSpan.Slice(4, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
         return (r, g, b);
     }
 

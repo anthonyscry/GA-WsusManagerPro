@@ -12,15 +12,27 @@ public class WsusCleanupExecutor : IWsusCleanupExecutor
 {
     private readonly IProcessRunner _processRunner;
     private readonly ILogService _logService;
+    private readonly ISettingsService? _settingsService;
 
-    public WsusCleanupExecutor(IProcessRunner processRunner, ILogService logService)
+    public WsusCleanupExecutor(
+        IProcessRunner processRunner,
+        ILogService logService,
+        ISettingsService? settingsService = null)
     {
         _processRunner = processRunner;
         _logService = logService;
+        _settingsService = settingsService;
     }
 
     public async Task<OperationResult> RunBuiltInCleanupAsync(IProgress<string> progress, CancellationToken ct)
     {
+        var allowFallback = _settingsService?.Current.EnableLegacyFallbackForCleanup ?? true;
+        if (!allowFallback)
+        {
+            _logService.Warning("Cleanup fallback execution is disabled by settings.");
+            return OperationResult.Fail("Legacy cleanup fallback is disabled by settings.");
+        }
+
         var psCommand =
             "Get-WsusServer -Name localhost -PortNumber 8530 | " +
             "Invoke-WsusServerCleanup " +

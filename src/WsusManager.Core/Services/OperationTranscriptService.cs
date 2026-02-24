@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -16,6 +17,7 @@ public sealed class OperationTranscriptService : IOperationTranscriptService
 {
     private const string TranscriptSubfolder = "Transcripts";
     private const string DefaultOperationName = "Operation";
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> FileWriteLocks = new(StringComparer.Ordinal);
     private readonly string _transcriptsDirectory;
 
     public OperationTranscriptService(string logDirectory)
@@ -32,10 +34,20 @@ public sealed class OperationTranscriptService : IOperationTranscriptService
         var path = GetTranscriptPath(operationId, operationName);
         Directory.CreateDirectory(_transcriptsDirectory);
 
-        await File.AppendAllTextAsync(
-            path,
-            line + Environment.NewLine,
-            ct).ConfigureAwait(false);
+        var fileLock = FileWriteLocks.GetOrAdd(path, _ => new SemaphoreSlim(1, 1));
+        await fileLock.WaitAsync(ct).ConfigureAwait(false);
+
+        try
+        {
+            await File.AppendAllTextAsync(
+                path,
+                line + Environment.NewLine,
+                ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            fileLock.Release();
+        }
     }
 
     public string GetTranscriptPath(Guid operationId, string operationName)
