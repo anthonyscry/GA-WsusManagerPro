@@ -242,7 +242,7 @@ public class KeyboardNavigationTests
     {
         var content = File.ReadAllText(GetXamlPath("MainWindow.xaml"));
 
-        Assert.Contains("pack://siteoforigin:,,,/general_atomics_logo_big.ico", content);
+        Assert.Contains("pack://application:,,,/general_atomics_logo_big.ico", content);
     }
 
     [Fact]
