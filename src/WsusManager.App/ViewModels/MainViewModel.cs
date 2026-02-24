@@ -813,7 +813,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             _logService?.Debug("Loading updates...");
 
-            var updates = await _dashboardService.GetUpdatesAsync(ct).ConfigureAwait(true);
+            var updates = await _dashboardService
+                .GetUpdatesAsync(_settings, pageNumber: 1, pageSize: 100, ct)
+                .ConfigureAwait(true);
 
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
@@ -1023,8 +1025,16 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanExecuteWsusOperation))]
     private async Task ResetContent()
     {
-        // Confirm before running destructive operation
-        if (!ConfirmDestructiveOperation("Content Reset"))
+        var confirm = MessageBox.Show(
+            "Reset Content will re-verify every WSUS content file against the database and may run for a while.\n\n" +
+            "Use this when clients report content mismatch or stuck download states.\n\n" +
+            "Do you want to continue?",
+            "Confirm Content Reset",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No);
+
+        if (confirm != MessageBoxResult.Yes)
             return;
 
         await Navigate("Diagnostics").ConfigureAwait(false);
@@ -1285,6 +1295,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (Application.Current.MainWindow is not null)
             dialog.Owner = Application.Current.MainWindow;
 
+        _themeService.ApplyTitleBarColorsToWindow(dialog, _settings.SelectedTheme);
+
         if (dialog.ShowDialog() != true || dialog.Options is null) return;
 
         var options = dialog.Options;
@@ -1483,6 +1495,28 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     private string _errorCodeResult = string.Empty;
+
+    partial void OnErrorCodeInputChanged(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            ErrorCodeResult = string.Empty;
+            return;
+        }
+
+        LookupErrorCode();
+    }
+
+    public IReadOnlyList<string> CommonErrorCodes =>
+    [
+        "0x80072EE2",
+        "0x80244022",
+        "0x80244010",
+        "0x80070005",
+        "0x80240022",
+        "0x80070643",
+        "0x80242016"
+    ];
 
     /// <summary>
     /// Hostnames for mass GPUpdate. Can be comma, semicolon, or newline separated.

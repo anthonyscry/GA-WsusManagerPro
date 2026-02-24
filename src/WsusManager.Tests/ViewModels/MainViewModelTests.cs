@@ -1260,4 +1260,39 @@ public class MainViewModelTests
         Assert.Equal("All", _vm.UpdateClassificationFilter);
         Assert.Empty(_vm.UpdateSearchText);
     }
+
+    [Fact]
+    public async Task LoadUpdatesAsync_Calls_Settings_Based_Dashboard_Overload()
+    {
+        var updates = new List<UpdateInfo>
+        {
+            new(Guid.NewGuid(), "Security Update", "5031000", "Security Updates", DateTime.UtcNow, true, false)
+        };
+
+        _mockDashboard
+            .Setup(d => d.GetUpdatesAsync(It.IsAny<AppSettings>(), 1, 100, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(updates);
+
+        await _vm.LoadUpdatesAsync();
+
+        _mockDashboard.Verify(
+            d => d.GetUpdatesAsync(It.IsAny<AppSettings>(), 1, 100, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public void CommonErrorCodes_Contains_Known_Update_Error_Codes()
+    {
+        Assert.Contains("0x80072EE2", _vm.CommonErrorCodes);
+        Assert.Contains("0x80244022", _vm.CommonErrorCodes);
+    }
+
+    [Fact]
+    public void CommonErrorCodes_All_Map_To_Known_Wsus_Error_Definitions()
+    {
+        foreach (var code in _vm.CommonErrorCodes)
+        {
+            Assert.NotNull(WsusErrorCodes.Lookup(code));
+        }
+    }
 }
