@@ -410,6 +410,13 @@ Compared to PowerShell v3.8.x:
 - **3x less memory** (50-80MB vs 150-200MB)
 - **52% less code** (1,180 vs 2,482 LOC)
 
+## Cutover Logging and Fallback Behavior
+
+- **Set HTTPS workflow:** The Setup menu includes `Set HTTPS`, which collects server name and certificate thumbprint, then runs a C#-first HTTPS path with optional legacy fallback.
+- **Live Terminal mode:** When enabled, process-backed operations use visible terminal execution instead of hidden buffered output mode.
+- **Operation telemetry:** Operations emit a stable operation ID and write per-operation transcript files under the WSUS log directory.
+- **Fallback markers:** Any legacy-path fallback emits a `[FALLBACK]` marker in progress/log output to simplify parity validation.
+
 ## License
 
 This project is proprietary software developed for GA-ASI internal use.

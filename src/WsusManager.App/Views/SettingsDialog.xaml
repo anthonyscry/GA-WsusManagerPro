@@ -108,6 +108,9 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="160"/>
@@ -305,8 +308,53 @@
                          Padding="6,4" FontSize="12" Margin="0,0,0,12"
                          InputScope="Number"/>
 
+                <!-- Install Fallback -->
+                <TextBlock Grid.Row="2" Grid.Column="0"
+                           Text="Install Fallback"
+                           Foreground="{DynamicResource TextSecondary}" FontSize="12"
+                           VerticalAlignment="Center" Margin="0,0,0,12">
+                    <TextBlock.ToolTip>
+                        <ToolTip Content="If enabled, installation uses legacy PowerShell path when native path fails."/>
+                    </TextBlock.ToolTip>
+                </TextBlock>
+                <CheckBox x:Name="ChkEnableLegacyFallbackForInstall"
+                          Grid.Row="2" Grid.Column="1"
+                          automation:AutomationProperties.AutomationId="EnableLegacyFallbackForInstallCheckBox"
+                          Content="Enable install fallback"
+                          VerticalAlignment="Center" Margin="0,0,0,12"/>
+
+                <!-- HTTPS Fallback -->
+                <TextBlock Grid.Row="3" Grid.Column="0"
+                           Text="HTTPS Fallback"
+                           Foreground="{DynamicResource TextSecondary}" FontSize="12"
+                           VerticalAlignment="Center" Margin="0,0,0,12">
+                    <TextBlock.ToolTip>
+                        <ToolTip Content="If enabled, HTTPS setup uses legacy PowerShell path when native path fails."/>
+                    </TextBlock.ToolTip>
+                </TextBlock>
+                <CheckBox x:Name="ChkEnableLegacyFallbackForHttps"
+                          Grid.Row="3" Grid.Column="1"
+                          automation:AutomationProperties.AutomationId="EnableLegacyFallbackForHttpsCheckBox"
+                          Content="Enable HTTPS fallback"
+                          VerticalAlignment="Center" Margin="0,0,0,12"/>
+
+                <!-- Cleanup Fallback -->
+                <TextBlock Grid.Row="4" Grid.Column="0"
+                           Text="Cleanup Fallback"
+                           Foreground="{DynamicResource TextSecondary}" FontSize="12"
+                           VerticalAlignment="Center" Margin="0,0,0,12">
+                    <TextBlock.ToolTip>
+                        <ToolTip Content="If enabled, deep cleanup can use legacy fallback behavior for unavailable native paths."/>
+                    </TextBlock.ToolTip>
+                </TextBlock>
+                <CheckBox x:Name="ChkEnableLegacyFallbackForCleanup"
+                          Grid.Row="4" Grid.Column="1"
+                          automation:AutomationProperties.AutomationId="EnableLegacyFallbackForCleanupCheckBox"
+                          Content="Enable cleanup fallback"
+                          VerticalAlignment="Center" Margin="0,0,0,12"/>
+
                 <!-- Reset to Defaults Button -->
-                <Button Grid.Row="2" Grid.ColumnSpan="2"
+                <Button Grid.Row="5" Grid.ColumnSpan="2"
                         x:Name="BtnResetToDefaults"
                         Content="Reset to Defaults"
                         Style="{StaticResource BtnSec}"

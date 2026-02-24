@@ -97,6 +97,28 @@ public class AppSettings
     public int WinRMRetryCount { get; set; } = 3;
 
     // ═══════════════════════════════════════════════════════════════
+    // CUTOVER SAFETY FLAGS
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Enables legacy PowerShell fallback when native install path fails.
+    /// </summary>
+    [JsonPropertyName("enableLegacyFallbackForInstall")]
+    public bool EnableLegacyFallbackForInstall { get; set; } = true;
+
+    /// <summary>
+    /// Enables legacy PowerShell fallback when native HTTPS path fails.
+    /// </summary>
+    [JsonPropertyName("enableLegacyFallbackForHttps")]
+    public bool EnableLegacyFallbackForHttps { get; set; } = true;
+
+    /// <summary>
+    /// Enables legacy PowerShell fallback when native cleanup step is unavailable.
+    /// </summary>
+    [JsonPropertyName("enableLegacyFallbackForCleanup")]
+    public bool EnableLegacyFallbackForCleanup { get; set; } = true;
+
+    // ═══════════════════════════════════════════════════════════════
     // DATA FILTERING SETTINGS (Phase 29)
     // ═══════════════════════════════════════════════════════════════
 

@@ -3,6 +3,7 @@ using WsusManager.Core.Infrastructure;
 using WsusManager.Core.Logging;
 using WsusManager.Core.Models;
 using WsusManager.Core.Services;
+using WsusManager.Core.Services.Interfaces;
 
 namespace WsusManager.Tests.Services;
 
@@ -14,9 +15,10 @@ public class ScheduledTaskServiceTests
 {
     private readonly Mock<IProcessRunner> _mockRunner = new();
     private readonly Mock<ILogService> _mockLog = new();
+    private readonly Mock<IMaintenanceCommandBuilder> _mockCommandBuilder = new();
 
     private ScheduledTaskService CreateService() =>
-        new(_mockRunner.Object, _mockLog.Object);
+        new(_mockRunner.Object, _mockLog.Object, _mockCommandBuilder.Object);
 
     private static ScheduledTaskOptions DefaultOptions(ScheduleType schedule = ScheduleType.Monthly) =>
         new()
@@ -241,6 +243,34 @@ public class ScheduledTaskServiceTests
 
         Assert.False(result.Success);
         Assert.Contains("script not found", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CreateTaskAsync_UsesNativeMaintenanceCommandBuilder()
+    {
+        var options = DefaultOptions();
+        _mockCommandBuilder
+            .Setup(b => b.Build(options, It.IsAny<string>()))
+            .Returns("powershell.exe -ExecutionPolicy Bypass -File \"C:\\WSUS\\Scripts\\Invoke-WsusMonthlyMaintenance.ps1\" -Unattended -MaintenanceProfile Full");
+
+        _mockRunner
+            .Setup(r => r.RunAsync("schtasks.exe", It.Is<string>(a => a.Contains("/Delete")), null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProcessResult(0, []));
+
+        _mockRunner
+            .Setup(r => r.RunAsync("schtasks.exe", It.Is<string>(a => a.Contains("/Create")), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProcessResult(0, ["SUCCESS"]));
+
+        var service = new ScheduledTaskService(
+            _mockRunner.Object,
+            _mockLog.Object,
+            _mockCommandBuilder.Object,
+            () => @"C:\WSUS\Scripts\Invoke-WsusMonthlyMaintenance.ps1");
+
+        var result = await service.CreateTaskAsync(options).ConfigureAwait(false);
+
+        Assert.True(result.Success);
+        _mockCommandBuilder.Verify(b => b.Build(options, It.IsAny<string>()), Times.Once);
     }
 
     [Fact]

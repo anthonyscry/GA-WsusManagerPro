@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using WsusManager.Core.Logging;
 using WsusManager.Core.Models;
+using WsusManager.Core.Services.Interfaces;
 
 namespace WsusManager.Core.Infrastructure;
 
@@ -12,10 +13,14 @@ namespace WsusManager.Core.Infrastructure;
 public class ProcessRunner : IProcessRunner
 {
     private readonly ILogService _logService;
+    private readonly ISettingsService? _settingsService;
 
-    public ProcessRunner(ILogService logService)
+    internal ProcessStartInfo? LastStartInfoSnapshot { get; private set; }
+
+    public ProcessRunner(ILogService logService, ISettingsService? settingsService = null)
     {
         _logService = logService;
+        _settingsService = settingsService;
     }
 
     public async Task<ProcessResult> RunAsync(
@@ -26,44 +31,66 @@ public class ProcessRunner : IProcessRunner
     {
         _logService.Debug("Running: {Executable} [arguments hidden]", executable);
 
+        var liveTerminalMode = _settingsService?.Current.LiveTerminalMode ?? false;
+        if (liveTerminalMode)
+        {
+            progress?.Report("[INFO] Live Terminal mode enabled for this operation.");
+        }
+
+        var startInfo = new ProcessStartInfo(executable, arguments)
+        {
+            RedirectStandardOutput = !liveTerminalMode,
+            RedirectStandardError = !liveTerminalMode,
+            UseShellExecute = liveTerminalMode,
+            CreateNoWindow = !liveTerminalMode
+        };
+
+        LastStartInfoSnapshot = new ProcessStartInfo(startInfo.FileName, startInfo.Arguments)
+        {
+            RedirectStandardOutput = startInfo.RedirectStandardOutput,
+            RedirectStandardError = startInfo.RedirectStandardError,
+            UseShellExecute = startInfo.UseShellExecute,
+            CreateNoWindow = startInfo.CreateNoWindow
+        };
+
         using var proc = new Process
         {
-            StartInfo = new ProcessStartInfo(executable, arguments)
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }
+            StartInfo = startInfo
         };
 
         var outputLines = new List<string>();
         var outputLock = new object();
 
-        proc.OutputDataReceived += (_, e) =>
+        if (!liveTerminalMode)
         {
-            if (e.Data is null) return;
-            lock (outputLock)
+            proc.OutputDataReceived += (_, e) =>
             {
-                outputLines.Add(e.Data);
-            }
-            progress?.Report(e.Data);
-        };
+                if (e.Data is null) return;
+                lock (outputLock)
+                {
+                    outputLines.Add(e.Data);
+                }
+                progress?.Report(e.Data);
+            };
 
-        proc.ErrorDataReceived += (_, e) =>
-        {
-            if (e.Data is null) return;
-            var line = $"[ERR] {e.Data}";
-            lock (outputLock)
+            proc.ErrorDataReceived += (_, e) =>
             {
-                outputLines.Add(line);
-            }
-            progress?.Report(line);
-        };
+                if (e.Data is null) return;
+                var line = $"[ERR] {e.Data}";
+                lock (outputLock)
+                {
+                    outputLines.Add(line);
+                }
+                progress?.Report(line);
+            };
+        }
 
         proc.Start();
-        proc.BeginOutputReadLine();
-        proc.BeginErrorReadLine();
+        if (!liveTerminalMode)
+        {
+            proc.BeginOutputReadLine();
+            proc.BeginErrorReadLine();
+        }
 
         try
         {

@@ -1,10 +1,13 @@
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
+using Serilog.Events;
+using WsusManager.Core.Models;
 using WsusManager.App.Services;
 using WsusManager.App.ViewModels;
 using WsusManager.App.Views;
@@ -12,6 +15,7 @@ using WsusManager.Core.Infrastructure;
 using WsusManager.Core.Logging;
 using WsusManager.Core.Services;
 using WsusManager.Core.Services.Interfaces;
+using AppLogLevel = WsusManager.Core.Models.LogLevel;
 
 namespace WsusManager.App;
 
@@ -28,11 +32,12 @@ public static class Program
     public static void Main(string[] args)
     {
         var startupTimer = Stopwatch.StartNew();
+        var startupSettings = LoadStartupSettings();
 
         // Create structured logger early so all startup activity is captured
-        var logService = new LogService(LogDirectory);
+        var logService = new LogService(LogDirectory, startupSettings);
 
-        var host = CreateHost(args, logService);
+        var host = CreateHost(args, logService, startupSettings);
 
         var app = new App();
         app.InitializeComponent();
@@ -72,18 +77,31 @@ public static class Program
     /// Creates the DI host with all services registered.
     /// Exposed as internal for integration testing.
     /// </summary>
-    internal static IHost CreateHost(string[] args, LogService logService)
+    internal static IHost CreateHost(string[] args, LogService logService, AppSettings startupSettings)
     {
         var builder = Host.CreateApplicationBuilder(args);
 
+        var retentionDays = Math.Clamp(startupSettings.LogRetentionDays, 1, 365);
+        var fileSizeBytes = (long)Math.Clamp(startupSettings.LogMaxFileSizeMb, 1, 1000) * 1024 * 1024;
+        var level = startupSettings.LogLevel switch
+        {
+            AppLogLevel.Debug => LogEventLevel.Debug,
+            AppLogLevel.Info => LogEventLevel.Information,
+            AppLogLevel.Warning => LogEventLevel.Warning,
+            AppLogLevel.Error => LogEventLevel.Error,
+            AppLogLevel.Fatal => LogEventLevel.Fatal,
+            _ => LogEventLevel.Information
+        };
+
         // Configure Serilog as the logging provider for Microsoft.Extensions.Logging
         var serilogLogger = new LoggerConfiguration()
-            .MinimumLevel.Debug()
+            .MinimumLevel.Is(level)
             .WriteTo.File(
                 Path.Combine(LogDirectory, "WsusManager-.log"),
                 rollingInterval: Serilog.RollingInterval.Day,
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}",
-                retainedFileCountLimit: 30,
+                retainedFileCountLimit: retentionDays,
+                fileSizeLimitBytes: fileSizeBytes,
                 shared: true)
             .CreateLogger();
 
@@ -92,6 +110,7 @@ public static class Program
 
         // Core services
         builder.Services.AddSingleton<ILogService>(logService);
+        builder.Services.AddSingleton<IOperationTranscriptService>(_ => new OperationTranscriptService(LogDirectory));
         builder.Services.AddSingleton<ISettingsService, SettingsService>();
         builder.Services.AddSingleton<IProcessRunner, ProcessRunner>();
         builder.Services.AddSingleton<IDashboardService, DashboardService>();
@@ -105,6 +124,7 @@ public static class Program
 
         // Phase 4: Database Operations
         builder.Services.AddSingleton<ISqlService, SqlService>();
+        builder.Services.AddSingleton<IWsusCleanupExecutor, WsusCleanupExecutor>();
         builder.Services.AddSingleton<IDeepCleanupService, DeepCleanupService>();
         builder.Services.AddSingleton<IDatabaseBackupService, DatabaseBackupService>();
 
@@ -114,8 +134,12 @@ public static class Program
         builder.Services.AddSingleton<IRobocopyService, RobocopyService>();
         builder.Services.AddSingleton<IExportService, ExportService>();
         builder.Services.AddSingleton<IImportService, ImportService>();
+        builder.Services.AddSingleton<LegacyHttpsConfigurationFallback>();
+        builder.Services.AddSingleton<IHttpsConfigurationService, HttpsConfigurationService>();
 
         // Phase 6: Installation and Scheduling
+        builder.Services.AddSingleton<INativeInstallationService, NativeInstallationService>();
+        builder.Services.AddSingleton<IMaintenanceCommandBuilder, MaintenanceCommandBuilder>();
         builder.Services.AddSingleton<IInstallationService, InstallationService>();
         builder.Services.AddSingleton<IScheduledTaskService, ScheduledTaskService>();
         builder.Services.AddSingleton<IGpoDeploymentService, GpoDeploymentService>();
@@ -129,6 +153,7 @@ public static class Program
 
         // Phase 16: Theme Infrastructure
         builder.Services.AddSingleton<IThemeService, ThemeService>();
+        builder.Services.AddSingleton<IHttpsDialogService, HttpsDialogService>();
 
         // Phase 27: Visual Feedback Polish
         builder.Services.AddSingleton<IBenchmarkTimingService, BenchmarkTimingService>();
@@ -146,5 +171,36 @@ public static class Program
         builder.Services.AddSingleton<MainWindow>();
 
         return builder.Build();
+    }
+
+    private static string GetSettingsPath()
+    {
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        return Path.Combine(appData, "WsusManager", "settings.json");
+    }
+
+    private static AppSettings LoadStartupSettings()
+    {
+        try
+        {
+            var settingsPath = GetSettingsPath();
+            if (!File.Exists(settingsPath))
+            {
+                return new AppSettings();
+            }
+
+            var json = File.ReadAllText(settingsPath);
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return new AppSettings();
+            }
+
+            var settings = JsonSerializer.Deserialize<AppSettings>(json);
+            return settings ?? new AppSettings();
+        }
+        catch
+        {
+            return new AppSettings();
+        }
     }
 }

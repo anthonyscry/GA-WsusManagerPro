@@ -14,14 +14,22 @@ public class ScheduledTaskService : IScheduledTaskService
 {
     private readonly IProcessRunner _processRunner;
     private readonly ILogService _logService;
+    private readonly IMaintenanceCommandBuilder _maintenanceCommandBuilder;
+    private readonly Func<string?> _locateScript;
 
     /// <summary>PowerShell maintenance script filename.</summary>
     public const string MaintenanceScriptName = "Invoke-WsusMonthlyMaintenance.ps1";
 
-    public ScheduledTaskService(IProcessRunner processRunner, ILogService logService)
+    public ScheduledTaskService(
+        IProcessRunner processRunner,
+        ILogService logService,
+        IMaintenanceCommandBuilder maintenanceCommandBuilder,
+        Func<string?>? locateScript = null)
     {
         _processRunner = processRunner;
         _logService = logService;
+        _maintenanceCommandBuilder = maintenanceCommandBuilder;
+        _locateScript = locateScript ?? LocateScript;
     }
 
     /// <inheritdoc/>
@@ -33,7 +41,7 @@ public class ScheduledTaskService : IScheduledTaskService
         try
         {
             // Locate the maintenance script
-            var scriptPath = LocateScript();
+            var scriptPath = _locateScript();
             if (scriptPath is null)
             {
                 var msg = $"Maintenance script not found. Searched for '{MaintenanceScriptName}' in:\n" +
@@ -55,9 +63,7 @@ public class ScheduledTaskService : IScheduledTaskService
                 ct: ct).ConfigureAwait(false);
 
             // Step 2: Build the task action command
-            var taskAction = $"powershell.exe -ExecutionPolicy Bypass " +
-                             $"-File \\\"{scriptPath}\\\" " +
-                             $"-Unattended -MaintenanceProfile {options.MaintenanceProfile}";
+            var taskAction = _maintenanceCommandBuilder.Build(options, scriptPath);
 
             // Step 3: Build schtasks /Create arguments
             var args = BuildCreateArguments(options, taskAction);

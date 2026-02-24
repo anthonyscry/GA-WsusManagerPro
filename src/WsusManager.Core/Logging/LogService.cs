@@ -1,5 +1,6 @@
 using Serilog;
 using Serilog.Events;
+using WsusManager.Core.Models;
 
 namespace WsusManager.Core.Logging;
 
@@ -12,16 +13,25 @@ public class LogService : ILogService, IDisposable
 {
     private const string DefaultLogDirectory = @"C:\WSUS\Logs";
     private const string LogFileTemplate = "WsusManager-.log";
+    private const int MinimumRetentionDays = 1;
+    private const int MaximumRetentionDays = 365;
+    private const int MinimumLogFileSizeMb = 1;
+    private const int MaximumLogFileSizeMb = 1000;
 
     private readonly Serilog.Core.Logger _logger;
     private bool _disposed;
 
     public LogService()
-        : this(DefaultLogDirectory)
+        : this(DefaultLogDirectory, new AppSettings())
     {
     }
 
     public LogService(string logDirectory)
+        : this(logDirectory, new AppSettings())
+    {
+    }
+
+    public LogService(string logDirectory, AppSettings settings)
     {
         // Ensure log directory exists
         try
@@ -37,18 +47,32 @@ public class LogService : ILogService, IDisposable
         }
 
         var logPath = Path.Combine(logDirectory, LogFileTemplate);
+        var level = MapLogLevel(settings?.LogLevel ?? LogLevel.Info);
+        var retentionDays = Math.Clamp(settings?.LogRetentionDays ?? 30, MinimumRetentionDays, MaximumRetentionDays);
+        var fileSizeBytes = (long)Math.Clamp(settings?.LogMaxFileSizeMb ?? 10, MinimumLogFileSizeMb, MaximumLogFileSizeMb) * 1024 * 1024;
 
         _logger = new LoggerConfiguration()
-            .MinimumLevel.Debug()
+            .MinimumLevel.Is(level)
             .WriteTo.File(
                 logPath,
                 rollingInterval: RollingInterval.Day,
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}",
-                retainedFileCountLimit: 30,
-                fileSizeLimitBytes: 50 * 1024 * 1024, // 50MB per file
+                retainedFileCountLimit: retentionDays,
+                fileSizeLimitBytes: fileSizeBytes,
                 shared: true)
             .CreateLogger();
     }
+
+    private static LogEventLevel MapLogLevel(LogLevel level) =>
+        level switch
+        {
+            LogLevel.Debug => LogEventLevel.Debug,
+            LogLevel.Info => LogEventLevel.Information,
+            LogLevel.Warning => LogEventLevel.Warning,
+            LogLevel.Error => LogEventLevel.Error,
+            LogLevel.Fatal => LogEventLevel.Fatal,
+            _ => LogEventLevel.Information
+        };
 
     public void Info(string messageTemplate, params object[] propertyValues)
         => _logger.Information(messageTemplate, propertyValues);

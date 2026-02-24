@@ -5,6 +5,19 @@ All notable changes to WSUS Manager will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- C#-first installation orchestration via `INativeInstallationService` with explicit legacy fallback marker flow.
+- `Set HTTPS` end-to-end workflow in the WPF UI (sidebar command, validated dialog, service invocation).
+- Per-operation transcript infrastructure and operation-scoped telemetry context for richer diagnostics.
+- Migration parity tests validating native-success paths avoid fallback markers.
+
+### Changed
+- Scheduled task action construction now uses `IMaintenanceCommandBuilder` abstraction instead of inline command composition.
+- Deep Cleanup Step 1 now uses `IWsusCleanupExecutor` abstraction for built-in cleanup execution.
+- Added safe-cutover settings flags for install/https/cleanup fallback behavior defaults.
+
 ## [4.5.9] - 2026-02-23
 
 ### Fixed

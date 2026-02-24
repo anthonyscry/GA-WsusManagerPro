@@ -84,6 +84,9 @@ public partial class SettingsDialog : Window
         // Populate Advanced section
         TxtWinRMTimeoutSeconds.Text = current.WinRMTimeoutSeconds.ToString();
         TxtWinRMRetryCount.Text = current.WinRMRetryCount.ToString();
+        ChkEnableLegacyFallbackForInstall.IsChecked = current.EnableLegacyFallbackForInstall;
+        ChkEnableLegacyFallbackForHttps.IsChecked = current.EnableLegacyFallbackForHttps;
+        ChkEnableLegacyFallbackForCleanup.IsChecked = current.EnableLegacyFallbackForCleanup;
 
         // Wire up validation handlers
         TxtLogRetentionDays.LostFocus += (s, e) => ValidateNumericTextBox(
@@ -308,7 +311,10 @@ string.Equals(selected.Content?.ToString(), "Air-Gap", StringComparison.Ordinal)
             DashboardRefreshInterval = ParseDashboardRefreshInterval(),
             RequireConfirmationDestructive = ChkRequireConfirmationDestructive.IsChecked ?? true,
             WinRMTimeoutSeconds = int.Parse(TxtWinRMTimeoutSeconds.Text),
-            WinRMRetryCount = int.Parse(TxtWinRMRetryCount.Text)
+            WinRMRetryCount = int.Parse(TxtWinRMRetryCount.Text),
+            EnableLegacyFallbackForInstall = ChkEnableLegacyFallbackForInstall.IsChecked ?? true,
+            EnableLegacyFallbackForHttps = ChkEnableLegacyFallbackForHttps.IsChecked ?? true,
+            EnableLegacyFallbackForCleanup = ChkEnableLegacyFallbackForCleanup.IsChecked ?? true
         };
 
         DialogResult = true;
@@ -365,6 +371,9 @@ string.Equals(selected.Content?.ToString(), "Air-Gap", StringComparison.Ordinal)
         ChkRequireConfirmationDestructive.IsChecked = defaults.RequireConfirmationDestructive;
         TxtWinRMTimeoutSeconds.Text = defaults.WinRMTimeoutSeconds.ToString();
         TxtWinRMRetryCount.Text = defaults.WinRMRetryCount.ToString();
+        ChkEnableLegacyFallbackForInstall.IsChecked = defaults.EnableLegacyFallbackForInstall;
+        ChkEnableLegacyFallbackForHttps.IsChecked = defaults.EnableLegacyFallbackForHttps;
+        ChkEnableLegacyFallbackForCleanup.IsChecked = defaults.EnableLegacyFallbackForCleanup;
 
         // Reset theme
         _previewTheme = defaults.SelectedTheme;

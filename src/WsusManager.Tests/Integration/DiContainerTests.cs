@@ -31,6 +31,7 @@ public class DiContainerTests
 
         // Phase 4: Database Operations
         services.AddSingleton<ISqlService, SqlService>();
+        services.AddSingleton<IWsusCleanupExecutor, WsusCleanupExecutor>();
         services.AddSingleton<IDeepCleanupService, DeepCleanupService>();
         services.AddSingleton<IDatabaseBackupService, DatabaseBackupService>();
 
@@ -42,6 +43,8 @@ public class DiContainerTests
         services.AddSingleton<IImportService, ImportService>();
 
         // Phase 6: Installation and Scheduling
+        services.AddSingleton<INativeInstallationService, NativeInstallationService>();
+        services.AddSingleton<IMaintenanceCommandBuilder, MaintenanceCommandBuilder>();
         services.AddSingleton<IInstallationService, InstallationService>();
         services.AddSingleton<IScheduledTaskService, ScheduledTaskService>();
         services.AddSingleton<IGpoDeploymentService, GpoDeploymentService>();

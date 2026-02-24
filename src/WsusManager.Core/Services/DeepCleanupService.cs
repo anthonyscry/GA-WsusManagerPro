@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using Microsoft.Data.SqlClient;
-using WsusManager.Core.Infrastructure;
 using WsusManager.Core.Logging;
 using WsusManager.Core.Models;
 using WsusManager.Core.Services.Interfaces;
@@ -15,7 +14,7 @@ namespace WsusManager.Core.Services;
 public class DeepCleanupService : IDeepCleanupService
 {
     private readonly ISqlService _sqlService;
-    private readonly IProcessRunner _processRunner;
+    private readonly IWsusCleanupExecutor _wsusCleanupExecutor;
     private readonly ILogService _logService;
 
     // SQL batch sizes matching PowerShell implementation
@@ -30,11 +29,11 @@ public class DeepCleanupService : IDeepCleanupService
 
     public DeepCleanupService(
         ISqlService sqlService,
-        IProcessRunner processRunner,
+        IWsusCleanupExecutor wsusCleanupExecutor,
         ILogService logService)
     {
         _sqlService = sqlService;
-        _processRunner = processRunner;
+        _wsusCleanupExecutor = wsusCleanupExecutor;
         _logService = logService;
     }
 
@@ -112,29 +111,15 @@ public class DeepCleanupService : IDeepCleanupService
         var sw = Stopwatch.StartNew();
         progress.Report("[Step 1/6] WSUS built-in cleanup...");
 
-        // Run Get-WsusServer | Invoke-WsusServerCleanup via PowerShell
-        // WSUS managed API is incompatible with .NET 9 — must use PS subprocess
-        var psCommand =
-            "Get-WsusServer -Name localhost -PortNumber 8530 | " +
-            "Invoke-WsusServerCleanup " +
-            "-CleanupObsoleteUpdates " +
-            "-CleanupUnneededContentFiles " +
-            "-CompressUpdates " +
-            "-DeclineSupersededUpdates";
-
-        var result = await _processRunner.RunAsync(
-            "powershell.exe",
-            $"-NonInteractive -NoProfile -Command \"{psCommand}\"",
-            progress,
-            ct).ConfigureAwait(false);
+        var result = await _wsusCleanupExecutor.RunBuiltInCleanupAsync(progress, ct).ConfigureAwait(false);
 
         sw.Stop();
         if (result.Success)
             progress.Report($"[Step 1/6] WSUS built-in cleanup... done ({sw.Elapsed.TotalSeconds:F0}s)");
         else
-            progress.Report($"[Step 1/6] WSUS built-in cleanup... warning (exit code {result.ExitCode}, {sw.Elapsed.TotalSeconds:F0}s)");
+            progress.Report($"[Step 1/6] WSUS built-in cleanup... warning ({result.Message}, {sw.Elapsed.TotalSeconds:F0}s)");
 
-        _logService.Info("Step 1 complete in {Elapsed}s, exit code {ExitCode}", sw.Elapsed.TotalSeconds, result.ExitCode);
+        _logService.Info("Step 1 complete in {Elapsed}s, success={Success}", sw.Elapsed.TotalSeconds, result.Success);
     }
 
     // ─── Step 2: Remove declined supersession records ────────────────────

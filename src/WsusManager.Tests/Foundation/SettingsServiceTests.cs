@@ -63,7 +63,10 @@ public class SettingsServiceTests : IDisposable
             LiveTerminalMode = true,
             ContentPath = @"D:\WSUS",
             SqlInstance = @"SERVER1\SQLEXPRESS",
-            RefreshIntervalSeconds = 45
+            RefreshIntervalSeconds = 45,
+            EnableLegacyFallbackForInstall = false,
+            EnableLegacyFallbackForHttps = false,
+            EnableLegacyFallbackForCleanup = true
         };
 
         await svc.SaveAsync(original);
@@ -78,6 +81,9 @@ public class SettingsServiceTests : IDisposable
         Assert.Equal(original.ContentPath, loaded.ContentPath);
         Assert.Equal(original.SqlInstance, loaded.SqlInstance);
         Assert.Equal(original.RefreshIntervalSeconds, loaded.RefreshIntervalSeconds);
+        Assert.Equal(original.EnableLegacyFallbackForInstall, loaded.EnableLegacyFallbackForInstall);
+        Assert.Equal(original.EnableLegacyFallbackForHttps, loaded.EnableLegacyFallbackForHttps);
+        Assert.Equal(original.EnableLegacyFallbackForCleanup, loaded.EnableLegacyFallbackForCleanup);
     }
 
     [Fact]

@@ -675,6 +675,20 @@ mockService.Setup(x => x.CheckHealthAsync(It.IsAny<CancellationToken>()))
 - `Get-EscapedPath` escapes dangerous characters
 - Whitelist approach (only allow safe paths)
 
+## CSharp-First Cutover Strategy
+
+The current migration strategy uses **C#-first execution with explicit fallback adapters**:
+
+- Native service path runs first for operations under migration (HTTPS setup, installation orchestration, maintenance command generation).
+- Legacy PowerShell fallback is retained as a safety net and emits `[FALLBACK]` markers in progress/log output.
+- Fallback behavior is controlled by settings flags (`EnableLegacyFallbackForInstall`, `EnableLegacyFallbackForHttps`, `EnableLegacyFallbackForCleanup`) with safe defaults enabled.
+
+### Execution Telemetry
+
+- Each operation receives an operation-scoped telemetry context (operation ID + name + timestamps).
+- Per-operation transcript files capture line-level operation output for post-run diagnostics.
+- Live Terminal mode remains a runtime setting and changes process-start behavior for supported operations.
+
 ## Future Enhancements
 
 Potential architecture improvements for future releases:

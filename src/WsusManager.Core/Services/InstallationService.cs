@@ -16,6 +16,9 @@ public class InstallationService : IInstallationService
 {
     private readonly IProcessRunner _processRunner;
     private readonly ILogService _logService;
+    private readonly INativeInstallationService _nativeInstallationService;
+    private readonly Func<string?> _locateScript;
+    private readonly ISettingsService? _settingsService;
 
     /// <summary>Required SQL Express installer filename.</summary>
     public const string RequiredInstallerExe = "SQLEXPRADV_x64_ENU.exe";
@@ -26,10 +29,18 @@ public class InstallationService : IInstallationService
     /// <summary>Minimum SA password length.</summary>
     public const int MinPasswordLength = 15;
 
-    public InstallationService(IProcessRunner processRunner, ILogService logService)
+    public InstallationService(
+        IProcessRunner processRunner,
+        ILogService logService,
+        INativeInstallationService nativeInstallationService,
+        ISettingsService? settingsService = null,
+        Func<string?>? locateScript = null)
     {
         _processRunner = processRunner;
         _logService = logService;
+        _nativeInstallationService = nativeInstallationService;
+        _settingsService = settingsService;
+        _locateScript = locateScript ?? LocateScript;
     }
 
     /// <inheritdoc/>
@@ -88,8 +99,28 @@ public class InstallationService : IInstallationService
     {
         try
         {
+            var native = await _nativeInstallationService
+                .InstallAsync(options, progress, ct)
+                .ConfigureAwait(false);
+
+            if (native.Success)
+            {
+                _logService.Info("WSUS installation completed via native C# path");
+                return native;
+            }
+
+            var allowFallback = _settingsService?.Current.EnableLegacyFallbackForInstall ?? true;
+            if (!allowFallback)
+            {
+                _logService.Warning("Native install failed and fallback is disabled. Reason: {Reason}", native.Message);
+                return native;
+            }
+
+            progress?.Report("[FALLBACK] Native install failed; using legacy PowerShell install path.");
+            _logService.Warning("Native install path failed; using legacy PowerShell fallback. Reason: {Reason}", native.Message);
+
             // Locate the PowerShell install script
-            var scriptPath = LocateScript();
+            var scriptPath = _locateScript();
             if (scriptPath is null)
             {
                 var msg = $"Install script not found. Searched for '{InstallScriptName}' in:\n" +

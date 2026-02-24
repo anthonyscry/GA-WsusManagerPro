@@ -27,6 +27,7 @@ namespace WsusManager.App.ViewModels;
 public partial class MainViewModel : ObservableObject, IDisposable
 {
     private readonly ILogService _logService;
+    private readonly IOperationTranscriptService _operationTranscriptService;
     private readonly ISettingsService _settingsService;
     private readonly IDashboardService _dashboardService;
     private readonly IHealthService _healthService;
@@ -39,7 +40,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly IImportService _importService;
     private readonly IInstallationService _installationService;
     private readonly IScheduledTaskService _scheduledTaskService;
+    private readonly IHttpsConfigurationService _httpsConfigurationService;
     private readonly IGpoDeploymentService _gpoDeploymentService;
+    private readonly IHttpsDialogService _httpsDialogService;
     private readonly IClientService _clientService;
     private readonly IScriptGeneratorService _scriptGeneratorService;
     private readonly IThemeService _themeService;
@@ -94,6 +97,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public MainViewModel(
         ILogService logService,
+        IOperationTranscriptService operationTranscriptService,
         ISettingsService settingsService,
         IDashboardService dashboardService,
         IHealthService healthService,
@@ -106,7 +110,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         IImportService importService,
         IInstallationService installationService,
         IScheduledTaskService scheduledTaskService,
+        IHttpsConfigurationService httpsConfigurationService,
         IGpoDeploymentService gpoDeploymentService,
+        IHttpsDialogService httpsDialogService,
         IClientService clientService,
         IScriptGeneratorService scriptGeneratorService,
         IThemeService themeService,
@@ -115,6 +121,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         ICsvExportService csvExportService)
     {
         _logService = logService;
+        _operationTranscriptService = operationTranscriptService;
         _settingsService = settingsService;
         _dashboardService = dashboardService;
         _healthService = healthService;
@@ -127,7 +134,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _importService = importService;
         _installationService = installationService;
         _scheduledTaskService = scheduledTaskService;
+        _httpsConfigurationService = httpsConfigurationService;
         _gpoDeploymentService = gpoDeploymentService;
+        _httpsDialogService = httpsDialogService;
         _clientService = clientService;
         _scriptGeneratorService = scriptGeneratorService;
         _themeService = themeService;
@@ -423,12 +432,45 @@ public partial class MainViewModel : ObservableObject, IDisposable
         // Auto-expand log panel when operation starts
         IsLogPanelExpanded = true;
 
-        _logService.Info("Starting operation: {Operation}", operationName);
+        var telemetry = new OperationTelemetryContext(operationName);
+        var transcriptTasks = new List<Task>();
+        var transcriptTasksLock = new object();
+
+        void EnqueueTranscriptLine(string line)
+        {
+            try
+            {
+                var writeTask = _operationTranscriptService.WriteLineAsync(
+                    telemetry.OperationId,
+                    telemetry.OperationName,
+                    line,
+                    CancellationToken.None);
+
+                lock (transcriptTasksLock)
+                {
+                    transcriptTasks.Add(writeTask);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logService.Warning(
+                    "Failed to queue operation transcript entry {OperationId}: {Error}",
+                    telemetry.OperationId,
+                    ex.Message);
+            }
+        }
+
+        _logService.Info(
+            "Starting operation: {OperationName} OperationId={OperationId}",
+            operationName,
+            telemetry.OperationId);
         AppendLog($"=== {operationName} ===");
+        EnqueueTranscriptLine($"=== {operationName} ===");
 
         var progress = new Progress<string>(line =>
         {
             AppendLog(line);
+            EnqueueTranscriptLine(line);
 
             // Parse "[Step N/M]" prefix to update step text in the log header
             if (line.StartsWith("[Step ", StringComparison.OrdinalIgnoreCase))
@@ -461,7 +503,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 StatusBannerText = $"✓ {operationName} completed successfully.";
                 StatusBannerColor = GetThemeBrush("StatusSuccess", Color.FromRgb(0x3F, 0xB9, 0x50));
                 AppendLog($"=== ✓ {operationName} completed ===");
-                _logService.Info("Operation completed: {Operation}", operationName);
+                EnqueueTranscriptLine($"=== ✓ {operationName} completed ===");
+                _logService.Info(
+                    "Operation finished {OperationName} OperationId={OperationId} Success={Success} DurationMs={DurationMs}",
+                    operationName,
+                    telemetry.OperationId,
+                    true,
+                    (int)telemetry.Elapsed.TotalMilliseconds);
             }
             else
             {
@@ -469,7 +517,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 StatusBannerText = $"✗ {operationName} failed.";
                 StatusBannerColor = GetThemeBrush("StatusError", Color.FromRgb(0xF8, 0x51, 0x49));
                 AppendLog($"=== ✗ {operationName} FAILED ===");
-                _logService.Warning("Operation failed: {Operation}", operationName);
+                EnqueueTranscriptLine($"=== ✗ {operationName} FAILED ===");
+                _logService.Warning(
+                    "Operation failed {OperationName} OperationId={OperationId} Success={Success} DurationMs={DurationMs}",
+                    operationName,
+                    telemetry.OperationId,
+                    false,
+                    (int)telemetry.Elapsed.TotalMilliseconds);
             }
 
             return success;
@@ -480,7 +534,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
             StatusBannerText = $"⚠ {operationName} cancelled.";
             StatusBannerColor = GetThemeBrush("StatusWarning", Color.FromRgb(0xD2, 0x99, 0x22));
             AppendLog($"=== ⚠ {operationName} CANCELLED ===");
-            _logService.Info("Operation cancelled: {Operation}", operationName);
+            EnqueueTranscriptLine($"=== ⚠ {operationName} CANCELLED ===");
+            _logService.Info(
+                "Operation cancelled {OperationName} OperationId={OperationId} DurationMs={DurationMs}",
+                operationName,
+                telemetry.OperationId,
+                (int)telemetry.Elapsed.TotalMilliseconds);
             return false;
         }
         catch (Exception ex)
@@ -490,7 +549,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
             StatusBannerColor = GetThemeBrush("StatusError", Color.FromRgb(0xF8, 0x51, 0x49));
             AppendLog($"[ERROR] {ex.Message}");
             AppendLog($"=== ✗ {operationName} FAILED ===");
-            _logService.Error(ex, "Operation error: {Operation}", operationName);
+            EnqueueTranscriptLine($"[ERROR] {ex.Message}");
+            EnqueueTranscriptLine($"=== ✗ {operationName} FAILED ===");
+            _logService.Error(ex,
+                "Operation error {OperationName} OperationId={OperationId} DurationMs={DurationMs}",
+                operationName,
+                telemetry.OperationId,
+                (int)telemetry.Elapsed.TotalMilliseconds);
             return false;
         }
         finally
@@ -499,14 +564,39 @@ public partial class MainViewModel : ObservableObject, IDisposable
             CurrentOperationName = string.Empty;
             OperationStepText = string.Empty;
             EstimatedTimeRemaining = string.Empty;
-            _operationCts?.Dispose();
-            _operationCts = null;
 
             // Ensure final batch is displayed
             FlushLogBatch();
 
+            List<Task> pendingTranscriptTasks;
+            lock (transcriptTasksLock)
+            {
+                pendingTranscriptTasks = transcriptTasks.ToList();
+                transcriptTasks.Clear();
+            }
+
+            await FlushOperationTranscriptsAsync(pendingTranscriptTasks).ConfigureAwait(false);
+
+            _operationCts?.Dispose();
+            _operationCts = null;
+
             // Notify all operation commands to re-evaluate CanExecute (re-enables buttons after operation)
             NotifyCommandCanExecuteChanged();
+        }
+    }
+
+    private static async Task FlushOperationTranscriptsAsync(List<Task> transcriptTasks)
+    {
+        if (transcriptTasks.Count == 0)
+            return;
+
+        try
+        {
+            await Task.WhenAll(transcriptTasks).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Transcript failures should never block app operations.
         }
     }
 
@@ -1255,6 +1345,31 @@ public partial class MainViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand(CanExecute = nameof(CanExecuteWsusOperation))]
+    private async Task RunSetHttps()
+    {
+        var dialogResult = _httpsDialogService.ShowDialog();
+        if (dialogResult is null) return;
+
+        await Navigate("Install").ConfigureAwait(false);
+
+        await RunOperationAsync("Set HTTPS", async (progress, ct) =>
+        {
+            var result = await _httpsConfigurationService.ConfigureAsync(
+                dialogResult.ServerName,
+                dialogResult.CertificateThumbprint,
+                progress,
+                ct).ConfigureAwait(false);
+
+            if (!result.Success && !string.IsNullOrWhiteSpace(result.Message))
+            {
+                progress.Report($"[FAIL] {result.Message}");
+            }
+
+            return result.Success;
+        }).ConfigureAwait(false);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanExecuteWsusOperation))]
     private async Task RunCreateGpo()
     {
         // Show hostname + port input dialog on UI thread before starting operation
@@ -1775,6 +1890,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             // Phase 6: Installation and Scheduling
             RunInstallWsusCommand.NotifyCanExecuteChanged();
             RunScheduleTaskCommand.NotifyCanExecuteChanged();
+            RunSetHttpsCommand.NotifyCanExecuteChanged();
             RunCreateGpoCommand.NotifyCanExecuteChanged();
             // Phase 12: Mode Override + Settings
             ToggleModeCommand.NotifyCanExecuteChanged();

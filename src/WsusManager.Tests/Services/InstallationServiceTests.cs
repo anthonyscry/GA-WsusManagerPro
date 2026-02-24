@@ -3,6 +3,7 @@ using WsusManager.Core.Infrastructure;
 using WsusManager.Core.Logging;
 using WsusManager.Core.Models;
 using WsusManager.Core.Services;
+using WsusManager.Core.Services.Interfaces;
 
 namespace WsusManager.Tests.Services;
 
@@ -14,9 +15,13 @@ public class InstallationServiceTests
 {
     private readonly Mock<IProcessRunner> _mockRunner = new();
     private readonly Mock<ILogService> _mockLog = new();
+    private readonly Mock<INativeInstallationService> _mockNativeInstall = new();
 
     private InstallationService CreateService() =>
-        new(_mockRunner.Object, _mockLog.Object);
+        new(_mockRunner.Object, _mockLog.Object, _mockNativeInstall.Object);
+
+    private InstallationService CreateServiceWithScript(string scriptPath) =>
+        new(_mockRunner.Object, _mockLog.Object, _mockNativeInstall.Object, null, () => scriptPath);
 
     // ═══════════════════════════════════════════════════════════════
     // ValidatePrerequisitesAsync Tests
@@ -199,8 +204,37 @@ public class InstallationServiceTests
     // ═══════════════════════════════════════════════════════════════
 
     [Fact]
+    public async Task InstallAsync_WhenNativePathSucceeds_DoesNotInvokePowershellScript()
+    {
+        var options = new InstallOptions
+        {
+            InstallerPath = @"C:\WSUS\SQLDB",
+            SaUsername = "sa",
+            SaPassword = "ValidPassword1!@#"
+        };
+
+        _mockNativeInstall
+            .Setup(n => n.InstallAsync(options, It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OperationResult.Ok("Native install succeeded."));
+
+        var service = CreateService();
+        var result = await service.InstallAsync(options, null, CancellationToken.None).ConfigureAwait(false);
+
+        Assert.True(result.Success);
+        _mockRunner.Verify(r => r.RunAsync(
+            "powershell.exe",
+            It.IsAny<string>(),
+            It.IsAny<IProgress<string>>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task Install_Returns_Failure_When_Script_Not_Found()
     {
+        _mockNativeInstall
+            .Setup(n => n.InstallAsync(It.IsAny<InstallOptions>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OperationResult.Fail("Native installation path is not yet implemented."));
+
         var service = CreateService();
         var options = new InstallOptions
         {
@@ -218,88 +252,71 @@ public class InstallationServiceTests
     [Fact]
     public async Task Install_Constructs_Correct_PowerShell_Arguments()
     {
-        // Create a temp script to satisfy the path check
-        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString(), "Scripts");
-        Directory.CreateDirectory(tempDir);
-        var scriptPath = Path.Combine(tempDir, "Install-WsusWithSqlExpress.ps1");
-        File.WriteAllText(scriptPath, "# mock script");
+        var scriptPath = @"C:\WSUS\Scripts\Install-WsusWithSqlExpress.ps1";
 
-        try
+        _mockNativeInstall
+            .Setup(n => n.InstallAsync(It.IsAny<InstallOptions>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OperationResult.Fail("Native installation path is not yet implemented."));
+
+        var service = CreateServiceWithScript(scriptPath);
+
+        var options = new InstallOptions
         {
-            // Create service with temp base directory
-            var service = new TestableInstallationService(
-                _mockRunner.Object, _mockLog.Object, scriptPath);
+            InstallerPath = @"C:\WSUS\SQLDB",
+            SaUsername = "sa",
+            SaPassword = "MyPassword123!@#"
+        };
 
-            var options = new InstallOptions
-            {
-                InstallerPath = @"C:\WSUS\SQLDB",
-                SaUsername = "sa",
-                SaPassword = "MyPassword123!@#"
-            };
-
-            _mockRunner
-                .Setup(r => r.RunAsync(
-                    "powershell.exe",
-                    It.IsAny<string>(),
-                    It.IsAny<IProgress<string>>(),
-                    It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new ProcessResult(0, ["Installation complete."]));
-
-            var result = await service.InstallAsync(options).ConfigureAwait(false);
-
-            Assert.True(result.Success);
-
-            // Verify argument construction
-            _mockRunner.Verify(r => r.RunAsync(
+        _mockRunner
+            .Setup(r => r.RunAsync(
                 "powershell.exe",
-                It.Is<string>(args =>
-                    args.Contains("-NonInteractive") &&
-                    args.Contains("-InstallerPath") &&
-                    args.Contains("-SaUsername") &&
-                    args.Contains("-SaPassword") &&
-                    args.Contains("-ExecutionPolicy Bypass")),
+                It.IsAny<string>(),
                 It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>()),
-                Times.Once);
-        }
-        finally
-        {
-            Directory.Delete(Path.GetDirectoryName(tempDir)!, true);
-        }
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProcessResult(0, ["Installation complete."]));
+
+        var result = await service.InstallAsync(options).ConfigureAwait(false);
+
+        Assert.True(result.Success);
+
+        // Verify argument construction
+        _mockRunner.Verify(r => r.RunAsync(
+            "powershell.exe",
+            It.Is<string>(args =>
+                args.Contains("-NonInteractive") &&
+                args.Contains("-InstallerPath") &&
+                args.Contains("-SaUsername") &&
+                args.Contains("-SaPassword") &&
+                args.Contains("-ExecutionPolicy Bypass")),
+            It.IsAny<IProgress<string>>(),
+            It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]
     public async Task Install_Reports_Progress()
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString(), "Scripts");
-        Directory.CreateDirectory(tempDir);
-        var scriptPath = Path.Combine(tempDir, "Install-WsusWithSqlExpress.ps1");
-        File.WriteAllText(scriptPath, "# mock");
+        _mockNativeInstall
+            .Setup(n => n.InstallAsync(It.IsAny<InstallOptions>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OperationResult.Fail("Native installation path is not yet implemented."));
 
-        try
-        {
-            var service = new TestableInstallationService(
-                _mockRunner.Object, _mockLog.Object, scriptPath);
+        var service = CreateServiceWithScript(@"C:\WSUS\Scripts\Install-WsusWithSqlExpress.ps1");
 
-            _mockRunner
-                .Setup(r => r.RunAsync(
-                    "powershell.exe",
-                    It.IsAny<string>(),
-                    It.IsAny<IProgress<string>>(),
-                    It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new ProcessResult(0, ["Done."]));
+        _mockRunner
+            .Setup(r => r.RunAsync(
+                "powershell.exe",
+                It.IsAny<string>(),
+                It.IsAny<IProgress<string>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProcessResult(0, ["Done."]));
 
-            var messages = new List<string>();
-            var progress = new Progress<string>(msg => messages.Add(msg));
+        var messages = new List<string>();
+        var progress = new Progress<string>(msg => messages.Add(msg));
 
-            await service.InstallAsync(new InstallOptions { SaPassword = "Test123!@#$%^&*(" }, progress).ConfigureAwait(false);
+        await service.InstallAsync(new InstallOptions { SaPassword = "Test123!@#$%^&*(" }, progress).ConfigureAwait(false);
 
-            Assert.True(messages.Count >= 3, $"Expected at least 3 progress messages, got {messages.Count}");
-        }
-        finally
-        {
-            Directory.Delete(Path.GetDirectoryName(tempDir)!, true);
-        }
+        Assert.True(messages.Count >= 4, $"Expected at least 4 progress messages, got {messages.Count}");
+        Assert.Contains(messages, m => m.Contains("[FALLBACK]", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -312,50 +329,5 @@ public class InstallationServiceTests
     public void MinPasswordLength_Is_15()
     {
         Assert.Equal(15, InstallationService.MinPasswordLength);
-    }
-
-    /// <summary>
-    /// Testable subclass that overrides script path resolution.
-    /// </summary>
-    private sealed class TestableInstallationService : InstallationService
-    {
-        private readonly string _scriptPath;
-
-        public TestableInstallationService(
-            IProcessRunner processRunner, ILogService logService, string scriptPath)
-            : base(processRunner, logService)
-        {
-            _scriptPath = scriptPath;
-        }
-
-        internal new string? LocateScript() => File.Exists(_scriptPath) ? _scriptPath : null;
-
-        public new async Task<OperationResult> InstallAsync(
-            InstallOptions options, IProgress<string>? progress = null, CancellationToken ct = default)
-        {
-            var scriptPath = LocateScript();
-            if (scriptPath is null)
-                return OperationResult.Fail("Install script not found.");
-
-            progress?.Report($"Script: {scriptPath}");
-            progress?.Report($"Installer path: {options.InstallerPath}");
-            progress?.Report("Starting installation...");
-
-            var arguments = $"-ExecutionPolicy Bypass -File \"{scriptPath}\" " +
-                            $"-NonInteractive " +
-                            $"-InstallerPath \"{options.InstallerPath}\" " +
-                            $"-SaUsername \"{options.SaUsername}\" " +
-                            $"-SaPassword \"{options.SaPassword}\"";
-
-            var processRunnerField = typeof(InstallationService)
-                .GetField("_processRunner",
-                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            var runner = (IProcessRunner)processRunnerField!.GetValue(this)!;
-
-            var result = await runner.RunAsync("powershell.exe", arguments, progress, ct).ConfigureAwait(false);
-            return result.Success
-                ? OperationResult.Ok("Installation completed successfully.")
-                : OperationResult.Fail($"Installation failed with exit code {result.ExitCode}.");
-        }
     }
 }

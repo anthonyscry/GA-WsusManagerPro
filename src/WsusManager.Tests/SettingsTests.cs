@@ -184,4 +184,14 @@ public class SettingsTests
         };
         Assert.Equal(5, settings.WinRMRetryCount);
     }
+
+    [Fact]
+    public void AppSettings_Defaults_EnableSafeFallbackFlags()
+    {
+        var settings = new AppSettings();
+
+        Assert.True(settings.EnableLegacyFallbackForInstall);
+        Assert.True(settings.EnableLegacyFallbackForHttps);
+        Assert.True(settings.EnableLegacyFallbackForCleanup);
+    }
 }

@@ -1,4 +1,5 @@
 using WsusManager.Core.Logging;
+using WsusManager.Core.Models;
 
 namespace WsusManager.Tests.Services;
 
@@ -87,5 +88,42 @@ public class LogServiceTests : IDisposable
         var ex = Record.Exception(() => svc.Flush());
 
         Assert.Null(ex);
+    }
+
+    [Fact]
+    public void CreateLogger_Respects_Configured_Log_Level_And_Retention()
+    {
+        var settings = new AppSettings
+        {
+            LogLevel = LogLevel.Warning,
+            LogRetentionDays = 7,
+            LogMaxFileSizeMb = 5
+        };
+
+        using var svc = new LogService(_tempDir, settings);
+        svc.Debug("debug-message-should-not-appear");
+        svc.Warning("warning-message-should-appear");
+        svc.Flush();
+
+        var files = Directory.GetFiles(_tempDir, "WsusManager-*.log");
+        Assert.Single(files);
+        var content = File.ReadAllText(files[0]);
+
+        Assert.DoesNotContain("debug-message-should-not-appear", content, StringComparison.Ordinal);
+        Assert.Contains("warning-message-should-appear", content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CreateLogger_Persists_Fallback_Marker_LogLine()
+    {
+        using var svc = new LogService(_tempDir, new AppSettings { LogLevel = LogLevel.Info });
+
+        svc.Info("[FALLBACK] Example fallback marker for parity test.");
+        svc.Flush();
+
+        var files = Directory.GetFiles(_tempDir, "WsusManager-*.log");
+        Assert.Single(files);
+        var content = File.ReadAllText(files[0]);
+        Assert.Contains("[FALLBACK] Example fallback marker for parity test.", content, StringComparison.Ordinal);
     }
 }

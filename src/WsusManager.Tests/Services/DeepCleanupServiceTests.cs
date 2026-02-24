@@ -1,5 +1,4 @@
 using Moq;
-using WsusManager.Core.Infrastructure;
 using WsusManager.Core.Logging;
 using WsusManager.Core.Models;
 using WsusManager.Core.Services;
@@ -14,11 +13,11 @@ namespace WsusManager.Tests.Services;
 public class DeepCleanupServiceTests
 {
     private readonly Mock<ISqlService> _mockSql = new();
-    private readonly Mock<IProcessRunner> _mockRunner = new();
+    private readonly Mock<IWsusCleanupExecutor> _mockCleanupExecutor = new();
     private readonly Mock<ILogService> _mockLog = new();
 
     private DeepCleanupService CreateService() =>
-        new(_mockSql.Object, _mockRunner.Object, _mockLog.Object);
+        new(_mockSql.Object, _mockCleanupExecutor.Object, _mockLog.Object);
 
     private void SetupDefaultMocks()
     {
@@ -60,36 +59,30 @@ public class DeepCleanupServiceTests
                 It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
 
-        // Step 1: PowerShell process
-        _mockRunner
-            .Setup(r => r.RunAsync("powershell.exe", It.IsAny<string>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ProcessResult(0, []));
+        // Step 1: WSUS built-in cleanup executor
+        _mockCleanupExecutor
+            .Setup(e => e.RunBuiltInCleanupAsync(It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OperationResult.Ok("Cleanup complete."));
     }
 
     // ─── Step 1 Tests ─────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Step1_Calls_ProcessRunner_With_PowerShell()
+    public async Task RunAsync_UsesWsusCleanupExecutor_ForStep1()
     {
         SetupDefaultMocks();
-        // Need a real SQL connection for Steps 4/5 which use SqlConnection directly
-        // Skip full pipeline test, test Step 1 invocation specifically
-        var messages = new List<string>();
-        var progress = new Progress<string>(m => messages.Add(m));
+        _mockSql
+            .Setup(s => s.ExecuteNonQueryAsync(
+                It.IsAny<string>(), "SUSDB", It.Is<string>(q => q.Contains("RevisionState = 2")),
+                It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new OperationCanceledException("Stop after step 1 verification."));
 
-        _mockRunner
-            .Setup(r => r.RunAsync("powershell.exe", It.IsAny<string>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new ProcessResult(0, []));
+        var service = CreateService();
+        var progress = new Progress<string>(_ => { });
 
-        // Verify call will be made — actual RunAsync call requires real SQL for steps 4/5
-        // We verify the ProcessRunner setup is compatible
-        var result = await _mockRunner.Object.RunAsync(
-            "powershell.exe",
-            "-NonInteractive -NoProfile -Command \"Get-WsusServer | Invoke-WsusServerCleanup\"",
-            progress);
+        _ = await service.RunAsync("localhost\\SQLEXPRESS", progress, CancellationToken.None).ConfigureAwait(false);
 
-        Assert.Equal(0, result.ExitCode);
-        Assert.True(result.Success);
+        _mockCleanupExecutor.Verify(e => e.RunBuiltInCleanupAsync(It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

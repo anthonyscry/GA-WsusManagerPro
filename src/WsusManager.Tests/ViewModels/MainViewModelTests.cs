@@ -1,5 +1,6 @@
 using Moq;
 using System.Windows.Data;
+using WsusManager.App.Services;
 using WsusManager.App.ViewModels;
 using WsusManager.Core.Logging;
 using WsusManager.Core.Models;
@@ -27,16 +28,34 @@ public class MainViewModelTests
     private readonly Mock<IImportService> _mockImport = new();
     private readonly Mock<IInstallationService> _mockInstall = new();
     private readonly Mock<IScheduledTaskService> _mockScheduledTask = new();
+    private readonly Mock<IHttpsConfigurationService> _mockHttps = new();
     private readonly Mock<IGpoDeploymentService> _mockGpo = new();
+    private readonly Mock<IHttpsDialogService> _mockHttpsDialogService = new();
+    private readonly Mock<IClientService> _mockClient = new();
+    private readonly Mock<IScriptGeneratorService> _mockScriptGenerator = new();
+    private readonly Mock<IThemeService> _mockThemeService = new();
+    private readonly Mock<IBenchmarkTimingService> _mockBenchmarkTiming = new();
+    private readonly Mock<ISettingsValidationService> _mockValidation = new();
+    private readonly Mock<ICsvExportService> _mockCsvExport = new();
+    private readonly Mock<IOperationTranscriptService> _mockTranscript = new();
     private readonly MainViewModel _vm;
 
     public MainViewModelTests()
     {
         _mockSettings.Setup(s => s.LoadAsync()).ReturnsAsync(new AppSettings());
         _mockSettings.Setup(s => s.Current).Returns(new AppSettings());
+        _mockHttpsDialogService.Setup(d => d.ShowDialog()).Returns((HttpsDialogResult?)null);
+        _mockTranscript
+            .Setup(t => t.WriteLineAsync(
+                It.IsAny<Guid>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
 
         _vm = new MainViewModel(
             _mockLog.Object,
+            _mockTranscript.Object,
             _mockSettings.Object,
             _mockDashboard.Object,
             _mockHealth.Object,
@@ -49,7 +68,15 @@ public class MainViewModelTests
             _mockImport.Object,
             _mockInstall.Object,
             _mockScheduledTask.Object,
-            _mockGpo.Object);
+            _mockHttps.Object,
+            _mockGpo.Object,
+            _mockHttpsDialogService.Object,
+            _mockClient.Object,
+            _mockScriptGenerator.Object,
+            _mockThemeService.Object,
+            _mockBenchmarkTiming.Object,
+            _mockValidation.Object,
+            _mockCsvExport.Object);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -198,6 +225,22 @@ public class MainViewModelTests
 
         Assert.Contains("Step 1 done", _vm.LogOutput);
         Assert.Contains("Step 2 done", _vm.LogOutput);
+    }
+
+    [Fact]
+    public async Task RunOperationAsync_Logs_OperationId_OnStartAndFinish()
+    {
+        var result = await _vm.RunOperationAsync("Diagnostics", async (_, ct) =>
+        {
+            await Task.Yield();
+            return true;
+        });
+
+        Assert.True(result);
+
+        _mockLog.Verify(
+            l => l.Info(It.Is<string>(m => m.Contains("OperationId", StringComparison.Ordinal)), It.IsAny<object[]>()),
+            Times.AtLeast(2));
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -677,6 +720,33 @@ public class MainViewModelTests
 
         _mockDeepCleanup.Verify(d => d.RunAsync(
             It.IsAny<string>(),
+            It.IsAny<IProgress<string>>(),
+            It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task RunSetHttpsCommand_InvokesHttpsConfigurationService()
+    {
+        _vm.IsWsusInstalled = true;
+
+        _mockHttpsDialogService
+            .Setup(d => d.ShowDialog())
+            .Returns(new HttpsDialogResult("wsus.contoso.local", "THUMBPRINT"));
+
+        _mockHttps
+            .Setup(s => s.ConfigureAsync(
+                "wsus.contoso.local",
+                "THUMBPRINT",
+                It.IsAny<IProgress<string>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OperationResult.Ok("HTTPS configured."));
+
+        await _vm.RunSetHttpsCommand.ExecuteAsync(null);
+
+        _mockHttps.Verify(s => s.ConfigureAsync(
+            "wsus.contoso.local",
+            "THUMBPRINT",
             It.IsAny<IProgress<string>>(),
             It.IsAny<CancellationToken>()),
             Times.Once);
