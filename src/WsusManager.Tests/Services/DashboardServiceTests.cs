@@ -153,4 +153,13 @@ public class DashboardServiceTests
         Assert.Single(computers);
         Assert.Equal("REAL-WSUS-CLIENT", computers[0].Hostname);
     }
+
+    [Fact]
+    public async Task GetUpdatesAsync_Does_Not_Return_Phase29_Mock_Kb_Rows()
+    {
+        var updates = await _service.GetUpdatesAsync(CancellationToken.None);
+
+        Assert.DoesNotContain(updates, u =>
+            string.Equals(u.KbArticle, "KB5034441", StringComparison.OrdinalIgnoreCase));
+    }
 }
