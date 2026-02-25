@@ -1200,7 +1200,7 @@
                             </Border>
 
                             <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
-                                    Padding="16" Margin="0,0,0,12">
+                                     Padding="16" Margin="0,0,0,12">
                                 <StackPanel>
                                     <TextBlock Text="Keyboard Shortcuts" FontSize="14" FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
@@ -1232,6 +1232,17 @@
                                         <TextBlock Grid.Row="4" Grid.Column="0" Text="Escape" Foreground="{DynamicResource TextSecondary}" FontSize="12" FontFamily="Consolas"/>
                                         <TextBlock Grid.Row="4" Grid.Column="1" Text="Cancel Operation" Foreground="{DynamicResource TextPrimary}" FontSize="12"/>
                                     </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
+                                    Padding="16" Margin="0,0,0,12">
+                                <StackPanel>
+                                    <TextBlock Text="Troubleshooting Commands" FontSize="14" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
+                                    <TextBlock FontFamily="Consolas" FontSize="11"
+                                               Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap"
+                                                Text="• Service status: Get-Service MSSQL$SQLEXPRESS, W3SVC, WsusService | Format-Table Name,Status&#x0a;• Database size: sqlcmd -S localhost\SQLEXPRESS -d SUSDB -Q 'SELECT name, size*8.0/1024 SizeMB FROM sys.database_files'&#x0a;• WSUS content size: Get-ChildItem C:\\WSUS\\WsusContent -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum | Select-Object Count,@{Name='TotalGB';Expression={[math]::Round($_.Sum / 1GB, 2)}}&#x0a;• Firewall/WSUS ports: Test-NetConnection -ComputerName localhost -Port 8530; Test-NetConnection -ComputerName localhost -Port 8531&#x0a;• WSUS content verification: 'C:\\Program Files\\Update Services\\Tools\\wsusutil.exe' reset"/>
                                 </StackPanel>
                             </Border>
 
@@ -1319,7 +1330,7 @@
                                                Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
                                     <TextBlock TextWrapping="Wrap" FontSize="11"
                                                Foreground="{DynamicResource TextSecondary}"
-                                               Text="• Windows Server 2019+&#x0a;• .NET 8.0 Runtime&#x0a;• SQL Server Express 2022&#x0a;• 50GB+ disk space"/>
+                                                Text="• Windows Server 2019+&#x0a;• .NET 8.0 Runtime&#x0a;• SQL Server Express 2022&#x0a;• 200GB+ free disk space recommended for WSUS content"/>
                                     <TextBlock Text="© 2026 GA-ASI. Internal use only." FontSize="10"
                                                Foreground="{DynamicResource TextMuted}" Margin="0,12,0,0"/>
                                 </StackPanel>

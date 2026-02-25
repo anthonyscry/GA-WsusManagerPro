@@ -8,15 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- C#-first installation orchestration via `INativeInstallationService` with explicit legacy fallback marker flow.
-- `Set HTTPS` end-to-end workflow in the WPF UI (sidebar command, validated dialog, service invocation).
-- Per-operation transcript infrastructure and operation-scoped telemetry context for richer diagnostics.
-- Migration parity tests validating native-success paths avoid fallback markers.
+- No unreleased changes yet.
 
 ### Changed
-- Scheduled task action construction now uses `IMaintenanceCommandBuilder` abstraction instead of inline command composition.
-- Deep Cleanup Step 1 now uses `IWsusCleanupExecutor` abstraction for built-in cleanup execution.
-- Added safe-cutover settings flags for install/https/cleanup fallback behavior defaults.
+- No unreleased changes yet.
+
+## [4.5.12] - 2026-02-25
+
+### Added
+- Standardized Help panel with troubleshooting command card and concise operational quick-actions in the UI.
+- Added troubleshooting command references in operational docs for quicker health investigations.
+- Added a troubleshooting command section in wiki documentation.
+
+### Changed
+- Increased documented WSUS content storage recommendations to 200 GB across README, SOP, and Wiki guidance.
+- Updated content re-verify expectations and transfer sizing guidance to reflect larger WSUS repositories.
+- Refined Client Tools layout and script generator/diagnostics UX in the C# application.
+- Added explicit destructive action confirmation guardrails for Reset Content operations.
+
+### Fixed
+- Included missing trailing WSUS error code entries in the application dictionaries.
+- Improved defensive checks around destructive operations and updated related service/operation tests.
 
 ## [4.5.9] - 2026-02-23
 
@@ -291,7 +303,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - MaxAutoApproveCount increased to 200
 
-[Unreleased]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.7...HEAD
+[Unreleased]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.12...HEAD
+[4.5.12]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.11...v4.5.12
 [4.5.7]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.6...v4.5.7
 [4.5.6]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.5...v4.5.6
 [4.5.5]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.4...v4.5.5

@@ -25,7 +25,7 @@ This guide covers everything you need to install and configure WSUS Manager.
 |-----------|---------|-------------|
 | CPU | 2 cores | 4+ cores |
 | RAM | 8 GB | 16+ GB |
-| Disk | 30 GB | 50+ GB SSD |
+| Disk | 30 GB | 200+ GB SSD |
 | Network | 1 Gbps | 1 Gbps |
 
 ### Software Requirements

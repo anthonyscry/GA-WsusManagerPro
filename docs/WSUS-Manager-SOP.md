@@ -70,7 +70,7 @@ README.md                 # Full documentation
 | Operating System | Windows Server 2016, 2019, or 2022 |
 | CPU | 4 cores minimum |
 | RAM | 16 GB minimum |
-| Disk Space | 125 GB minimum (50 GB for WSUS content) |
+| Disk Space | 200 GB minimum (200 GB for WSUS content) |
 | Network | Valid IPv4 configuration (static IP recommended) |
 | PowerShell | 5.1 or higher |
 

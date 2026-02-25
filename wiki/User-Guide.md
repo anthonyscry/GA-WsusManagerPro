@@ -417,7 +417,7 @@ Currently, WSUS Manager operates primarily via mouse. Keyboard navigation:
 ### Regular Maintenance
 - Run **Online Sync** on a schedule
 - Monitor database size (aim for < 7 GB)
-- Keep at least 50 GB free disk space
+- Keep at least 200 GB free disk space
 
 ### Before Major Operations
 - Create a database backup

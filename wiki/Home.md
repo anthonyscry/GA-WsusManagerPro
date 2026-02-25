@@ -67,7 +67,7 @@ Server Mode auto-detects Online vs Air-Gap based on internet connectivity to sho
 | Operating System | Windows Server 2019 or later |
 | CPU | 4+ cores recommended |
 | RAM | 16+ GB recommended |
-| Disk Space | 50+ GB for updates |
+| Disk Space | 200+ GB for WSUS content |
 | PowerShell | 5.1 or later |
 | SQL Server | SQL Server Express 2022 |
 | Privileges | Local Administrator + SQL sysadmin |

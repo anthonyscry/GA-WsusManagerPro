@@ -7,13 +7,14 @@ This guide helps you diagnose and resolve common issues with WSUS Manager and WS
 ## Table of Contents
 
 1. [Quick Diagnostics](#quick-diagnostics)
-2. [Service Issues](#service-issues)
-3. [Database Issues](#database-issues)
-4. [Client Issues](#client-issues)
-5. [GUI Issues](#gui-issues)
-6. [Performance Issues](#performance-issues)
-7. [Export/Import Issues](#exportimport-issues)
-8. [Error Reference](#error-reference)
+2. [Troubleshooting Commands](#troubleshooting-commands)
+3. [Service Issues](#service-issues)
+4. [Database Issues](#database-issues)
+5. [Client Issues](#client-issues)
+6. [GUI Issues](#gui-issues)
+7. [Performance Issues](#performance-issues)
+8. [Export/Import Issues](#exportimport-issues)
+9. [Error Reference](#error-reference)
 
 ---
 
@@ -45,6 +46,30 @@ The Health Check verifies:
 
 ---
 
+## Troubleshooting Commands
+
+Run these commands from an elevated PowerShell session to quickly validate WSUS health:
+
+```powershell
+# Service status
+Get-Service MSSQL$SQLEXPRESS, W3SVC, WsusService | Format-Table Name, Status
+
+# Database size
+sqlcmd -S localhost\SQLEXPRESS -d SUSDB -Q "SELECT name, size*8.0/1024 SizeMB FROM sys.database_files"
+
+# WSUS content size on disk
+Get-ChildItem C:\WSUS\WsusContent -Recurse -ErrorAction SilentlyContinue |
+    Measure-Object -Property Length -Sum |
+    Select-Object Count, @{Name='TotalGB';Expression={[math]::Round($_.Sum / 1GB, 2)}}
+
+# Firewall/WSUS ports
+Test-NetConnection -ComputerName localhost -Port 8530
+Test-NetConnection -ComputerName localhost -Port 8531
+
+# WSUS content verification
+& "C:\Program Files\Update Services\Tools\wsusutil.exe" reset
+```
+
 ## Service Issues
 
 ### Services Won't Start
@@ -57,14 +82,14 @@ The Health Check verifies:
 **Solutions:**
 
 1. **Check dependencies**
-   ```powershell
-   # SQL must start before WSUS
-   Start-Service MSSQL`$SQLEXPRESS
+    ```powershell
+    # SQL must start before WSUS
+    Start-Service MSSQL`$SQLEXPRESS
    Start-Sleep -Seconds 10
    Start-Service W3SVC
    Start-Sleep -Seconds 5
    Start-Service WSUSService
-   ```
+    ```
 
 2. **Check Event Logs**
    ```powershell
@@ -519,7 +544,7 @@ The Health Check verifies:
 
 1. **Check disk space**
    - USB needs space for all content
-   - Full export can be 50+ GB
+   - Full export can be 200+ GB
 
 2. **Use NTFS format**
    - FAT32 has 4 GB file limit

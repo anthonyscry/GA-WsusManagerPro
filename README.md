@@ -1,6 +1,6 @@
 # WSUS Manager
 
-**Version:** 4.5.0
+**Version:** 4.5.12
 **Author:** Tony Tran, ISSO, Classified Computing, GA-ASI
 
 A comprehensive C# WPF automation suite for Windows Server Update Services (WSUS) with SQL Server Express 2022. Single-file EXE distribution with dark-themed dashboard, real-time diagnostics, theme picker, data filtering, CSV export, and air-gap support.
@@ -400,7 +400,7 @@ After restoring a WSUS database or performing a reset operation, the WSUS server
 - The dashboard may show "Update is downloading" status
 - This is normal behavior - do not interrupt the process
 - Content verification happens automatically in the background
-- Large content stores (50GB+) may take several hours to fully re-verify
+- Large content stores (200GB+) may take several hours to fully re-verify
 
 ### Performance Metrics
 

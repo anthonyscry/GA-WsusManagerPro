@@ -103,7 +103,7 @@ Download and save to `C:\WSUS\SQLDB\` before installation:
 | Operating System | Windows Server 2019, 2022, or Windows 10/11 |
 | CPU | 4+ cores |
 | RAM | 16+ GB |
-| Disk Space | 50+ GB for update content |
+| Disk Space | 200+ GB for WSUS content |
 | PowerShell | 5.1 or later |
 | SQL Server | SQL Server Express 2022 |
 | Privileges | Local Administrator + SQL sysadmin role |
@@ -132,7 +132,7 @@ Download and save to `C:\WSUS\SQLDB\` before installation:
 | 1 | Download WSUS Manager package | Extract to `C:\WSUS\` |
 | 2 | Download SQL Server Express 2022 | Save to `C:\WSUS\SQLDB\` |
 | 3 | Download SSMS (optional) | Save to `C:\WSUS\SQLDB\` |
-| 4 | Verify disk space | Minimum 50 GB free on C: |
+| 4 | Verify disk space | Minimum 200 GB free on C: |
 | 5 | Verify admin privileges | Right-click > Run as Administrator |
 
 ### 7.2 Installation Steps
@@ -315,7 +315,7 @@ Backup location: `C:\WSUS\SUSDB_backup_YYYYMMDD.bak`
 | 4 | Wait for restore to complete |
 | 5 | Verify dashboard shows database status |
 
-**Important:** After restoring the database, the WSUS server will need to re-verify and re-download update content. **This process can take 30+ minutes depending on your content size.** The dashboard may show "Update is downloading" status during this time - this is normal behavior. Do not interrupt the process. Large content stores (50GB+) may take several hours to fully re-verify.
+**Important:** After restoring the database, the WSUS server will need to re-verify and re-download update content. **This process can take 30+ minutes depending on your content size.** The dashboard may show "Update is downloading" status during this time - this is normal behavior. Do not interrupt the process. Large content stores (200GB+) may take several hours to fully re-verify.
 
 ### 13.3 SQL Sysadmin Permission Setup
 
