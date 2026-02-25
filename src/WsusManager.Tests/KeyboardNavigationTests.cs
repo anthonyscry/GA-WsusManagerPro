@@ -173,10 +173,16 @@ public class KeyboardNavigationTests
     [Fact]
     public void MainWindow_ClientTools_ShouldUse_Compact_Hostname_Input()
     {
-        var content = File.ReadAllText(GetXamlPath("MainWindow.xaml"));
+        var xaml = XDocument.Load(GetXamlPath("MainWindow.xaml"));
+        XNamespace autoNs = "clr-namespace:System.Windows.Automation;assembly=PresentationCore";
 
-        Assert.Contains("AutomationProperties.AutomationId=\"ClientHostnameTextBox\"", content);
-        Assert.Contains("Width=\"320\"", content);
+        var hostnameBox = xaml.Descendants()
+            .FirstOrDefault(e => e.Name.LocalName == "TextBox" &&
+                                 (string?)e.Attribute(autoNs + "AutomationProperties.AutomationId") == "ClientHostnameTextBox");
+
+        Assert.NotNull(hostnameBox);
+        Assert.Equal("320", (string?)hostnameBox.Attribute("Width"));
+        Assert.Equal("Left", (string?)hostnameBox.Attribute("HorizontalAlignment"));
     }
 
     [Fact]
@@ -219,8 +225,8 @@ public class KeyboardNavigationTests
         var content = File.ReadAllText(GetXamlPath("MainWindow.xaml"));
 
         Assert.Contains("AutomationProperties.AutomationId=\"ErrorCodeInputTextBox\"", content);
-        Assert.Contains("SelectedItem=\"{Binding ErrorCodeInput", content);
-        Assert.Contains("IsEditable=\"False\"", content);
+        Assert.Contains("Text=\"{Binding ErrorCodeInput, UpdateSourceTrigger=PropertyChanged}\"", content);
+        Assert.Contains("IsEditable=\"True\"", content);
         Assert.DoesNotContain("Text=\"Error Code:\"", content);
         Assert.Contains("Width=\"260\"", content);
         Assert.DoesNotContain("Content=\"Lookup\"", content);

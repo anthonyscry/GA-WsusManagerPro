@@ -155,7 +155,7 @@ public class DashboardServiceTests
     }
 
     [Fact]
-    public async Task GetUpdatesAsync_Does_Not_Return_Phase29_Mock_Kb_Rows()
+    public async Task GetUpdatesAsync_NoSettingsOverload_ShouldNotReturnHardcodedKbRows()
     {
         var updates = await _service.GetUpdatesAsync(CancellationToken.None);
 

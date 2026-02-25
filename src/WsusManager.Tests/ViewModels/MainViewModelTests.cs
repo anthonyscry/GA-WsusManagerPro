@@ -1275,7 +1275,7 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public async Task LoadUpdatesAsync_Calls_Settings_Based_Dashboard_Overload()
+    public async Task LoadUpdatesAsync_ShouldCallSettingsBasedDashboardApi()
     {
         var updates = new List<UpdateInfo>
         {

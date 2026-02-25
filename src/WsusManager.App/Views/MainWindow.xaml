@@ -700,7 +700,7 @@
 
                             <!-- Target Host -->
                             <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
-                                    Padding="12" Margin="0,0,0,10">
+                                    Padding="12" Margin="0,0,0,8">
                                 <StackPanel>
                                     <TextBlock Text="Target Host" FontSize="14" FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,6"/>
@@ -717,6 +717,7 @@
                                                    VerticalAlignment="Center"/>
                                         <TextBox Grid.Column="1"
                                                   Width="320"
+                                                  HorizontalAlignment="Left"
                                                   MaxWidth="360"
                                                   Style="{StaticResource UniformInputTextBox}"
                                                   automation:AutomationProperties.AutomationId="ClientHostnameTextBox"
@@ -727,7 +728,7 @@
 
                             <!-- Remote Operations -->
                             <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
-                                    Padding="12" Margin="0,0,0,10">
+                                    Padding="12" Margin="0,0,0,8">
                                 <StackPanel>
                                     <TextBlock Text="Remote Operations" FontSize="14" FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
@@ -758,7 +759,7 @@
 
                             <!-- Mass Operations -->
                             <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
-                                    Padding="12" Margin="0,0,0,10">
+                                    Padding="12" Margin="0,0,0,8">
                                 <StackPanel>
                                     <TextBlock Text="Mass Operations" FontSize="14" FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
@@ -792,7 +793,7 @@
 
                             <!-- Script Generator -->
                             <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
-                                    Padding="12" Margin="0,0,0,10">
+                                    Padding="12" Margin="0,0,0,8">
                                 <StackPanel>
                                     <TextBlock Text="Script Generator" FontSize="14" FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
@@ -838,8 +839,8 @@
                                                   Style="{StaticResource UniformInputComboBox}"
                                                   automation:AutomationProperties.AutomationId="ErrorCodeInputTextBox"
                                                   ItemsSource="{Binding CommonErrorCodes}"
-                                                  SelectedItem="{Binding ErrorCodeInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                                  IsEditable="False"
+                                                  Text="{Binding ErrorCodeInput, UpdateSourceTrigger=PropertyChanged}"
+                                                  IsEditable="True"
                                                   IsTextSearchEnabled="True"
                                                   StaysOpenOnEdit="False"/>
                                     </Grid>
@@ -1089,16 +1090,6 @@
                                           automation:AutomationProperties.AutomationId="UpdatesListView">
                                     <ListView.View>
                                         <GridView>
-                                            <GridView.ColumnHeaderContainerStyle>
-                                                <Style TargetType="GridViewColumnHeader">
-                                                    <Setter Property="Background" Value="{DynamicResource NavBackground}"/>
-                                                    <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
-                                                    <Setter Property="FontWeight" Value="SemiBold"/>
-                                                    <Setter Property="Padding" Value="8,6"/>
-                                                    <Setter Property="BorderBrush" Value="{DynamicResource BorderPrimary}"/>
-                                                    <Setter Property="BorderThickness" Value="0,0,0,1"/>
-                                                </Style>
-                                            </GridView.ColumnHeaderContainerStyle>
                                             <GridViewColumn Header="KB Article" Width="100">
                                                 <GridViewColumn.CellTemplate>
                                                     <DataTemplate>
