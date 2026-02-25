@@ -59,7 +59,7 @@ if ($content -match "OperationId") {
 }
 
 Write-Step "Checking fallback markers in latest log"
-$fallbackMatches = Select-String -Path $latestLog.FullName -Pattern "\[FALLBACK\]" -SimpleMatch
+$fallbackMatches = Select-String -Path $latestLog.FullName -Pattern "[FALLBACK]" -SimpleMatch
 if ($fallbackMatches) {
     Write-Host "[INFO] Fallback markers found (review if expected):" -ForegroundColor Yellow
     $fallbackMatches | Select-Object -First 20 | ForEach-Object { Write-Host "  $($_.Line)" }
