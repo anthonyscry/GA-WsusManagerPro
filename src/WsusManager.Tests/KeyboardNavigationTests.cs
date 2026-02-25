@@ -208,15 +208,14 @@ public class KeyboardNavigationTests
     }
 
     [Fact]
-    public void MainWindow_ScriptGeneratorComboBox_ShouldUseCompactWidth()
+    public void MainWindow_ScriptGenerator_ShouldRemoveOperationLabel_AndUseSingleRow()
     {
         var content = File.ReadAllText(GetXamlPath("MainWindow.xaml"));
 
+        Assert.DoesNotContain("Text=\"Operation:\"", content);
         Assert.Contains("AutomationProperties.AutomationId=\"ScriptOperationComboBox\"", content);
         Assert.Contains("Width=\"260\"", content);
-        Assert.DoesNotContain("Text=\"Operation:\"", content);
-        Assert.Contains("AutomationProperties.AutomationId=\"GenerateScriptButton\"", content);
-        Assert.Contains("Grid.Column=\"2\" Content=\"Generate Script\"", content);
+        Assert.Contains("Grid.Column=\"1\" Content=\"Generate Script\"", content);
     }
 
     [Fact]

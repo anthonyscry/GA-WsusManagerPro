@@ -1025,17 +1025,21 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanExecuteWsusOperation))]
     private async Task ResetContent()
     {
-        var confirm = MessageBox.Show(
-            "Reset Content will re-verify every WSUS content file against the database and may run for a while.\n\n" +
-            "Use this when clients report content mismatch or stuck download states.\n\n" +
-            "Do you want to continue?",
-            "Confirm Content Reset",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning,
-            MessageBoxResult.No);
+        if (_settings.RequireConfirmationDestructive)
+        {
+            var confirm = MessageBox.Show(
+                "Reset Content will re-verify every WSUS content file against the database.\n\n" +
+                "WARNING: This operation may run for hours on air-gapped systems and disrupt database performance.\n\n" +
+                "Use this only when clients report content mismatch or stuck download states.\n\n" +
+                "Do you want to continue?",
+                "Confirm Content Reset",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning,
+                MessageBoxResult.No);
 
-        if (confirm != MessageBoxResult.Yes)
-            return;
+            if (confirm != MessageBoxResult.Yes)
+                return;
+        }
 
         await Navigate("Diagnostics").ConfigureAwait(false);
 

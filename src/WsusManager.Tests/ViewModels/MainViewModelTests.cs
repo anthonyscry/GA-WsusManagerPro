@@ -899,6 +899,27 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task ResetContentCommand_Executes_WithoutPrompt_When_ConfirmationDisabled()
+    {
+        // Arrange
+        _mockSettings.Setup(s => s.LoadAsync())
+            .ReturnsAsync(new AppSettings { RequireConfirmationDestructive = false });
+        
+        await _vm.InitializeAsync();
+        _vm.IsWsusInstalled = true;
+
+        _mockContentReset.Setup(x => x.ResetContentAsync(It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OperationResult.CreateSuccess("Content reset complete."))
+            .Verifiable();
+
+        // Act
+        await _vm.ResetContentCommand.ExecuteAsync(null);
+
+        // Assert
+        _mockContentReset.Verify();
+    }
+
+    [Fact]
     public void QuickCleanupCommand_CanExecute_False_When_WsusNotInstalled()
     {
         _vm.IsWsusInstalled = false;
