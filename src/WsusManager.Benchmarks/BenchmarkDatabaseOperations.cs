@@ -25,7 +25,6 @@ namespace WsusManager.Benchmarks;
 [StopOnFirstError]
 public class BenchmarkDatabaseOperations
 {
-
     private readonly string _connectionString = "Data Source=localhost\\SQLEXPRESS;Initial Catalog=SUSDB;Integrated Security=True;TrustServerCertificate=True;Connect Timeout=5";
 
     private ISqlService _sqlService = null!;

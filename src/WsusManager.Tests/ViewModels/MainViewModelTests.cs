@@ -235,7 +235,7 @@ public class MainViewModelTests
     {
         var result = await _vm.RunOperationAsync("Diagnostics", async (_, ct) =>
         {
-            await Task.Yield().ConfigureAwait(false);
+            await Task.Yield();
             return true;
         });
 

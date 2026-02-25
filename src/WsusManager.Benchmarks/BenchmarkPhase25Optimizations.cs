@@ -149,8 +149,6 @@ public class BenchmarkPhase25Optimizations
             .ToList();
     }
 
-    #region Helper Methods
-
     private static List<ComputerInfo> CreateMockComputers(int count)
     {
         var computers = new List<ComputerInfo>(count);
@@ -160,7 +158,7 @@ public class BenchmarkPhase25Optimizations
         {
             computers.Add(new ComputerInfo(
                 $"COMPUTER-{i:D4}",
-                $"192.168.1.{i % 255 + 1}",
+                $"192.168.1.{(i % 255) + 1}",
                 statuses[i % statuses.Length],
                 DateTime.Now.AddHours(-i % 48),
                 i % 10,
@@ -205,6 +203,4 @@ public class BenchmarkPhase25Optimizations
         // Simulate service initialization (parallelized in Phase 25)
         Thread.Sleep(10); // Reduced from 20ms due to parallelization
     }
-
-    #endregion
 }

@@ -97,9 +97,8 @@ public class ThemeServiceTests
         var info = service.GetThemeInfo("NonExistentTheme");
         Assert.Null(info);
 
-        string? nullTheme = null;
-        var nullInfo = service.GetThemeInfo(nullTheme);
-        Assert.Null(nullInfo);
+        var whitespaceInfo = service.GetThemeInfo("   ");
+        Assert.Null(whitespaceInfo);
 
         var emptyInfo = service.GetThemeInfo("");
         Assert.Null(emptyInfo);
