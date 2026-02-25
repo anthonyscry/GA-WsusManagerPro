@@ -161,6 +161,34 @@ public class KeyboardNavigationTests
     }
 
     [Fact]
+    public void MainWindow_UpdatesList_ShouldUse_Themed_VirtualizedListView_Style()
+    {
+        var content = File.ReadAllText(GetXamlPath("MainWindow.xaml"));
+
+        Assert.Contains("x:Name=\"UpdatesListView\"", content);
+        Assert.Contains("BasedOn=\"{StaticResource VirtualizedListView}\"", content);
+        Assert.Contains("ItemContainerStyle=\"{StaticResource DarkListViewItem}\"", content);
+    }
+
+    [Fact]
+    public void MainWindow_ClientTools_ShouldUse_Compact_Hostname_Input()
+    {
+        var content = File.ReadAllText(GetXamlPath("MainWindow.xaml"));
+
+        Assert.Contains("AutomationProperties.AutomationId=\"ClientHostnameTextBox\"", content);
+        Assert.Contains("Width=\"320\"", content);
+    }
+
+    [Fact]
+    public void MainWindow_ErrorCodeLookup_ShouldUse_Searchable_ComboBox()
+    {
+        var content = File.ReadAllText(GetXamlPath("MainWindow.xaml"));
+
+        Assert.Contains("AutomationProperties.AutomationId=\"ErrorCodeInputTextBox\"", content);
+        Assert.Contains("IsTextSearchEnabled=\"True\"", content);
+    }
+
+    [Fact]
     public void MainWindow_ShouldNotNestDataTriggerInsideDataTrigger()
     {
         var xaml = XDocument.Load(GetXamlPath("MainWindow.xaml"));
@@ -171,5 +199,69 @@ public class KeyboardNavigationTests
 
         Assert.False(hasNestedDataTrigger,
             "MainWindow.xaml must not nest DataTrigger inside DataTrigger. Use MultiDataTrigger or default setters.");
+    }
+
+    [Fact]
+    public void MainWindow_ScriptGeneratorComboBox_ShouldUseCompactWidth()
+    {
+        var content = File.ReadAllText(GetXamlPath("MainWindow.xaml"));
+
+        Assert.Contains("AutomationProperties.AutomationId=\"ScriptOperationComboBox\"", content);
+        Assert.Contains("Width=\"260\"", content);
+        Assert.DoesNotContain("Text=\"Operation:\"", content);
+        Assert.Contains("AutomationProperties.AutomationId=\"GenerateScriptButton\"", content);
+        Assert.Contains("Grid.Column=\"2\" Content=\"Generate Script\"", content);
+    }
+
+    [Fact]
+    public void MainWindow_ErrorCodeLookupComboBox_ShouldUseDropdownOnlyWithoutLookupButton()
+    {
+        var content = File.ReadAllText(GetXamlPath("MainWindow.xaml"));
+
+        Assert.Contains("AutomationProperties.AutomationId=\"ErrorCodeInputTextBox\"", content);
+        Assert.Contains("SelectedItem=\"{Binding ErrorCodeInput", content);
+        Assert.Contains("IsEditable=\"False\"", content);
+        Assert.DoesNotContain("Text=\"Error Code:\"", content);
+        Assert.Contains("Width=\"260\"", content);
+        Assert.DoesNotContain("Content=\"Lookup\"", content);
+    }
+
+    [Fact]
+    public void MainWindow_PrimaryClientInputs_ShouldUseUniformInputStyles()
+    {
+        var content = File.ReadAllText(GetXamlPath("MainWindow.xaml"));
+
+        Assert.Contains("AutomationProperties.AutomationId=\"ClientHostnameTextBox\"", content);
+        Assert.Contains("Style=\"{StaticResource UniformInputTextBox}\"", content);
+        Assert.Contains("AutomationProperties.AutomationId=\"ScriptOperationComboBox\"", content);
+        Assert.Contains("Style=\"{StaticResource UniformInputComboBox}\"", content);
+    }
+
+    [Fact]
+    public void MainWindow_AboutPanel_ShouldUsePackUriForGaLogo()
+    {
+        var content = File.ReadAllText(GetXamlPath("MainWindow.xaml"));
+
+        Assert.Contains("pack://application:,,,/general_atomics_logo_big.ico", content);
+    }
+
+    [Fact]
+    public void SettingsDialog_AdvancedSection_ShouldDefineEnoughRowsForAllControls()
+    {
+        var xaml = XDocument.Load(GetXamlPath("SettingsDialog.xaml"));
+
+        var advancedGroup = xaml.Descendants()
+            .FirstOrDefault(e => e.Name.LocalName == "GroupBox" &&
+                                 string.Equals((string?)e.Attribute("Header"), "Advanced", StringComparison.Ordinal));
+
+        Assert.NotNull(advancedGroup);
+
+        var rowDefinitions = advancedGroup!
+            .Descendants()
+            .Where(e => e.Name.LocalName == "RowDefinition")
+            .Count();
+
+        Assert.True(rowDefinitions >= 6,
+            "Advanced settings grid must define at least 6 rows (timeouts, retries, 3 fallbacks, reset button).");
     }
 }

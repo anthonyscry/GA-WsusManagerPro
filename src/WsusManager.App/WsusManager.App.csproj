@@ -37,9 +37,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="general_atomics_logo_big.ico">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
+    <Resource Include="general_atomics_logo_big.ico" />
     <Content Include="general_atomics_logo_small.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

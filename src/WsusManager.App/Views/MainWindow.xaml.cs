@@ -75,10 +75,18 @@ public partial class MainWindow : Window
 
     private void ValidateBrandingAssets()
     {
-        var aboutLogoPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "general_atomics_logo_big.ico");
-        if (!System.IO.File.Exists(aboutLogoPath))
+        try
         {
-            _logService.Warning("Branding asset missing at startup: {AssetPath}. About panel icon may be unavailable.", aboutLogoPath);
+            var aboutLogoUri = new Uri("pack://application:,,,/general_atomics_logo_big.ico", UriKind.Absolute);
+            var logoStream = Application.GetResourceStream(aboutLogoUri);
+            if (logoStream == null)
+            {
+                _logService.Warning("Branding asset missing at startup: {AssetUri}. About panel icon may be unavailable.", aboutLogoUri);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logService.Warning("Failed to validate branding asset resource: {Error}", ex.Message);
         }
     }
 

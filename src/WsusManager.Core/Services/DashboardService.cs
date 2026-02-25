@@ -337,25 +337,7 @@ public class DashboardService : IDashboardService
     /// </summary>
     public async Task<IReadOnlyList<UpdateInfo>> GetUpdatesAsync(CancellationToken ct = default)
     {
-        // Phase 29: Return mock data for UI testing
-        // Future: Query SUSDB for real update list
-        await Task.Delay(50, ct).ConfigureAwait(false); // Simulate database query
-
-        var now = DateTime.UtcNow;
-        return new List<UpdateInfo>
-        {
-            new(Guid.NewGuid(), "KB5034441", "Security Update for Windows 11", "Security Updates", now.AddDays(-5), true, false),
-            new(Guid.NewGuid(), "KB5034439", "Cumulative Update for Windows 11", "Critical Updates", now.AddDays(-5), true, false),
-            new(Guid.NewGuid(), "KB5034442", "Security Update for .NET Framework 3.5", "Security Updates", now.AddDays(-3), true, false),
-            new(Guid.NewGuid(), "KB5034443", "Security Update for Microsoft Defender", "Definition Updates", now.AddDays(-1), true, false),
-            new(Guid.NewGuid(), "KB5034444", "Cumulative Update for Windows 10", "Critical Updates", now.AddDays(-7), true, false),
-            new(Guid.NewGuid(), "KB5034445", "Security Update for Windows Server 2022", "Security Updates", now.AddDays(-4), false, false),
-            new(Guid.NewGuid(), "KB5034446", "Update for Windows 11", "Updates", now.AddDays(-2), false, false),
-            new(Guid.NewGuid(), "KB5034447", "Definition Update for Windows Defender", "Definition Updates", now.AddHours(-12), true, false),
-            new(Guid.NewGuid(), "KB5034448", "Security Update for Microsoft Office", "Security Updates", now.AddDays(-6), false, false),
-            new(Guid.NewGuid(), "KB5034449", "Critical Update for Windows Server 2019", "Critical Updates", now.AddDays(-10), true, false),
-            new(Guid.NewGuid(), "KB5034450", "Cumulative Update for .NET Framework", "Updates", now.AddDays(-8), false, true), // Declined
-            new(Guid.NewGuid(), "KB5034451", "Security Update for Windows 10", "Security Updates", now.AddDays(-9), false, false),
-        };
+        return await GetUpdatesAsync(new AppSettings(), pageNumber: 1, pageSize: 100, ct)
+            .ConfigureAwait(false);
     }
 }

@@ -28,11 +28,11 @@ public class UiConsistencyRegressionTests
     private static string GetViewModelsPath() => Path.Combine(GetProjectRoot(), "ViewModels");
 
     [Fact]
-    public void MainWindow_AboutPanel_ShouldUseSiteOfOriginPackUri_ForGaIcon()
+    public void MainWindow_AboutPanel_ShouldUseApplicationPackUri_ForGaIcon()
     {
         var xaml = File.ReadAllText(Path.Combine(GetViewsPath(), "MainWindow.xaml"));
 
-        Assert.Contains("pack://siteoforigin:,,,/general_atomics_logo_big.ico", xaml);
+        Assert.Contains("pack://application:,,,/general_atomics_logo_big.ico", xaml);
     }
 
     [Fact]
@@ -89,6 +89,6 @@ public class UiConsistencyRegressionTests
     {
         var viewModel = File.ReadAllText(Path.Combine(GetViewModelsPath(), "MainViewModel.cs"));
 
-        Assert.Contains("_themeService.ApplyTitleBarColorsToWindow(dialog, _settingsService.Current.SelectedTheme);", viewModel);
+        Assert.Contains("_themeService.ApplyTitleBarColorsToWindow(dialog, _settings.SelectedTheme);", viewModel);
     }
 }

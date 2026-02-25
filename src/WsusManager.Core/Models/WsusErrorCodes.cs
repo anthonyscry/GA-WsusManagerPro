@@ -103,6 +103,13 @@ public static class WsusErrorCodes
                 Description = "WU_E_PT_HTTP_STATUS_NOT_FOUND — HTTP 404. The WSUS server URL returned a Not Found response.",
                 RecommendedFix = "Verify the WUServer registry value has the correct URL and port. Check that the WSUS IIS application is running and the /ClientWebService virtual directory exists. Run 'iisreset' on the WSUS server if needed."
             },
+            ["80244022"] = new WsusErrorInfo
+            {
+                Code = "0x80244022",
+                HexCode = "80244022",
+                Description = "WU_E_PT_HTTP_STATUS_SERVICE_UNAVAIL — HTTP 503. The WSUS service is temporarily unavailable.",
+                RecommendedFix = "Verify IIS and WSUS services are running, check WSUS app pool health, and review server resource usage. Restart IIS/WSUS services if needed and retry the scan."
+            },
             ["80070002"] = new WsusErrorInfo
             {
                 Code = "0x80070002",
@@ -130,6 +137,20 @@ public static class WsusErrorCodes
                 HexCode = "80240016",
                 Description = "WU_E_INSTALL_NOT_ALLOWED — Operation tried to install while another installation was in progress or the system was pending a mandatory restart.",
                 RecommendedFix = "Restart the computer to clear the pending reboot state. Check for other running installers (MSI, Windows Installer service). After reboot, trigger a new update scan."
+            },
+            ["80070643"] = new WsusErrorInfo
+            {
+                Code = "0x80070643",
+                HexCode = "80070643",
+                Description = "ERROR_INSTALL_FAILURE — Fatal error during update installation.",
+                RecommendedFix = "Run Windows Update troubleshooter, verify .NET health and Windows Installer service state, then retry. If recurring, review CBS and WindowsUpdate logs for the specific package failure and repair component store with DISM/SFC."
+            },
+            ["80242016"] = new WsusErrorInfo
+            {
+                Code = "0x80242016",
+                HexCode = "80242016",
+                Description = "WU_E_UH_POSTREBOOTSTILLPENDING — The update remains pending after reboot.",
+                RecommendedFix = "Restart again, clear pending reboot flags if safe, and rerun scan/install. Check servicing stack health and ensure no other installer session is blocking update finalization."
             },
             ["80244007"] = new WsusErrorInfo
             {

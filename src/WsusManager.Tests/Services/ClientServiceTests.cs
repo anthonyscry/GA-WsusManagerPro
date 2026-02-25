@@ -430,6 +430,32 @@ public class ClientServiceTests
         Assert.Equal("0x80072EE2", result.Data.Code);
     }
 
+    [Fact]
+    public void LookupErrorCode_Recognizes_0x80244022()
+    {
+        var service = CreateService();
+
+        var result = service.LookupErrorCode("0x80244022");
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.Data);
+        Assert.Equal("0x80244022", result.Data.Code);
+    }
+
+    [Theory]
+    [InlineData("0x80070643")]
+    [InlineData("0x80242016")]
+    public void LookupErrorCode_Recognizes_Trailing_Common_Codes(string code)
+    {
+        var service = CreateService();
+
+        var result = service.LookupErrorCode(code);
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.Data);
+        Assert.Equal(code, result.Data.Code);
+    }
+
     // -------------------------------------------------------------------------
     // MassForceCheckInAsync
     // -------------------------------------------------------------------------
