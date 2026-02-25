@@ -65,7 +65,11 @@ public partial class App : Application
     private void OnAppDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)
     {
         var exception = e.ExceptionObject as Exception;
-        _logger?.LogCritical(exception, "Fatal unhandled exception (IsTerminating={IsTerminating})", e.IsTerminating);
+        if (_logger != null && _logger.IsEnabled(LogLevel.Critical))
+        {
+            _logger.LogCritical("Fatal unhandled exception (IsTerminating={IsTerminating})", e.IsTerminating);
+            _logger.LogCritical(exception, "Unhandled app-domain termination");
+        }
 
         if (exception != null)
         {

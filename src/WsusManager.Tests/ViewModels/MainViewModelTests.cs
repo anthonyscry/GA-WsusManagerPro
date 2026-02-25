@@ -94,7 +94,7 @@ public class MainViewModelTests
         await _vm.RunOperationAsync("Test", async (progress, ct) =>
         {
             wasRunningDuringOp = _vm.IsOperationRunning;
-            await Task.CompletedTask;
+            await Task.CompletedTask.ConfigureAwait(false);
             return true;
         });
 
@@ -107,7 +107,7 @@ public class MainViewModelTests
     {
         var result = await _vm.RunOperationAsync("Test", async (progress, ct) =>
         {
-            await Task.CompletedTask;
+            await Task.CompletedTask.ConfigureAwait(false);
             return true;
         });
 
@@ -122,7 +122,7 @@ public class MainViewModelTests
     {
         var result = await _vm.RunOperationAsync("Test", async (progress, ct) =>
         {
-            await Task.CompletedTask;
+            await Task.CompletedTask.ConfigureAwait(false);
             return false;
         });
 
@@ -136,7 +136,7 @@ public class MainViewModelTests
     {
         var result = await _vm.RunOperationAsync("Test", async (progress, ct) =>
         {
-            await Task.CompletedTask;
+            await Task.CompletedTask.ConfigureAwait(false);
             throw new OperationCanceledException();
         });
 
@@ -150,7 +150,7 @@ public class MainViewModelTests
     {
         var result = await _vm.RunOperationAsync("Test", async (progress, ct) =>
         {
-            await Task.CompletedTask;
+            await Task.CompletedTask.ConfigureAwait(false);
             throw new InvalidOperationException("Something broke");
         });
 
@@ -167,12 +167,12 @@ public class MainViewModelTests
 
         var firstOp = _vm.RunOperationAsync("First", async (progress, ct) =>
         {
-            return await tcs.Task;
+            return await tcs.Task.ConfigureAwait(false);
         });
 
         var secondResult = await _vm.RunOperationAsync("Second", async (progress, ct) =>
         {
-            await Task.CompletedTask;
+            await Task.CompletedTask.ConfigureAwait(false);
             return true;
         });
 
@@ -191,7 +191,7 @@ public class MainViewModelTests
         var opTask = _vm.RunOperationAsync("CancelTest", async (progress, ct) =>
         {
             operationStarted.SetResult();
-            await Task.Delay(TimeSpan.FromSeconds(30), ct);
+            await Task.Delay(TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
             return true;
         });
 
@@ -222,7 +222,7 @@ public class MainViewModelTests
         {
             progress.Report("Step 1 done");
             progress.Report("Step 2 done");
-            await Task.CompletedTask;
+            await Task.CompletedTask.ConfigureAwait(false);
             return true;
         });
 
@@ -235,7 +235,7 @@ public class MainViewModelTests
     {
         var result = await _vm.RunOperationAsync("Diagnostics", async (_, ct) =>
         {
-            await Task.Yield();
+            await Task.Yield().ConfigureAwait(false);
             return true;
         });
 
@@ -904,12 +904,12 @@ public class MainViewModelTests
         // Arrange
         _mockSettings.Setup(s => s.LoadAsync())
             .ReturnsAsync(new AppSettings { RequireConfirmationDestructive = false });
-        
+
         await _vm.InitializeAsync();
         _vm.IsWsusInstalled = true;
 
         _mockContentReset.Setup(x => x.ResetContentAsync(It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(OperationResult.CreateSuccess("Content reset complete."))
+            .ReturnsAsync(OperationResult.Ok("Content reset complete."))
             .Verifiable();
 
         // Act
@@ -1003,7 +1003,7 @@ public class MainViewModelTests
         await _vm.RunOperationAsync("TestOp", async (progress, ct) =>
         {
             nameCapture = _vm.CurrentOperationName;
-            await Task.CompletedTask;
+            await Task.CompletedTask.ConfigureAwait(false);
             return true;
         });
 
@@ -1077,7 +1077,7 @@ public class MainViewModelTests
         await _vm.RunOperationAsync("FeedbackTest", async (progress, ct) =>
         {
             wasVisibleDuringOp = _vm.IsProgressBarVisible;
-            await Task.CompletedTask;
+            await Task.CompletedTask.ConfigureAwait(false);
             return true;
         });
 
@@ -1090,7 +1090,7 @@ public class MainViewModelTests
     {
         await _vm.RunOperationAsync("MyOp", async (progress, ct) =>
         {
-            await Task.CompletedTask;
+            await Task.CompletedTask.ConfigureAwait(false);
             return true;
         });
 
@@ -1105,7 +1105,7 @@ public class MainViewModelTests
     {
         await _vm.RunOperationAsync("FailOp", async (progress, ct) =>
         {
-            await Task.CompletedTask;
+            await Task.CompletedTask.ConfigureAwait(false);
             return false;
         });
 
@@ -1124,7 +1124,7 @@ public class MainViewModelTests
         {
             progress.Report("[Step 3/6]: Rebuilding indexes");
             // Allow Progress<T> callback to fire on the UI thread
-            await Task.Delay(50, ct);
+            await Task.Delay(50, ct).ConfigureAwait(false);
             capturedStepText = _vm.OperationStepText;
             return true;
         });
@@ -1138,7 +1138,7 @@ public class MainViewModelTests
         await _vm.RunOperationAsync("CleanupTest", async (progress, ct) =>
         {
             progress.Report("[Step 1/3]: Starting");
-            await Task.CompletedTask;
+            await Task.CompletedTask.ConfigureAwait(false);
             return true;
         });
 

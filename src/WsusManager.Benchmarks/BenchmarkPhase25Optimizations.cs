@@ -17,12 +17,8 @@ namespace WsusManager.Benchmarks;
 [CsvMeasurementsExporter]
 [RPlotExporter]
 [GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByMethod)]
-[ArgumentsSource(nameof(ComputerCounts))]
 public class BenchmarkPhase25Optimizations
 {
-    // Parametrized computer counts for realistic testing
-    public IEnumerable<int> ComputerCounts => new[] { 100, 500, 1000, 2000, 5000 };
-
     [Params(100, 500, 1000, 2000)]
     public int ComputerCount { get; set; }
 
@@ -46,7 +42,7 @@ public class BenchmarkPhase25Optimizations
 
     /// <summary>
     /// Benchmark: Application cold startup time.
-    /// Baseline from Phase 22: ~1200ms. Target: <840ms (30% improvement).
+    /// Baseline from Phase 22: ~1200ms. Target: &lt;840ms (30% improvement).
     /// Note: This is a simplified benchmark that simulates parallel initialization.
     /// Actual startup time requires full application benchmarking.
     /// </summary>
