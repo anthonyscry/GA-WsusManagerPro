@@ -211,10 +211,12 @@ jobs:
         run: dotnet restore src/WsusManager.Benchmarks/WsusManager.Benchmarks.csproj
 
       - name: Build benchmarks
-        run: dotnet build src/WsusManager.Benchmarks/WsusManager.Benchmarks.csproj --configuration Release
+        working-directory: src/WsusManager.Benchmarks
+        run: dotnet build --configuration Release
 
       - name: Run all benchmarks
-        run: dotnet run --project src/WsusManager.Benchmarks/WsusManager.Benchmarks.csproj --configuration Release
+        working-directory: src/WsusManager.Benchmarks
+        run: dotnet run --configuration Release
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
@@ -227,10 +229,10 @@ jobs:
       - name: Detect regressions
         shell: pwsh
         run: |
-          $currentResults = Get-ChildItem "src/WsusManager.Benchmarks/BenchmarkDotNet.Artifacts/*-report.csv" | Select-Object -First 1 -ExpandProperty FullName
           $baselineStartup = "src/WsusManager.Benchmarks/baselines/startup-baseline.csv"
           $baselineDatabase = "src/WsusManager.Benchmarks/baselines/database-baseline.csv"
           $baselineWinrm = "src/WsusManager.Benchmarks/baselines/winrm-baseline.csv"
+          $benchmarkResultsPath = "src/WsusManager.Benchmarks/BenchmarkDotNet.Artifacts"
 
           # Check if baselines exist
           if (-not (Test-Path $baselineStartup)) {
@@ -240,21 +242,21 @@ jobs:
 
           # Run regression detection
           & src/WsusManager.Benchmarks/scripts/detect-regression.ps1 `
-            -CurrentResultsPath $currentResults `
+            -CurrentResultsPath "src/WsusManager.Benchmarks/BenchmarkDotNet.Artifacts" `
             -BaselinePath $baselineStartup `
             -ThresholdPercent 10
 
           # Repeat for database and WinRM baselines
           if (Test-Path $baselineDatabase) {
             & src/WsusManager.Benchmarks/scripts/detect-regression.ps1 `
-              -CurrentResultsPath $currentResults `
+              -CurrentResultsPath $benchmarkResultsPath `
               -BaselinePath $baselineDatabase `
               -ThresholdPercent 10
           }
 
           if (Test-Path $baselineWinrm) {
             & src/WsusManager.Benchmarks/scripts/detect-regression.ps1 `
-              -CurrentResultsPath $currentResults `
+              -CurrentResultsPath $benchmarkResultsPath `
               -BaselinePath $baselineWinrm `
               -ThresholdPercent 10
           }
