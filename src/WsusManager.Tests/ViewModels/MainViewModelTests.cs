@@ -1,10 +1,13 @@
-using Moq;
+using System.Reflection;
 using System.Windows.Data;
+using Moq;
 using WsusManager.App.Services;
 using WsusManager.App.ViewModels;
 using WsusManager.Core.Logging;
 using WsusManager.Core.Models;
 using WsusManager.Core.Services.Interfaces;
+
+#pragma warning disable CA2007
 
 namespace WsusManager.Tests.ViewModels;
 
@@ -284,7 +287,7 @@ public class MainViewModelTests
             IsOnline = true
         };
 
-        _vm.UpdateDashboardCards(data);
+        InvokeUpdateDashboardCards(data);
 
         Assert.Equal("3 / 3", _vm.ServicesValue);
         // Green color: #3FB950
@@ -305,7 +308,7 @@ public class MainViewModelTests
             IsOnline = true
         };
 
-        _vm.UpdateDashboardCards(data);
+        InvokeUpdateDashboardCards(data);
 
         Assert.Equal("1 / 3", _vm.ServicesValue);
         // Orange color: #D29922
@@ -318,7 +321,7 @@ public class MainViewModelTests
         var data = CreateHealthyData();
         data.DatabaseSizeGB = 5.0;
 
-        _vm.UpdateDashboardCards(data);
+        InvokeUpdateDashboardCards(data);
 
         Assert.Equal("5.0 / 10 GB", _vm.DatabaseValue);
         Assert.Equal(Color(0x3F, 0xB9, 0x50), _vm.DatabaseBarColor.Color);
@@ -330,7 +333,7 @@ public class MainViewModelTests
         var data = CreateHealthyData();
         data.DatabaseSizeGB = 7.5;
 
-        _vm.UpdateDashboardCards(data);
+        InvokeUpdateDashboardCards(data);
 
         Assert.Equal("7.5 / 10 GB", _vm.DatabaseValue);
         Assert.Equal(Color(0xD2, 0x99, 0x22), _vm.DatabaseBarColor.Color);
@@ -343,7 +346,7 @@ public class MainViewModelTests
         var data = CreateHealthyData();
         data.DatabaseSizeGB = 9.5;
 
-        _vm.UpdateDashboardCards(data);
+        InvokeUpdateDashboardCards(data);
 
         Assert.Equal("9.5 / 10 GB", _vm.DatabaseValue);
         Assert.Equal(Color(0xF8, 0x51, 0x49), _vm.DatabaseBarColor.Color);
@@ -356,7 +359,7 @@ public class MainViewModelTests
         var data = CreateHealthyData();
         data.DatabaseSizeGB = -1;
 
-        _vm.UpdateDashboardCards(data);
+        InvokeUpdateDashboardCards(data);
 
         Assert.Equal("Offline", _vm.DatabaseValue);
         Assert.Equal(Color(0xF8, 0x51, 0x49), _vm.DatabaseBarColor.Color);
@@ -376,7 +379,7 @@ public class MainViewModelTests
             IsOnline = false
         };
 
-        _vm.UpdateDashboardCards(data);
+        InvokeUpdateDashboardCards(data);
 
         Assert.Equal("N/A", _vm.ServicesValue);
         Assert.Equal("Not Installed", _vm.ServicesSubtext);
@@ -392,7 +395,7 @@ public class MainViewModelTests
         var data = CreateHealthyData();
         data.DiskFreeGB = 5.0;
 
-        _vm.UpdateDashboardCards(data);
+        InvokeUpdateDashboardCards(data);
 
         Assert.Equal("5.0 GB", _vm.DiskValue);
         Assert.Equal(Color(0xF8, 0x51, 0x49), _vm.DiskBarColor.Color);
@@ -409,7 +412,7 @@ public class MainViewModelTests
         var data = CreateHealthyData();
         data.IsOnline = true;
 
-        _vm.UpdateDashboardCards(data);
+        InvokeUpdateDashboardCards(data);
 
         Assert.True(_vm.IsOnline);
         Assert.Equal("Online", _vm.ConnectionStatusText);
@@ -422,7 +425,7 @@ public class MainViewModelTests
         var data = CreateHealthyData();
         data.IsOnline = false;
 
-        _vm.UpdateDashboardCards(data);
+        InvokeUpdateDashboardCards(data);
 
         Assert.False(_vm.IsOnline);
         Assert.Equal("Offline", _vm.ConnectionStatusText);
@@ -1119,12 +1122,22 @@ public class MainViewModelTests
         });
 
         Assert.False(_vm.IsProgressBarVisible, "IsProgressBarVisible should be false after completion");
-        Assert.Equal(string.Empty, _vm.OperationStepText, "OperationStepText should be empty after completion");
+        Assert.Equal(string.Empty, _vm.OperationStepText);
     }
 
     // ═══════════════════════════════════════════════════════════════
     // Helpers
     // ═══════════════════════════════════════════════════════════════
+
+    private void InvokeUpdateDashboardCards(DashboardData data)
+    {
+        var method = typeof(MainViewModel).GetMethod(
+            "UpdateDashboardCards",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.NotNull(method);
+        method!.Invoke(_vm, new object[] { data });
+    }
 
     private static DashboardData CreateHealthyData() => new()
     {
@@ -1261,3 +1274,5 @@ public class MainViewModelTests
         Assert.Empty(_vm.UpdateSearchText);
     }
 }
+
+#pragma warning restore CA2007

@@ -210,12 +210,12 @@ Full details: `.planning/milestones/v4.4-ROADMAP.md`
 4. Success/failure banners use consistent iconography and colors across all operations
 5. All toolbar and quick action buttons have tooltip help text on hover
 
-**Plans:** 5/5 planned
-- [ ] 27-01-PLAN.md — Estimated time remaining for long operations (UX-06)
-- [ ] 27-02-PLAN.md — Loading indicators on buttons (UX-07)
-- [ ] 27-03-PLAN.md — Actionable error messages (UX-08)
-- [ ] 27-04-PLAN.md — Consistent success/failure banners (UX-09)
-- [ ] 27-05-PLAN.md — Tooltip help text (UX-10)
+**Plans:** 5/5 complete
+- [x] 27-01-PLAN.md — Estimated time remaining for long operations (UX-06)
+- [x] 27-02-PLAN.md — Loading indicators on buttons (UX-07)
+- [x] 27-03-PLAN.md — Actionable error messages (UX-08)
+- [x] 27-04-PLAN.md — Consistent success/failure banners (UX-09)
+- [x] 27-05-PLAN.md — Tooltip help text (UX-10)
 
 ---
 
@@ -283,10 +283,10 @@ Full details: `.planning/milestones/v4.4-ROADMAP.md`
 3. CSV exports include UTF-8 BOM for proper Excel character encoding
 4. Export operation shows progress and opens destination folder on completion
 
-**Plans:** 3/3 planned
-- [ ] 30-01-PLAN.md — CSV Export Service (2026-02-21) (DAT-05, DAT-06, DAT-07)
-- [ ] 30-02-PLAN.md — Export Button UI (2026-02-21) (DAT-05, DAT-06)
-- [ ] 30-03-PLAN.md — Export Progress Dialog (2026-02-21) (DAT-08)
+**Plans:** 3/3 complete
+- [x] 30-01-PLAN.md — CSV Export Service (2026-02-22) (DAT-05, DAT-06, DAT-07)
+- [x] 30-02-PLAN.md — Export Button UI (2026-02-22) (DAT-05, DAT-06)
+- [x] 30-03-PLAN.md — Export Progress Dialog (2026-02-22) (DAT-08)
 
 ---
 

@@ -136,22 +136,51 @@ public class ThemeService : IThemeService
     /// </summary>
     private void ApplyTitleBarColors(string themeName)
     {
-        if (_mainWindow == null) return;
+        if (_mainWindow == null)
+        {
+            _logService.Warning("Skipped title bar color apply for theme {ThemeName}: main window not initialized.", themeName);
+            return;
+        }
 
-        if (_titleBarColors.TryGetValue(themeName, out var colors))
+        if (!_titleBarColors.TryGetValue(themeName, out var colors))
+        {
+            _logService.Warning("No title bar color mapping found for theme {ThemeName}.", themeName);
+            return;
+        }
+
+        try
         {
             TitleBarService.SetTitleBarColors(_mainWindow, colors.Background, colors.Foreground);
+        }
+        catch (Exception ex)
+        {
+            _logService.Warning("Failed to apply title bar colors for theme {ThemeName}: {Error}", themeName, ex.Message);
         }
     }
 
     /// <inheritdoc/>
     public void ApplyTitleBarColorsToWindow(Window window, string themeName)
     {
-        if (window == null) return;
+        if (window == null)
+        {
+            _logService.Warning("Skipped title bar color apply for theme {ThemeName}: target window is null.", themeName);
+            return;
+        }
 
-        if (_titleBarColors.TryGetValue(themeName, out var colors))
+        if (!_titleBarColors.TryGetValue(themeName, out var colors))
+        {
+            _logService.Warning("No title bar color mapping found for theme {ThemeName}.", themeName);
+            return;
+        }
+
+        try
         {
             TitleBarService.SetTitleBarColors(window, colors.Background, colors.Foreground);
+        }
+        catch (Exception ex)
+        {
+            _logService.Warning("Failed to apply title bar colors for theme {ThemeName} on window {WindowType}: {Error}",
+                themeName, window.GetType().Name, ex.Message);
         }
     }
 

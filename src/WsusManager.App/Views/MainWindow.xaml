@@ -1092,6 +1092,7 @@
                                     MinHeight="300">
                                 <ListView x:Name="UpdatesListView"
                                           ItemsSource="{Binding FilteredUpdates}"
+                                          ItemContainerStyle="{StaticResource DarkListViewItem}"
                                           VirtualizingPanel.IsVirtualizing="True"
                                           VirtualizingPanel.VirtualizationMode="Recycling"
                                           ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -1170,7 +1171,7 @@
 
                                     <!-- Empty State -->
                                     <ListView.Style>
-                                        <Style TargetType="ListView">
+                                        <Style TargetType="ListView" BasedOn="{StaticResource VirtualizedListView}">
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding FilteredUpdates.Count}" Value="0">
                                                     <Setter Property="Template">
@@ -1281,7 +1282,7 @@
                                     Padding="16" Margin="0,0,0,12">
                                 <StackPanel Orientation="Horizontal">
                                     <Image Width="56" Height="56" Margin="0,0,16,0" VerticalAlignment="Center"
-                                           Source="general_atomics_logo_big.ico" Stretch="Uniform"/>
+                                           Source="pack://siteoforigin:,,,/general_atomics_logo_big.ico" Stretch="Uniform"/>
                                     <StackPanel VerticalAlignment="Center">
                                         <TextBlock Text="WSUS Manager" FontSize="18" FontWeight="Bold"
                                                    Foreground="{DynamicResource TextPrimary}"/>

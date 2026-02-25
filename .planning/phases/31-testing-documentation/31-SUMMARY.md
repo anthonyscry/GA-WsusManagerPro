@@ -169,9 +169,9 @@ From Phase 31 CONTEXT.md:
 
 ## Next Steps
 
-1. **Create GitHub Release** — Tag v4.5.0, upload artifacts, publish release notes
-2. **Close Milestone** — Mark v4.5 Enhancement Suite complete
-3. **Plan v4.6** — Next release focused on advanced analytics, notifications, and reporting
+1. ✅ **GitHub Releases Published** — follow-up patch releases through v4.5.9 are published.
+2. ✅ **Milestone Closed** — v4.5 Enhancement Suite is complete.
+3. **Plan v4.6** — Next release focused on advanced analytics, notifications, and reporting.
 
 ## Timeline Actual
 

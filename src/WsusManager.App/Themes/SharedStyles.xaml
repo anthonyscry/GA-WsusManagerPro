@@ -676,13 +676,56 @@
         <Setter Property="GridView.ColumnHeaderContainerStyle">
             <Setter.Value>
                 <Style TargetType="GridViewColumnHeader">
-                    <Setter Property="Background" Value="{DynamicResource NavBackground}" />
-                    <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+                    <Setter Property="Background" Value="{DynamicResource TableHeaderBackground}" />
+                    <Setter Property="Foreground" Value="{DynamicResource TableHeaderForeground}" />
                     <Setter Property="FontWeight" Value="SemiBold" />
                     <Setter Property="Padding" Value="8,6" />
                     <Setter Property="BorderBrush" Value="{DynamicResource BorderPrimary}" />
                     <Setter Property="BorderThickness" Value="0,0,0,1" />
+                    <Setter Property="HorizontalContentAlignment" Value="Left" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="GridViewColumnHeader">
+                                <Border Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}">
+                                    <ContentPresenter Margin="{TemplateBinding Padding}"
+                                                      VerticalAlignment="Center"
+                                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                      RecognizesAccessKey="True"/>
+                                </Border>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
                 </Style>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="DarkListViewItem" TargetType="ListViewItem">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimary}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListViewItem">
+                    <Border x:Name="ItemBorder" Background="{TemplateBinding Background}">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource TableRowHoverBackground}"/>
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource TableRowSelectedBackground}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TableRowSelectedForeground}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>

@@ -5,6 +5,7 @@ using System.Windows.Media.Imaging;
 using WsusManager.App.Services;
 using WsusManager.App.ViewModels;
 using WsusManager.Core.Infrastructure;
+using WsusManager.Core.Logging;
 using WsusManager.Core.Models;
 using WsusManager.Core.Services.Interfaces;
 
@@ -19,19 +20,26 @@ public partial class MainWindow : Window
     private readonly MainViewModel _viewModel;
     private readonly ISettingsService _settingsService;
     private readonly IThemeService _themeService;
+    private readonly ILogService _logService;
     private AppSettings _settings;
 
-    public MainWindow(MainViewModel viewModel, ISettingsService settingsService, IThemeService themeService)
+    public MainWindow(
+        MainViewModel viewModel,
+        ISettingsService settingsService,
+        IThemeService themeService,
+        ILogService logService)
     {
         InitializeComponent();
         _viewModel = viewModel;
         _settingsService = settingsService;
         _themeService = themeService;
+        _logService = logService;
         _settings = _settingsService.Current;
         DataContext = viewModel;
 
         // Load GA logo as window icon
         LoadIcon();
+        ValidateBrandingAssets();
 
         SourceInitialized += MainWindow_SourceInitialized;
         Loaded += MainWindow_Loaded;
@@ -43,9 +51,10 @@ public partial class MainWindow : Window
 
     private void LoadIcon()
     {
+        var iconPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "general_atomics_logo_small.ico");
+
         try
         {
-            var iconPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "general_atomics_logo_small.ico");
             if (System.IO.File.Exists(iconPath))
             {
                 var uri = new Uri(iconPath);
@@ -53,10 +62,23 @@ public partial class MainWindow : Window
                 bitmap.Freeze();
                 Icon = bitmap;
             }
+            else
+            {
+                _logService.Warning("Window icon file not found at {IconPath}. Using system default icon.", iconPath);
+            }
         }
-        catch
+        catch (Exception ex)
         {
-            // Icon load failed, use default
+            _logService.Warning("Failed to load window icon from {IconPath}: {Error}", iconPath, ex.Message);
+        }
+    }
+
+    private void ValidateBrandingAssets()
+    {
+        var aboutLogoPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "general_atomics_logo_big.ico");
+        if (!System.IO.File.Exists(aboutLogoPath))
+        {
+            _logService.Warning("Branding asset missing at startup: {AssetPath}. About panel icon may be unavailable.", aboutLogoPath);
         }
     }
 

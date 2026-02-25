@@ -74,4 +74,20 @@
     <Color x:Key="ColorNavActiveBackground">#1A1A1A</Color>
     <SolidColorBrush x:Key="NavActiveBackground" Color="{StaticResource ColorNavActiveBackground}"/>
 
+    <!-- Table Colors -->
+    <Color x:Key="ColorTableHeaderBackground">#0A0A0A</Color>
+    <SolidColorBrush x:Key="TableHeaderBackground" Color="{StaticResource ColorTableHeaderBackground}"/>
+
+    <Color x:Key="ColorTableHeaderForeground">#9E9E9E</Color>
+    <SolidColorBrush x:Key="TableHeaderForeground" Color="{StaticResource ColorTableHeaderForeground}"/>
+
+    <Color x:Key="ColorTableRowHoverBackground">#1A1A1A</Color>
+    <SolidColorBrush x:Key="TableRowHoverBackground" Color="{StaticResource ColorTableRowHoverBackground}"/>
+
+    <Color x:Key="ColorTableRowSelectedBackground">#1A1A1A</Color>
+    <SolidColorBrush x:Key="TableRowSelectedBackground" Color="{StaticResource ColorTableRowSelectedBackground}"/>
+
+    <Color x:Key="ColorTableRowSelectedForeground">#FFFFFF</Color>
+    <SolidColorBrush x:Key="TableRowSelectedForeground" Color="{StaticResource ColorTableRowSelectedForeground}"/>
+
 </ResourceDictionary>

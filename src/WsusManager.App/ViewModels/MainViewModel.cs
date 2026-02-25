@@ -1285,6 +1285,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (Application.Current.MainWindow is not null)
             dialog.Owner = Application.Current.MainWindow;
 
+        _themeService.ApplyTitleBarColorsToWindow(dialog, _settingsService.Current.SelectedTheme);
+
         if (dialog.ShowDialog() != true || dialog.Options is null) return;
 
         var options = dialog.Options;
@@ -1870,7 +1872,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// </summary>
     private void NotifyCommandCanExecuteChanged()
     {
-        Application.Current.Dispatcher.InvokeAsync(() =>
+        void NotifyAllCommands()
         {
             QuickDiagnosticsCommand.NotifyCanExecuteChanged();
             QuickCleanupCommand.NotifyCanExecuteChanged();
@@ -1903,7 +1905,16 @@ public partial class MainViewModel : ObservableObject, IDisposable
             // Phase 15: Mass Operations + Script Generator
             RunMassGpUpdateCommand.NotifyCanExecuteChanged();
             GenerateScriptCommand.NotifyCanExecuteChanged();
-        }, System.Windows.Threading.DispatcherPriority.Normal);
+        }
+
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            NotifyAllCommands();
+            return;
+        }
+
+        _ = dispatcher.InvokeAsync(NotifyAllCommands, System.Windows.Threading.DispatcherPriority.Normal);
     }
 
     // ═══════════════════════════════════════════════════════════════
