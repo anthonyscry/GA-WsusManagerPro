@@ -159,4 +159,17 @@ public class KeyboardNavigationTests
         Assert.Contains("AutomationProperties.AutomationId=\"LogLevelComboBox\"", content);
         Assert.Contains("AutomationProperties.AutomationId=\"LogRetentionDaysTextBox\"", content);
     }
+
+    [Fact]
+    public void MainWindow_ShouldNotNestDataTriggerInsideDataTrigger()
+    {
+        var xaml = XDocument.Load(GetXamlPath("MainWindow.xaml"));
+
+        var hasNestedDataTrigger = xaml.Descendants()
+            .Where(e => e.Name.LocalName == "DataTrigger")
+            .Any(e => e.Descendants().Any(child => child.Name.LocalName == "DataTrigger"));
+
+        Assert.False(hasNestedDataTrigger,
+            "MainWindow.xaml must not nest DataTrigger inside DataTrigger. Use MultiDataTrigger or default setters.");
+    }
 }

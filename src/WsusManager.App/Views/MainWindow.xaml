@@ -1139,6 +1139,7 @@
                                                                 <Style TargetType="TextBlock">
                                                                     <Setter Property="FontSize" Value="12"/>
                                                                     <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
+                                                                    <Setter Property="Text" Value="Not Approved"/>
                                                                     <Style.Triggers>
                                                                         <DataTrigger Binding="{Binding IsApproved}" Value="True">
                                                                             <Setter Property="Foreground" Value="{DynamicResource StatusSuccess}"/>
@@ -1147,11 +1148,6 @@
                                                                         <DataTrigger Binding="{Binding IsDeclined}" Value="True">
                                                                             <Setter Property="Foreground" Value="{DynamicResource StatusError}"/>
                                                                             <Setter Property="Text" Value="Declined"/>
-                                                                        </DataTrigger>
-                                                                        <DataTrigger Binding="{Binding IsApproved}" Value="False">
-                                                                            <DataTrigger Binding="{Binding IsDeclined}" Value="False">
-                                                                                <Setter Property="Text" Value="Not Approved"/>
-                                                                            </DataTrigger>
                                                                         </DataTrigger>
                                                                     </Style.Triggers>
                                                                 </Style>
