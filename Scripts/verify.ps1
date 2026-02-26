@@ -426,9 +426,12 @@ try {
             'src/WsusManager.Tests/WsusManager.Tests.csproj',
             '--configuration', $Configuration,
             '--no-build',
-            '--verbosity', 'normal',
+            '--verbosity', 'minimal',
             '--logger', 'trx;LogFileName=test-results.trx',
             '--results-directory', $script:TestResultsRoot,
+            '--blame-hang-timeout', '15m',
+            '--blame-hang-dump-type', 'mini',
+            '--diag', (Join-Path $script:LogsRoot 'vstest.diag.log'),
             '--filter', 'FullyQualifiedName!~ExeValidation&FullyQualifiedName!~DistributionPackage',
             '--settings', 'src/coverlet.runsettings',
             '--collect:XPlat Code Coverage'
