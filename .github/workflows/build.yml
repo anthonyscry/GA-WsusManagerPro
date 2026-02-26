@@ -7,6 +7,7 @@ on:
       - 'Scripts/**'
       - 'Modules/**'
       - 'Tests/**'
+      - 'build/**'
       - '*.ps1'
       - '.github/workflows/build.yml'
   workflow_dispatch:
@@ -45,23 +46,66 @@ jobs:
     name: PowerShell Code Review
     runs-on: windows-latest
     if: ${{ !(github.event.inputs.skip_tests == 'true' && github.event_name == 'workflow_dispatch') }}
+    env:
+      CI_LOG_ROOT: .\.ci-artifacts\legacy\code-review
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+
+    - name: Record CI context & prepare diagnostics
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+
+        $context = @{
+          Workflow = "${{ github.workflow }}"
+          Job = "${{ github.job }}"
+          Event = "${{ github.event_name }}"
+          Runner = "${{ runner.name }}"
+          Ref = "${{ github.ref }}"
+          SHA = "${{ github.sha }}"
+        }
+
+        $summaryLines = @(
+          '## CI Context',
+          "* Workflow: $($context.Workflow)",
+          "* Job: $($context.Job)",
+          "* Event: $($context.Event)",
+          "* Runner: $($context.Runner)",
+          "* Ref: $($context.Ref)",
+          "* SHA: $($context.SHA)"
+        )
+
+        $summaryLines | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+        New-Item -ItemType Directory -Path $env:CI_LOG_ROOT -Force | Out-Null
+
     - name: Install PSScriptAnalyzer
       shell: pwsh
       run: |
-        Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-        Install-Module -Name PSScriptAnalyzer -MinimumVersion 1.21.0 -Force -Scope CurrentUser
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+
+        .\build\Install-ModuleWithRetry.ps1 -ModuleName PSScriptAnalyzer -MinimumVersion 1.21.0
         Get-Module -Name PSScriptAnalyzer -ListAvailable | Select-Object Name, Version
 
     - name: Run PSScriptAnalyzer
       id: lint
       shell: pwsh
       run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+
+        $diagRoot = $env:CI_LOG_ROOT
+        New-Item -ItemType Directory -Path $diagRoot -Force | Out-Null
+        $analyzerLog = Join-Path $diagRoot 'analyzer-log.txt'
+        $analyzerJson = Join-Path $diagRoot 'analyzer-results.json'
+        $summaryLog = Join-Path $diagRoot 'analyzer-summary.txt'
+
         Write-Host "=== Running PSScriptAnalyzer ===" -ForegroundColor Cyan
+        "=== Running PSScriptAnalyzer ===" | Add-Content -Path $analyzerLog
 
         $results = @()
         $settingsPath = ".\.PSScriptAnalyzerSettings.psd1"
@@ -71,6 +115,7 @@ jobs:
                    Where-Object { $_.FullName -notmatch '\\Tests\\|\\\.git\\|\\dist\\' }
 
         Write-Host "Found $($psFiles.Count) PowerShell files to analyze"
+        "Found $($psFiles.Count) PowerShell files to analyze" | Add-Content -Path $analyzerLog
 
         $analyzerParams = @{
           Severity = @('Error', 'Warning')
@@ -87,6 +132,7 @@ jobs:
             }
           } catch {
             Write-Host "Skipped: $($file.Name) (analyzer error)" -ForegroundColor Yellow
+            "Skipped: $($file.Name) (analyzer error)" | Add-Content -Path $analyzerLog
           }
         }
 
@@ -98,6 +144,12 @@ jobs:
         Write-Host "=== Results ===" -ForegroundColor Cyan
         Write-Host "Errors: $($errors.Count)" -ForegroundColor $(if ($errors.Count -gt 0) { 'Red' } else { 'Green' })
         Write-Host "Warnings: $($warnings.Count)" -ForegroundColor $(if ($warnings.Count -gt 0) { 'Yellow' } else { 'Green' })
+
+        $results | ConvertTo-Json -Depth 6 | Out-File -FilePath $analyzerJson -Encoding utf8
+        @(
+          "Errors: $($errors.Count)",
+          "Warnings: $($warnings.Count)"
+        ) | Out-File -FilePath $summaryLog -Encoding utf8
 
         if ($results.Count -gt 0) {
           Write-Host ""
@@ -125,7 +177,16 @@ jobs:
       id: security
       shell: pwsh
       run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+
+        $diagRoot = $env:CI_LOG_ROOT
+        New-Item -ItemType Directory -Path $diagRoot -Force | Out-Null
+        $securityLog = Join-Path $diagRoot 'security-log.txt'
+        $securityJson = Join-Path $diagRoot 'security-issues.json'
+
         Write-Host "=== Running Security Analysis ===" -ForegroundColor Cyan
+        "=== Running Security Analysis ===" | Add-Content -Path $securityLog
 
         $securityRules = @(
           'PSAvoidUsingPlainTextForPassword',
@@ -152,13 +213,48 @@ jobs:
         }
 
         Write-Host "Security Issues: $($securityIssues.Count)"
+        "Security Issues: $($securityIssues.Count)" | Add-Content -Path $securityLog
+        $securityIssues | Select-Object ScriptName, Line, RuleName, Severity, Message | ConvertTo-Json -Depth 6 | Out-File -FilePath $securityJson -Encoding utf8
         echo "SECURITY_ISSUES=$($securityIssues.Count)" >> $env:GITHUB_OUTPUT
 
         if ($securityIssues.Count -gt 0) {
           $securityIssues | ForEach-Object {
-            Write-Host "[$($_.Severity)] $($_.ScriptName):$($_.Line) - $($_.RuleName)" -ForegroundColor Yellow
+            $line = "[$($_.Severity)] $($_.ScriptName):$($_.Line) - $($_.RuleName)"
+            Write-Host $line -ForegroundColor Yellow
+            $line | Add-Content -Path $securityLog
           }
         }
+
+    - name: Upload code-review diagnostics
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: code-review-diagnostics
+        path: ./.ci-artifacts/legacy/code-review/*
+        if-no-files-found: warn
+        retention-days: 7
+
+    - name: Code review summary
+      if: always()
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+
+        $lintErrors = '${{ steps.lint.outputs.ERRORS }}'
+        $lintWarnings = '${{ steps.lint.outputs.WARNINGS }}'
+        $securityIssues = '${{ steps.security.outputs.SECURITY_ISSUES }}'
+
+        $summaryLines = @(
+          '',
+          '## Job Summary',
+          "* PSScriptAnalyzer errors: $lintErrors",
+          "* PSScriptAnalyzer warnings: $lintWarnings",
+          "* Security issues: $securityIssues",
+          '* Diagnostics: .ci-artifacts/legacy/code-review'
+        )
+
+        $summaryLines | Add-Content -Path $env:GITHUB_STEP_SUMMARY
 
   #############################################
   # Pester Tests
@@ -167,22 +263,61 @@ jobs:
     name: Pester Tests
     runs-on: windows-latest
     if: ${{ !(github.event.inputs.skip_tests == 'true' && github.event_name == 'workflow_dispatch') }}
+    env:
+      CI_LOG_ROOT: .\.ci-artifacts\legacy\test
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Record CI context & prepare diagnostics
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+
+        $context = @{
+          Workflow = "${{ github.workflow }}"
+          Job = "${{ github.job }}"
+          Event = "${{ github.event_name }}"
+          Runner = "${{ runner.name }}"
+          Ref = "${{ github.ref }}"
+          SHA = "${{ github.sha }}"
+        }
+
+        $summaryLines = @(
+          '## CI Context',
+          "* Workflow: $($context.Workflow)",
+          "* Job: $($context.Job)",
+          "* Event: $($context.Event)",
+          "* Runner: $($context.Runner)",
+          "* Ref: $($context.Ref)",
+          "* SHA: $($context.SHA)"
+        )
+
+        $summaryLines | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+        New-Item -ItemType Directory -Path $env:CI_LOG_ROOT -Force | Out-Null
+
     - name: Install Pester
       shell: pwsh
       run: |
-        Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-        Install-Module -Name Pester -MinimumVersion 5.0.0 -Force -Scope CurrentUser
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+
+        .\build\Install-ModuleWithRetry.ps1 -ModuleName Pester -MinimumVersion 5.0.0
         Get-Module -Name Pester -ListAvailable | Select-Object Name, Version
 
     - name: Run Pester Tests
       id: pester
       shell: pwsh
       run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+
+        $diagRoot = $env:CI_LOG_ROOT
+        New-Item -ItemType Directory -Path $diagRoot -Force | Out-Null
+        $pesterLog = Join-Path $diagRoot 'pester-summary.txt'
+
         Write-Host "=== Running Pester Tests ===" -ForegroundColor Cyan
 
         # Exclude ExeValidation.Tests.ps1 - those tests require the exe which is built AFTER tests run
@@ -191,6 +326,7 @@ jobs:
 
         if (-not $testFiles -or $testFiles.Count -eq 0) {
           Write-Host "No test files found" -ForegroundColor Yellow
+          "No test files found" | Add-Content -Path $pesterLog
           echo "TESTS_RUN=0" >> $env:GITHUB_OUTPUT
           echo "TESTS_PASSED=0" >> $env:GITHUB_OUTPUT
           echo "TESTS_FAILED=0" >> $env:GITHUB_OUTPUT
@@ -217,6 +353,13 @@ jobs:
         Write-Host "Passed: $($results.PassedCount)" -ForegroundColor Green
         Write-Host "Failed: $($results.FailedCount)" -ForegroundColor $(if ($results.FailedCount -gt 0) { 'Red' } else { 'Green' })
 
+        @(
+          "Total: $($results.TotalCount)",
+          "Passed: $($results.PassedCount)",
+          "Failed: $($results.FailedCount)",
+          "Results XML: ./test-results.xml"
+        ) | Out-File -FilePath $pesterLog -Encoding utf8
+
         echo "TESTS_RUN=$($results.TotalCount)" >> $env:GITHUB_OUTPUT
         echo "TESTS_PASSED=$($results.PassedCount)" >> $env:GITHUB_OUTPUT
         echo "TESTS_FAILED=$($results.FailedCount)" >> $env:GITHUB_OUTPUT
@@ -232,7 +375,39 @@ jobs:
       with:
         name: test-results
         path: ./test-results.xml
+        if-no-files-found: warn
         retention-days: 14
+
+    - name: Upload test diagnostics
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-diagnostics
+        path: ./.ci-artifacts/legacy/test/*
+        if-no-files-found: warn
+        retention-days: 7
+
+    - name: Test job summary
+      if: always()
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+
+        $testsRun = '${{ steps.pester.outputs.TESTS_RUN }}'
+        $testsPassed = '${{ steps.pester.outputs.TESTS_PASSED }}'
+        $testsFailed = '${{ steps.pester.outputs.TESTS_FAILED }}'
+
+        $summaryLines = @(
+          '',
+          '## Job Summary',
+          "* Tests run: $testsRun",
+          "* Tests passed: $testsPassed",
+          "* Tests failed: $testsFailed",
+          '* Diagnostics: .ci-artifacts/legacy/test'
+        )
+
+        $summaryLines | Add-Content -Path $env:GITHUB_STEP_SUMMARY
 
   #############################################
   # Build Executable
@@ -246,6 +421,8 @@ jobs:
       always() &&
       (needs.code-review.result == 'success' || needs.code-review.result == 'skipped') &&
       (needs.test.result == 'success' || needs.test.result == 'skipped')
+    env:
+      CI_LOG_ROOT: .\.ci-artifacts\legacy\build
     outputs:
       version: ${{ steps.version.outputs.VERSION }}
 
@@ -253,10 +430,45 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Record CI context & prepare diagnostics
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+
+        $context = @{
+          Workflow = "${{ github.workflow }}"
+          Job = "${{ github.job }}"
+          Event = "${{ github.event_name }}"
+          Runner = "${{ runner.name }}"
+          Ref = "${{ github.ref }}"
+          SHA = "${{ github.sha }}"
+        }
+
+        $summaryLines = @(
+          '## CI Context',
+          "* Workflow: $($context.Workflow)",
+          "* Job: $($context.Job)",
+          "* Event: $($context.Event)",
+          "* Runner: $($context.Runner)",
+          "* Ref: $($context.Ref)",
+          "* SHA: $($context.SHA)"
+        )
+
+        $summaryLines | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+        New-Item -ItemType Directory -Path $env:CI_LOG_ROOT -Force | Out-Null
+
     - name: Get version
       id: version
       shell: pwsh
       run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+
+        $diagRoot = $env:CI_LOG_ROOT
+        New-Item -ItemType Directory -Path $diagRoot -Force | Out-Null
+        $generalLog = Join-Path $diagRoot 'build-general.log'
+
         if ("${{ github.event.inputs.version }}" -ne "") {
           $version = "${{ github.event.inputs.version }}"
         } else {
@@ -270,17 +482,27 @@ jobs:
         }
         echo "VERSION=$version" >> $env:GITHUB_OUTPUT
         Write-Host "Version: $version" -ForegroundColor Cyan
+        "Version: $version" | Add-Content -Path $generalLog
 
     - name: Install PS2EXE
       shell: powershell
       run: |
-        Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-        Install-Module -Name ps2exe -Force -Scope CurrentUser -AllowClobber
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+
+        .\build\Install-ModuleWithRetry.ps1 -ModuleName ps2exe -AllowClobber
 
     - name: Build executable
       id: build_exe
       shell: powershell
       run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+
+        $diagRoot = $env:CI_LOG_ROOT
+        New-Item -ItemType Directory -Path $diagRoot -Force | Out-Null
+        $buildLog = Join-Path $diagRoot 'build-exe.log'
+
         $version = "${{ steps.version.outputs.VERSION }}"
 
         Import-Module ps2exe -Force -ErrorAction Stop
@@ -313,19 +535,31 @@ jobs:
 
         if (Test-Path ".\WsusManager.exe") {
           Write-Host "Build successful in ${buildDuration}s!" -ForegroundColor Green
+          "Build successful in ${buildDuration}s!" | Add-Content -Path $buildLog
         } else {
           Write-Host "Build failed" -ForegroundColor Red
+          "Build failed" | Add-Content -Path $buildLog
           exit 1
         }
 
     - name: Run EXE Validation Tests
+      id: exe-validation
       shell: pwsh
       run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+
+        $diagRoot = $env:CI_LOG_ROOT
+        New-Item -ItemType Directory -Path $diagRoot -Force | Out-Null
+        $exeLog = Join-Path $diagRoot 'exe-validation.log'
+        $exeJson = Join-Path $diagRoot 'exe-validation.json'
+
         Write-Host "=== Running EXE Validation Tests ===" -ForegroundColor Cyan
+        "=== Running EXE Validation Tests ===" | Add-Content -Path $exeLog
 
         # Install Pester if not present
         if (-not (Get-Module -ListAvailable -Name Pester | Where-Object { $_.Version -ge '5.0.0' })) {
-          Install-Module -Name Pester -MinimumVersion 5.0.0 -Force -Scope CurrentUser
+          .\build\Install-ModuleWithRetry.ps1 -ModuleName Pester -MinimumVersion 5.0.0
         }
         Import-Module Pester -MinimumVersion 5.0.0 -Force
 
@@ -340,6 +574,22 @@ jobs:
         Write-Host "Passed: $($results.PassedCount)" -ForegroundColor Green
         Write-Host "Failed: $($results.FailedCount)" -ForegroundColor $(if ($results.FailedCount -gt 0) { 'Red' } else { 'Green' })
         Write-Host "Skipped: $($results.SkippedCount)" -ForegroundColor Yellow
+        @(
+          "Passed: $($results.PassedCount)",
+          "Failed: $($results.FailedCount)",
+          "Skipped: $($results.SkippedCount)"
+        ) | Add-Content -Path $exeLog
+        (
+          [pscustomobject]@{
+            Passed = $results.PassedCount
+            Failed = $results.FailedCount
+            Skipped = $results.SkippedCount
+          }
+        ) | ConvertTo-Json -Depth 3 | Out-File -FilePath $exeJson -Encoding utf8
+
+        echo "EXE_VALIDATION_PASSED=$($results.PassedCount)" >> $env:GITHUB_OUTPUT
+        echo "EXE_VALIDATION_FAILED=$($results.FailedCount)" >> $env:GITHUB_OUTPUT
+        echo "EXE_VALIDATION_SKIPPED=$($results.SkippedCount)" >> $env:GITHUB_OUTPUT
 
         if ($results.FailedCount -gt 0) {
           Write-Host "::warning::$($results.FailedCount) EXE validation test(s) failed"
@@ -348,6 +598,13 @@ jobs:
     - name: Create distribution package
       shell: pwsh
       run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+
+        $diagRoot = $env:CI_LOG_ROOT
+        New-Item -ItemType Directory -Path $diagRoot -Force | Out-Null
+        $packagingLog = Join-Path $diagRoot 'packaging.log'
+
         $version = "${{ steps.version.outputs.VERSION }}"
         $packageName = "WsusManager-v$version"
         $distDir = ".\dist"
@@ -364,16 +621,20 @@ jobs:
         if (Test-Path ".\Scripts") {
           Copy-Item ".\Scripts" -Destination "$packageDir\Scripts" -Recurse
           Write-Host "Copied Scripts folder" -ForegroundColor Green
+          "Copied Scripts folder" | Add-Content -Path $packagingLog
         } else {
           Write-Host "::error::Scripts folder not found - EXE will not work!"
+          "Scripts folder missing" | Add-Content -Path $packagingLog
           exit 1
         }
 
         if (Test-Path ".\Modules") {
           Copy-Item ".\Modules" -Destination "$packageDir\Modules" -Recurse
           Write-Host "Copied Modules folder" -ForegroundColor Green
+          "Copied Modules folder" | Add-Content -Path $packagingLog
         } else {
           Write-Host "::error::Modules folder not found - EXE will not work!"
+          "Modules folder missing" | Add-Content -Path $packagingLog
           exit 1
         }
 
@@ -381,22 +642,26 @@ jobs:
         if (Test-Path ".\DomainController") {
           Copy-Item ".\DomainController" -Destination "$packageDir\DomainController" -Recurse
           Write-Host "Copied DomainController folder" -ForegroundColor Green
+          "Copied DomainController folder" | Add-Content -Path $packagingLog
         }
-        if (Test-Path ".\wsus-icon.ico") { Copy-Item ".\wsus-icon.ico" -Destination $packageDir }
-        if (Test-Path ".\general_atomics_logo_small.ico") { Copy-Item ".\general_atomics_logo_small.ico" -Destination $packageDir }
-        if (Test-Path ".\general_atomics_logo_big.ico") { Copy-Item ".\general_atomics_logo_big.ico" -Destination $packageDir }
-        if (Test-Path ".\README.md") { Copy-Item ".\README.md" -Destination $packageDir }
-        if (Test-Path ".\QUICK-START.txt") { Copy-Item ".\QUICK-START.txt" -Destination $packageDir }
+        foreach ($optional in @('.\wsus-icon.ico', '.\general_atomics_logo_small.ico', '.\general_atomics_logo_big.ico', '.\README.md', '.\QUICK-START.txt')) {
+          if (Test-Path $optional) {
+            Copy-Item $optional -Destination $packageDir
+            "Copied $optional" | Add-Content -Path $packagingLog
+          }
+        }
 
         # List contents for verification
         Write-Host "`nPackage contents:" -ForegroundColor Cyan
         Get-ChildItem -Path $packageDir -Recurse | ForEach-Object {
           $relativePath = $_.FullName.Replace((Get-Item $packageDir).FullName, "")
           Write-Host "  $relativePath"
+          "  $relativePath" | Add-Content -Path $packagingLog
         }
 
         # Create single zip with everything needed to run
         Compress-Archive -Path "$packageDir\*" -DestinationPath "$distDir\$packageName.zip" -Force
+        "Compressed $packageDir to $distDir\$packageName.zip" | Add-Content -Path $packagingLog
 
         # Remove staging directory - only keep the zip
         Remove-Item -Path $packageDir -Recurse -Force
@@ -404,11 +669,19 @@ jobs:
         Write-Host "`nFinal artifact:" -ForegroundColor Cyan
         Get-ChildItem -Path $distDir -File | ForEach-Object {
           Write-Host "  $($_.Name) ($([math]::Round($_.Length / 1MB, 2)) MB)"
+          "  $($_.Name) ($([math]::Round($_.Length / 1MB, 2)) MB)" | Add-Content -Path $packagingLog
         }
 
     - name: Prepare artifact for direct download
       shell: pwsh
       run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+
+        $diagRoot = $env:CI_LOG_ROOT
+        New-Item -ItemType Directory -Path $diagRoot -Force | Out-Null
+        $artifactLog = Join-Path $diagRoot 'artifact-prep.log'
+
         $version = "${{ steps.version.outputs.VERSION }}"
         $distDir = ".\dist"
         $stagingFinal = "$distDir\staging-final"
@@ -422,6 +695,7 @@ jobs:
         if ($zipPath) {
           Expand-Archive -Path $zipPath.FullName -DestinationPath $stagingFinal -Force
           Write-Host "Extracted $($zipPath.Name) for direct artifact download" -ForegroundColor Green
+          "Extracted $($zipPath.Name) to $stagingFinal" | Add-Content -Path $artifactLog
 
           # Show final contents
           Write-Host "`nArtifact contents:" -ForegroundColor Cyan
@@ -444,6 +718,39 @@ jobs:
         name: WsusManager-v${{ steps.version.outputs.VERSION }}-release
         path: ./dist/*.zip
         retention-days: 30
+
+    - name: Upload build diagnostics
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-diagnostics
+        path: ./.ci-artifacts/legacy/build/*
+        if-no-files-found: warn
+        retention-days: 7
+
+    - name: Build job summary
+      if: always()
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+
+        $version = '${{ steps.version.outputs.VERSION }}'
+        $buildDuration = '${{ steps.build_exe.outputs.BUILD_DURATION }}'
+        $exePassed = '${{ steps.exe-validation.outputs.EXE_VALIDATION_PASSED }}'
+        $exeFailed = '${{ steps.exe-validation.outputs.EXE_VALIDATION_FAILED }}'
+        $exeSkipped = '${{ steps.exe-validation.outputs.EXE_VALIDATION_SKIPPED }}'
+
+        $summaryLines = @(
+          '',
+          '## Job Summary',
+          "* Version: $version",
+          "* Build duration: $buildDuration s",
+          "* EXE validation (passed/failed/skipped): $exePassed/$exeFailed/$exeSkipped",
+          '* Diagnostics: .ci-artifacts/legacy/build'
+        )
+
+        $summaryLines | Add-Content -Path $env:GITHUB_STEP_SUMMARY
 
   #############################################
   # Create Release

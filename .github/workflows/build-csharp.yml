@@ -6,10 +6,17 @@ on:
     paths:
       - 'src/**'
       - '.github/workflows/build-csharp.yml'
+      - 'global.json'
+      - 'Scripts/verify.ps1'
+      - 'Scripts/verify-local.ps1'
   pull_request:
     branches: [ main ]
     paths:
       - 'src/**'
+      - '.github/workflows/build-csharp.yml'
+      - 'global.json'
+      - 'Scripts/verify.ps1'
+      - 'Scripts/verify-local.ps1'
   workflow_dispatch:
     inputs:
       version:
@@ -31,55 +38,72 @@ jobs:
     runs-on: windows-latest
     outputs:
       version: ${{ steps.get-version.outputs.version }}
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: 'true'
+      NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET 8 SDK
+      - name: Setup .NET SDK (global.json)
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          global-json-file: global.json
 
-      - name: Restore dependencies
-        run: |
-          dotnet restore src/WsusManager.Core/WsusManager.Core.csproj
-          dotnet restore src/WsusManager.App/WsusManager.App.csproj
-          dotnet restore src/WsusManager.Tests/WsusManager.Tests.csproj
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json', 'src/**/*.csproj', 'src/**/*.props', 'src/**/*.targets', '**/nuget.config', 'global.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
-      - name: Build
+      - name: Write CI context summary
+        shell: pwsh
         run: |
-          dotnet build src/WsusManager.App/WsusManager.App.csproj --configuration Release --no-restore
+          @"
+          ## Build C# CI Context
+          - Workflow: `${{ github.workflow }}`
+          - Job: `${{ github.job }}`
+          - Event: `${{ github.event_name }}`
+          - Runner: `${{ runner.os }}` / `${{ runner.arch }}`
+          - Ref: `${{ github.ref }}`
+          - SHA: `${{ github.sha }}`
+          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
 
-      - name: Static Analysis Gate (Phase 19)
+      - name: Verify (restore/build/format/test)
+        shell: pwsh
         run: |
-          # Build with warnings-as-errors for critical rules
-          dotnet build src/WsusManager.sln --configuration Release --no-incremental --warnaserror | tee build.log
-          # Note: Phase 1a uses warnings for CA2007 - will elevate to error in Phase 1b after fixes
+          ./Scripts/verify.ps1 `
+            -Configuration Release `
+            -RestoreRetryCount 3 `
+            -RestoreRetryDelaySeconds 5
 
-      - name: Run tests
-        run: |
-          dotnet test src/WsusManager.Tests/WsusManager.Tests.csproj `
-            --configuration Release `
-            --no-build `
-            --verbosity normal `
-            --logger "trx;LogFileName=test-results.trx" `
-            --filter "FullyQualifiedName!~ExeValidation&FullyQualifiedName!~DistributionPackage" `
-            --settings src/coverlet.runsettings `
-            --collect:"XPlat Code Coverage"
+      - name: Upload verification diagnostics
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verify-diagnostics
+          path: .ci-artifacts/**
+          retention-days: 14
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
-          path: src/WsusManager.Tests/TestResults/*.trx
+          path: .ci-artifacts/test-results/**/*.trx
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Generate coverage report
+        if: success()
         run: |
           dotnet tool install -g dotnet-reportgenerator-globaltool
           reportgenerator `
-            -reports:./src/WsusManager.Tests/TestResults/**/coverage.cobertura.xml `
+            -reports:./.ci-artifacts/test-results/**/coverage.cobertura.xml `
             -targetdir:./CoverageReport `
             -reporttypes:HtmlInline
 
@@ -89,6 +113,17 @@ jobs:
         with:
           name: code-coverage-report
           path: ./CoverageReport/
+
+      - name: Append diagnostics summary
+        if: always()
+        shell: pwsh
+        run: |
+          @"
+          ### Diagnostics Artifacts
+          - `verify-diagnostics` (logs, TRX, binlogs, dotnet format report)
+          - `test-results` (TRX)
+          - `code-coverage-report` (when generated)
+          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
 
       - name: Publish single-file EXE
         run: |
@@ -205,7 +240,15 @@ jobs:
       - name: Setup .NET 8 SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json', 'src/**/*.csproj', 'src/**/*.props', 'src/**/*.targets', '**/nuget.config', 'global.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
 
       - name: Restore benchmarks
         run: dotnet restore src/WsusManager.Benchmarks/WsusManager.Benchmarks.csproj
