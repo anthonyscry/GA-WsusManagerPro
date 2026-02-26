@@ -79,10 +79,18 @@ jobs:
         shell: pwsh
         timeout-minutes: 45
         run: |
-          ./Scripts/verify.ps1 `
-            -Configuration Release `
-            -RestoreRetryCount 3 `
-            -RestoreRetryDelaySeconds 5
+          $verifyArgs = @(
+            './Scripts/verify.ps1',
+            '-Configuration', 'Release',
+            '-RestoreRetryCount', '3',
+            '-RestoreRetryDelaySeconds', '5'
+          )
+
+          if ($env:GITHUB_EVENT_NAME -ne 'pull_request') {
+            $verifyArgs += '-CollectCoverage'
+          }
+
+          & $verifyArgs
 
       - name: Upload verification diagnostics
         uses: actions/upload-artifact@v4
@@ -102,7 +110,7 @@ jobs:
           retention-days: 14
 
       - name: Generate coverage report
-        if: success()
+        if: success() && github.event_name != 'pull_request'
         run: |
           dotnet tool install -g dotnet-reportgenerator-globaltool
           reportgenerator `
@@ -112,7 +120,7 @@ jobs:
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && github.event_name != 'pull_request'
         with:
           name: code-coverage-report
           path: ./CoverageReport/
@@ -129,6 +137,7 @@ jobs:
           "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
 
       - name: Publish single-file EXE
+        if: github.event_name != 'pull_request'
         run: |
           dotnet publish src/WsusManager.App/WsusManager.App.csproj `
             --configuration Release `
@@ -139,6 +148,7 @@ jobs:
             -p:IncludeAllContentForSelfExtract=true
 
       - name: Validate published EXE
+        if: github.event_name != 'pull_request'
         run: |
           $env:WSUS_EXE_PATH = "${{ github.workspace }}/publish/WsusManager.App.exe"
           dotnet test src/WsusManager.Tests/WsusManager.Tests.csproj `
@@ -148,6 +158,7 @@ jobs:
             --filter "FullyQualifiedName~ExeValidation"
 
       - name: Get version
+        if: github.event_name != 'pull_request'
         id: get-version
         shell: pwsh
         run: |
@@ -169,6 +180,7 @@ jobs:
           echo "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Create distribution package
+        if: github.event_name != 'pull_request'
         shell: pwsh
         run: |
           $version = "${{ steps.get-version.outputs.version }}"
@@ -194,6 +206,7 @@ jobs:
           Write-Host "Created: $zipName"
 
       - name: Validate distribution package
+        if: github.event_name != 'pull_request'
         run: |
           $env:WSUS_DIST_PATH = "${{ github.workspace }}/dist-csharp"
           dotnet test src/WsusManager.Tests/WsusManager.Tests.csproj `
@@ -203,6 +216,7 @@ jobs:
             --filter "FullyQualifiedName~DistributionPackage"
 
       - name: Smoke test EXE
+        if: github.event_name != 'pull_request'
         shell: pwsh
         run: |
           # Start the EXE with a timeout - it will fail gracefully without WSUS
@@ -227,6 +241,7 @@ jobs:
           }
 
       - name: Upload distribution artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: WsusManager-v${{ steps.get-version.outputs.version }}-CSharp

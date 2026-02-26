@@ -7,6 +7,8 @@ param(
 
     [switch]$RunPackaging,
 
+    [switch]$CollectCoverage,
+
     [ValidateRange(1, 5)]
     [int]$RestoreRetryCount = 3,
 
@@ -418,24 +420,29 @@ try {
         '{"status":"skipped","reason":"src/.editorconfig not found"}' | Out-File -FilePath $script:FormatReportPath -Encoding utf8
     }
 
+    $testArguments = @(
+        'test',
+        'src/WsusManager.Tests/WsusManager.Tests.csproj',
+        '--configuration', $Configuration,
+        '--no-build',
+        '--verbosity', 'minimal',
+        '--logger', 'trx;LogFileName=test-results.trx',
+        '--results-directory', $script:TestResultsRoot,
+        '--blame-hang-timeout', '15m',
+        '--blame-hang-dump-type', 'mini',
+        '--filter', 'FullyQualifiedName!~ExeValidation&FullyQualifiedName!~DistributionPackage'
+    )
+
+    if ($CollectCoverage) {
+        $testArguments += '--settings'
+        $testArguments += 'src/coverlet.runsettings'
+        $testArguments += '--collect:XPlat Code Coverage'
+    }
+
     Invoke-NativeStep `
         -StepName 'Tests' `
         -Executable 'dotnet' `
-        -Arguments @(
-            'test',
-            'src/WsusManager.Tests/WsusManager.Tests.csproj',
-            '--configuration', $Configuration,
-            '--no-build',
-            '--verbosity', 'minimal',
-            '--logger', 'trx;LogFileName=test-results.trx',
-            '--results-directory', $script:TestResultsRoot,
-            '--blame-hang-timeout', '15m',
-            '--blame-hang-dump-type', 'mini',
-            '--diag', (Join-Path $script:LogsRoot 'vstest.diag.log'),
-            '--filter', 'FullyQualifiedName!~ExeValidation&FullyQualifiedName!~DistributionPackage',
-            '--settings', 'src/coverlet.runsettings',
-            '--collect:XPlat Code Coverage'
-        ) `
+        -Arguments $testArguments `
         -BaseLogPath (Join-Path $script:LogsRoot 'test.log')
 
     if ($RunPackaging) {
