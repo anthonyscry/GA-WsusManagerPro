@@ -79,18 +79,18 @@ jobs:
         shell: pwsh
         timeout-minutes: 45
         run: |
-          $verifyArgs = @(
-            './Scripts/verify.ps1',
-            '-Configuration', 'Release',
-            '-RestoreRetryCount', '3',
-            '-RestoreRetryDelaySeconds', '5'
-          )
-
           if ($env:GITHUB_EVENT_NAME -ne 'pull_request') {
-            $verifyArgs += '-CollectCoverage'
+            ./Scripts/verify.ps1 `
+              -Configuration Release `
+              -CollectCoverage `
+              -RestoreRetryCount 3 `
+              -RestoreRetryDelaySeconds 5
+          } else {
+            ./Scripts/verify.ps1 `
+              -Configuration Release `
+              -RestoreRetryCount 3 `
+              -RestoreRetryDelaySeconds 5
           }
-
-          & $verifyArgs
 
       - name: Upload verification diagnostics
         uses: actions/upload-artifact@v4
