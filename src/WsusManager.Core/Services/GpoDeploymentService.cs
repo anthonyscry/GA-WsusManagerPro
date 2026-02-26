@@ -11,6 +11,7 @@ namespace WsusManager.Core.Services;
 public class GpoDeploymentService : IGpoDeploymentService
 {
     private readonly ILogService _logService;
+    private readonly string _destinationDirectory;
 
     /// <summary>Source directory name containing GPO files.</summary>
     public const string SourceDirectoryName = "DomainController";
@@ -19,19 +20,30 @@ public class GpoDeploymentService : IGpoDeploymentService
     public const string DefaultDestination = @"C:\WSUS\WSUS GPO";
 
     public GpoDeploymentService(ILogService logService)
+        : this(logService, DefaultDestination)
+    {
+    }
+
+    internal GpoDeploymentService(ILogService logService, string destinationDirectory)
     {
         _logService = logService;
+        _destinationDirectory = string.IsNullOrWhiteSpace(destinationDirectory)
+            ? throw new ArgumentException("Destination directory must not be empty.", nameof(destinationDirectory))
+            : destinationDirectory;
     }
 
     /// <inheritdoc/>
     public async Task<OperationResult<string>> DeployGpoFilesAsync(
         string wsusHostname,
         int httpPort = 8530,
+        int httpsPort = 8531,
         IProgress<string>? progress = null,
         CancellationToken ct = default)
     {
         try
         {
+            var normalizedHostname = ValidateHostname(wsusHostname);
+
             // Locate source directory
             var sourceDir = LocateSourceDirectory();
             if (sourceDir is null)
@@ -44,22 +56,27 @@ public class GpoDeploymentService : IGpoDeploymentService
                 return OperationResult<string>.Fail(msg);
             }
 
-            _logService.Info("Deploying GPO files from {Source} to {Dest}", sourceDir, DefaultDestination);
+            _logService.Info("Deploying GPO files from {Source} to {Dest}", sourceDir, _destinationDirectory);
             progress?.Report($"Source: {sourceDir}");
-            progress?.Report($"Destination: {DefaultDestination}");
+            progress?.Report($"Destination: {_destinationDirectory}");
 
             // Create destination directory
-            Directory.CreateDirectory(DefaultDestination);
+            Directory.CreateDirectory(_destinationDirectory);
             progress?.Report("Created destination directory.");
 
             // Copy all files recursively
-            var fileCount = await Task.Run(() => CopyDirectory(sourceDir, DefaultDestination, progress), ct).ConfigureAwait(false);
+            var fileCount = await Task.Run(() => CopyDirectory(sourceDir, _destinationDirectory, progress, ct), ct).ConfigureAwait(false);
+
+            var wrapperScriptPath = Path.Combine(_destinationDirectory, "Run-WsusGpoSetup.ps1");
+            var wrapperScriptText = BuildWrapperScriptText(normalizedHostname, httpPort, httpsPort);
+            await File.WriteAllTextAsync(wrapperScriptPath, wrapperScriptText, ct).ConfigureAwait(false);
+            progress?.Report($"Generated wrapper script: {wrapperScriptPath}");
 
             _logService.Info("GPO deployment complete: {Count} files copied", fileCount);
-            progress?.Report($"[OK] Copied {fileCount} files to {DefaultDestination}");
+            progress?.Report($"[OK] Copied {fileCount} files to {_destinationDirectory}");
 
-            var instructions = BuildInstructionText(wsusHostname, httpPort);
-            return OperationResult<string>.Ok(instructions, $"GPO files deployed ({fileCount} files).");
+            var instructions = BuildInstructionText(normalizedHostname, httpPort, httpsPort);
+            return OperationResult<string>.Ok(instructions, $"GPO files deployed ({fileCount} files) and wrapper generated.");
         }
         catch (OperationCanceledException)
         {
@@ -77,13 +94,15 @@ public class GpoDeploymentService : IGpoDeploymentService
     /// Recursively copies all files from source to destination, preserving directory structure.
     /// Returns the number of files copied.
     /// </summary>
-    internal static int CopyDirectory(string sourceDir, string destDir, IProgress<string>? progress)
+    internal static int CopyDirectory(string sourceDir, string destDir, IProgress<string>? progress, CancellationToken ct)
     {
         var count = 0;
         var source = new DirectoryInfo(sourceDir);
 
         foreach (var file in source.GetFiles("*", SearchOption.AllDirectories))
         {
+            ct.ThrowIfCancellationRequested();
+
             var relativePath = Path.GetRelativePath(sourceDir, file.FullName);
             var destPath = Path.Combine(destDir, relativePath);
             var destDirectory = Path.GetDirectoryName(destPath)!;
@@ -91,6 +110,8 @@ public class GpoDeploymentService : IGpoDeploymentService
             Directory.CreateDirectory(destDirectory);
             file.CopyTo(destPath, overwrite: true);
             count++;
+
+            progress?.Report($"Copied: {relativePath}");
         }
 
         return count;
@@ -99,25 +120,104 @@ public class GpoDeploymentService : IGpoDeploymentService
     /// <summary>
     /// Builds the step-by-step instruction text for the DC admin.
     /// </summary>
-    internal static string BuildInstructionText(string wsusHostname, int httpPort = 8530)
+    internal static string BuildInstructionText(string wsusHostname, int httpPort = 8530, int httpsPort = 8531)
     {
-        var serverUrl = $"http://{wsusHostname}:{httpPort}";
+        var normalizedHostname = ValidateHostname(wsusHostname);
+        var normalizedHttpPort = NormalizePort(httpPort, 8530);
+        var normalizedHttpsPort = NormalizePort(httpsPort, 8531);
+        var httpServerUrl = BuildWsusServerUrl("http", normalizedHostname, normalizedHttpPort);
+        var httpsServerUrl = BuildWsusServerUrl("https", normalizedHostname, normalizedHttpsPort);
         return $"""
             GPO files have been copied to {DefaultDestination}
 
-            WSUS Server: {serverUrl}
+            WSUS Server URLs:
+              HTTP:  {httpServerUrl}
+              HTTPS: {httpsServerUrl}
 
             Steps for the Domain Controller admin:
 
             1. Copy the "WSUS GPO" folder to the Domain Controller
 
-            2. Run Set-WsusGroupPolicy.ps1 on the Domain Controller:
-               powershell -ExecutionPolicy Bypass -File Set-WsusGroupPolicy.ps1 -WsusServerUrl "{serverUrl}"
+            2. Open PowerShell as Administrator on the Domain Controller and run the wrapper:
+               powershell -ExecutionPolicy Bypass -File .\Run-WsusGpoSetup.ps1
 
-            3. Force client check-in on target machines:
+            3. To target HTTPS instead, add -UseHttps:
+               powershell -ExecutionPolicy Bypass -File .\Run-WsusGpoSetup.ps1 -UseHttps
+
+               Note: The wrapper calls Set-WsusGroupPolicy.ps1 with the selected URL.
+
+            4. Force client check-in on target machines:
                gpupdate /force
                wuauclt /detectnow
             """;
+    }
+
+    internal static int NormalizePort(int candidate, int fallback)
+    {
+        return candidate is >= 1 and <= 65535 ? candidate : fallback;
+    }
+
+    internal static string BuildWrapperScriptText(string wsusHostname, int httpPort, int httpsPort)
+    {
+        var normalizedHostname = ValidateHostname(wsusHostname);
+        var normalizedHttpPort = NormalizePort(httpPort, 8530);
+        var normalizedHttpsPort = NormalizePort(httpsPort, 8531);
+        var httpServerUrl = EscapePowerShellSingleQuotedString(BuildWsusServerUrl("http", normalizedHostname, normalizedHttpPort));
+        var httpsServerUrl = EscapePowerShellSingleQuotedString(BuildWsusServerUrl("https", normalizedHostname, normalizedHttpsPort));
+
+        return $$"""
+            #requires -RunAsAdministrator
+            [CmdletBinding()]
+            param(
+                [string]$BackupPath = (Join-Path -Path $PSScriptRoot -ChildPath "WSUS GPOs"),
+                [switch]$UseHttps
+            )
+
+            $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+            if (-not $isAdmin) {
+                Write-Error "This script must be run as Administrator."
+                exit 1
+            }
+
+            $computerSystem = Get-CimInstance -ClassName Win32_ComputerSystem
+            if ($computerSystem.DomainRole -lt 4) {
+                Write-Error "This script must be run on a Domain Controller."
+                exit 1
+            }
+
+            $wsusServerUrl = if ($UseHttps) { '{{httpsServerUrl}}' } else { '{{httpServerUrl}}' }
+
+            $setGpoScript = Join-Path -Path $PSScriptRoot -ChildPath "Set-WsusGroupPolicy.ps1"
+            & $setGpoScript -WsusServerUrl $wsusServerUrl -BackupPath $BackupPath
+            """;
+    }
+
+    internal static string ValidateHostname(string candidate)
+    {
+        if (string.IsNullOrWhiteSpace(candidate))
+            throw new ArgumentException("WSUS hostname must not be empty.", nameof(candidate));
+
+        var normalized = candidate.Trim();
+        var hostType = Uri.CheckHostName(normalized);
+
+        if (hostType is UriHostNameType.Unknown)
+            throw new ArgumentException("WSUS hostname must be a valid host or IP address.", nameof(candidate));
+
+        return normalized;
+    }
+
+    internal static string BuildWsusServerUrl(string scheme, string hostname, int port)
+    {
+        var wrappedHost = Uri.CheckHostName(hostname) == UriHostNameType.IPv6
+            ? $"[{hostname}]"
+            : hostname;
+
+        return $"{scheme}://{wrappedHost}:{port}";
+    }
+
+    internal static string EscapePowerShellSingleQuotedString(string value)
+    {
+        return value.Replace("'", "''", StringComparison.Ordinal);
     }
 
     /// <summary>

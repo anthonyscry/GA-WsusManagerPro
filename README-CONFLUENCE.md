@@ -192,7 +192,7 @@ Mode is saved to user settings and persists across restarts.
 |-----------|-------------|------|
 | Install WSUS | Install WSUS + SQL Express from scratch | Both |
 | Restore Database | Restore SUSDB from backup file | Air-Gap |
-| Create GPO | Copy GPO files to `C:\WSUS GPO` for DC import | Both |
+| Create GPO | Copy GPO files to `C:\WSUS\WSUS GPO` for DC import | Both |
 | Export to Media | Export DB and content to USB drive | Online |
 | Import from Media | Import updates from USB drive | Air-Gap |
 | Online Sync | Run sync with Microsoft Update and optimization | Online |
@@ -300,7 +300,7 @@ Excluded: Upgrades (require manual review)
 ### 13.1 Database Backup
 
 Database backups are automatically created during:
-- Monthly Maintenance (Full profile)
+- Online Sync (Full Sync profile)
 - Export to Media operations
 
 Backup location: `C:\WSUS\SUSDB_backup_YYYYMMDD.bak`
@@ -341,18 +341,23 @@ Run on the Domain Controller, not the WSUS server.
 
 | Step | Action |
 |------|--------|
-| 1 | On WSUS server: Click **Create GPO** to copy files to `C:\WSUS GPO` |
-| 2 | Copy `C:\WSUS GPO` folder to Domain Controller |
-| 3 | On DC: Open PowerShell as Administrator |
-| 4 | Run: `.\Set-WsusGroupPolicy.ps1 -WsusServerUrl "http://WSUS01:8530"` |
+| 1 | On WSUS server: Click **Create GPO**, then enter WSUS hostname + HTTP/HTTPS ports |
+| 2 | If ports are blank/invalid, defaults are HTTP `8530` and HTTPS `8531` |
+| 3 | Copy `C:\WSUS\WSUS GPO` (including `Run-WsusGpoSetup.ps1`) to Domain Controller |
+| 4 | On DC: Open PowerShell as Administrator |
+| 5 | Run: `Set-Location 'C:\WSUS\WSUS GPO'` |
+| 6 | Run: `powershell -ExecutionPolicy Bypass -File .\Run-WsusGpoSetup.ps1` |
+| 7 | Optional HTTPS mode: `powershell -ExecutionPolicy Bypass -File .\Run-WsusGpoSetup.ps1 -UseHttps` |
+
+Run the wrapper locally on the Domain Controller. It performs DC-local setup and does not prompt for WSUS-server credentials or use remote mode.
 
 ### 14.2 GPOs Created
 
 | GPO Name | Purpose |
 |----------|---------|
 | WSUS Update Policy | Client update settings |
-| WSUS Inbound Firewall | Inbound firewall rules |
-| WSUS Outbound Firewall | Outbound firewall rules |
+| WSUS Inbound Allow | Inbound firewall rules |
+| WSUS Outbound Allow | Outbound firewall rules |
 
 ### 14.3 Client Verification
 

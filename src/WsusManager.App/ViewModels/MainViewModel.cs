@@ -95,6 +95,29 @@ public partial class MainViewModel : ObservableObject, IDisposable
         return $"{(int)ts.TotalSeconds}s";
     }
 
+    private static int NormalizeWsusPort(string? candidate, int fallback)
+    {
+        if (!int.TryParse(candidate?.Trim(), out var parsed))
+            return fallback;
+
+        return parsed is > 0 and <= 65535 ? parsed : fallback;
+    }
+
+    private Task<OperationResult<string>> DeployCreateGpoFilesAsync(
+        string wsusHostname,
+        int wsusPort,
+        int wsusHttpsPort,
+        IProgress<string> progress,
+        CancellationToken ct)
+    {
+        return _gpoDeploymentService.DeployGpoFilesAsync(
+            wsusHostname,
+            httpPort: wsusPort,
+            httpsPort: wsusHttpsPort,
+            progress: progress,
+            ct: ct);
+    }
+
     public MainViewModel(
         ILogService logService,
         IOperationTranscriptService operationTranscriptService,
@@ -1391,6 +1414,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         // Show hostname + port input dialog on UI thread before starting operation
         string? wsusHostname = null;
         int wsusPort = 8530;
+        int wsusHttpsPort = 8531;
 
         Application.Current.Dispatcher.Invoke(() =>
         {
@@ -1398,7 +1422,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             {
                 Title = "Create GPO — WSUS Server",
                 Width = 400,
-                Height = 220,
+                Height = 300,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 ResizeMode = ResizeMode.NoResize,
                 Background = Application.Current.FindResource("PrimaryBackground") as System.Windows.Media.Brush
@@ -1407,6 +1431,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 dialog.Owner = Application.Current.MainWindow;
 
             var grid = new System.Windows.Controls.Grid { Margin = new Thickness(20) };
+            grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
             grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
             grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
             grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
@@ -1430,8 +1456,16 @@ public partial class MainViewModel : ObservableObject, IDisposable
             System.Windows.Controls.Grid.SetRow(portBox, 3);
             grid.Children.Add(portBox);
 
+            var httpsPortLabel = new System.Windows.Controls.TextBlock { Text = "HTTPS Port", FontSize = 12, Foreground = Application.Current.FindResource("TextSecondary") as System.Windows.Media.Brush, Margin = new Thickness(0, 0, 0, 4) };
+            System.Windows.Controls.Grid.SetRow(httpsPortLabel, 4);
+            grid.Children.Add(httpsPortLabel);
+
+            var httpsPortBox = new System.Windows.Controls.TextBox { Text = "8531", FontSize = 12, Padding = new Thickness(6, 4, 6, 4), Background = Application.Current.FindResource("InputBackground") as System.Windows.Media.Brush, Foreground = Application.Current.FindResource("TextPrimary") as System.Windows.Media.Brush, BorderBrush = Application.Current.FindResource("BorderPrimary") as System.Windows.Media.Brush, Margin = new Thickness(0, 0, 0, 12) };
+            System.Windows.Controls.Grid.SetRow(httpsPortBox, 5);
+            grid.Children.Add(httpsPortBox);
+
             var btnPanel = new System.Windows.Controls.StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-            System.Windows.Controls.Grid.SetRow(btnPanel, 5);
+            System.Windows.Controls.Grid.SetRow(btnPanel, 7);
 
             var cancelBtn = new System.Windows.Controls.Button { Content = "Cancel", Padding = new Thickness(20, 8, 20, 8), Margin = new Thickness(0, 0, 8, 0) };
             cancelBtn.Click += (s, e) =>
@@ -1457,8 +1491,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
             if (dialog.ShowDialog() == true)
             {
                 wsusHostname = hostnameBox.Text.Trim();
-                if (int.TryParse(portBox.Text.Trim(), out var p) && p > 0 && p <= 65535)
-                    wsusPort = p;
+                wsusPort = NormalizeWsusPort(portBox.Text, 8530);
+                wsusHttpsPort = NormalizeWsusPort(httpsPortBox.Text, 8531);
             }
         });
 
@@ -1469,7 +1503,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         await RunOperationAsync("Create GPO", async (progress, ct) =>
         {
-            var result = await _gpoDeploymentService.DeployGpoFilesAsync(wsusHostname, wsusPort, progress, ct).ConfigureAwait(false);
+            var result = await DeployCreateGpoFilesAsync(
+                wsusHostname,
+                wsusPort,
+                wsusHttpsPort,
+                progress,
+                ct).ConfigureAwait(false);
 
             if (result.Success && result.Data is not null)
             {

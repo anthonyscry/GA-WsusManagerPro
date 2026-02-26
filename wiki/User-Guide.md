@@ -126,13 +126,17 @@ Copies Group Policy Objects to `C:\WSUS\WSUS GPO` for transfer to a Domain Contr
 
 **Steps:**
 1. Click **Create GPO**
-2. Confirm the copy operation
-3. Copy the `C:\WSUS\WSUS GPO` folder to the Domain Controller
-4. On the DC, run as Administrator:
+2. Enter WSUS hostname, HTTP port, and HTTPS port
+3. If either port is blank or invalid, WSUS Manager uses defaults (`8530` for HTTP, `8531` for HTTPS)
+4. Copy `C:\WSUS\WSUS GPO` (including generated `Run-WsusGpoSetup.ps1`) to the Domain Controller
+5. On the DC, run as Administrator:
    ```powershell
    cd 'C:\WSUS\WSUS GPO'
-   .\Set-WsusGroupPolicy.ps1 -WsusServerUrl "http://YOURSERVER:8530"
+   powershell -ExecutionPolicy Bypass -File .\Run-WsusGpoSetup.ps1
+   powershell -ExecutionPolicy Bypass -File .\Run-WsusGpoSetup.ps1 -UseHttps
    ```
+
+**Important:** Run the wrapper script locally on the Domain Controller. It applies GPOs directly on the DC and does not prompt for WSUS-server credentials or use remote execution mode.
 
 **To force clients to update:**
 ```powershell
@@ -395,10 +399,10 @@ Click the **folder icon** next to "Open Log" in the sidebar to open the logs dir
 ### Log Format
 
 ```
-2026-01-11 14:30:22 [INFO] Starting monthly maintenance
+2026-01-11 14:30:22 [INFO] Starting Online Sync
 2026-01-11 14:30:25 [OK] Database connection verified
 2026-01-11 14:31:00 [WARN] High database size: 7.5 GB
-2026-01-11 14:35:00 [OK] Maintenance completed successfully
+2026-01-11 14:35:00 [OK] Online Sync completed successfully
 ```
 
 ---

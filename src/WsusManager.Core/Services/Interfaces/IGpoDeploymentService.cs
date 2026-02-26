@@ -11,5 +11,5 @@ public interface IGpoDeploymentService
     /// <summary>
     /// Copies GPO files to the destination directory and returns instruction text on success.
     /// </summary>
-    Task<OperationResult<string>> DeployGpoFilesAsync(string wsusHostname, int httpPort = 8530, IProgress<string>? progress = null, CancellationToken ct = default);
+    Task<OperationResult<string>> DeployGpoFilesAsync(string wsusHostname, int httpPort = 8530, int httpsPort = 8531, IProgress<string>? progress = null, CancellationToken ct = default);
 }

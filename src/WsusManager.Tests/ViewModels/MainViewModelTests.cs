@@ -878,6 +878,72 @@ public class MainViewModelTests
         Assert.True(_vm.RunCreateGpoCommand.CanExecute(null));
     }
 
+    [Theory]
+    [InlineData(null, 8530, 8530)]
+    [InlineData("", 8530, 8530)]
+    [InlineData("8530", 8530, 8530)]
+    [InlineData("65535", 8530, 65535)]
+    [InlineData("0", 8530, 8530)]
+    [InlineData("70000", 8530, 8530)]
+    [InlineData("not-a-number", 8530, 8530)]
+    [InlineData(" 8531 ", 8531, 8531)]
+    [InlineData("-1", 8531, 8531)]
+    public void NormalizeWsusPort_Returns_Expected_Value(string? candidate, int fallback, int expected)
+    {
+        var method = typeof(MainViewModel).GetMethod(
+            "NormalizeWsusPort",
+            BindingFlags.Static | BindingFlags.NonPublic);
+
+        Assert.NotNull(method);
+
+        var actual = (int)method!.Invoke(null, new object?[] { candidate, fallback })!;
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public async Task CreateGpoDeploymentRequest_Forwards_Host_And_Both_Ports_To_Service()
+    {
+        const string wsusHostname = "wsus01.contoso.local";
+        const int wsusHttpPort = 8530;
+        const int wsusHttpsPort = 8531;
+
+        _mockGpo
+            .Setup(g => g.DeployGpoFilesAsync(
+                wsusHostname,
+                wsusHttpPort,
+                wsusHttpsPort,
+                It.IsAny<IProgress<string>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OperationResult<string>.Ok("ok"));
+
+        var method = typeof(MainViewModel).GetMethod(
+            "DeployCreateGpoFilesAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.NotNull(method);
+
+        var task = (Task<OperationResult<string>>)method!.Invoke(_vm,
+            new object?[]
+            {
+                wsusHostname,
+                wsusHttpPort,
+                wsusHttpsPort,
+                new Progress<string>(_ => { }),
+                CancellationToken.None
+            })!;
+
+        var result = await task;
+
+        Assert.True(result.Success);
+        _mockGpo.Verify(g => g.DeployGpoFilesAsync(
+            wsusHostname,
+            wsusHttpPort,
+            wsusHttpsPort,
+            It.IsAny<IProgress<string>>(),
+            It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // Phase 7: Comprehensive CanExecute and State Tests
     // ═══════════════════════════════════════════════════════════════
