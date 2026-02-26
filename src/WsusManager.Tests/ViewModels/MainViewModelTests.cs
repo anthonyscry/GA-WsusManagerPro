@@ -944,6 +944,79 @@ public class MainViewModelTests
             Times.Once);
     }
 
+    [Fact]
+    public async Task RunFleetWsusTargetAudit_Forwards_ExpectedHostname_And_Ports_To_Service()
+    {
+        _vm.ExpectedWsusHostname = " wsus-gold.contoso.local ";
+        _vm.ExpectedWsusHttpPort = " 8532 ";
+        _vm.ExpectedWsusHttpsPort = " ";
+
+        _mockDashboard
+            .Setup(d => d.GetComputersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new ComputerInfo("host-a", "10.0.0.10", "Online", DateTime.UtcNow, 0, "Windows 11"),
+                new ComputerInfo("host-a", "10.0.0.11", "Online", DateTime.UtcNow, 0, "Windows 11"),
+                new ComputerInfo("", "10.0.0.12", "Online", DateTime.UtcNow, 0, "Windows 11")
+            ]);
+
+        _mockClient
+            .Setup(c => c.RunFleetWsusTargetAuditAsync(
+                It.IsAny<IReadOnlyList<string>>(),
+                It.IsAny<string>(),
+                It.IsAny<int>(),
+                It.IsAny<int>(),
+                It.IsAny<IProgress<string>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OperationResult<FleetWsusTargetAuditReport>.Ok(new FleetWsusTargetAuditReport()));
+
+        await _vm.RunFleetWsusTargetAuditCommand.ExecuteAsync(null);
+
+        _mockClient.Verify(c => c.RunFleetWsusTargetAuditAsync(
+            It.Is<IReadOnlyList<string>>(hosts => hosts.Count == 1 && hosts[0] == "host-a"),
+            "wsus-gold.contoso.local",
+            8532,
+            8531,
+            It.IsAny<IProgress<string>>(),
+            It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public void RunFleetWsusTargetAuditCommand_CanExecute_False_When_ExpectedHostname_Blank()
+    {
+        _vm.ExpectedWsusHostname = "   ";
+
+        Assert.False(_vm.RunFleetWsusTargetAuditCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task RunFleetWsusTargetAudit_DoesNotCallService_When_Inventory_Is_Empty()
+    {
+        _vm.ExpectedWsusHostname = "wsus-gold.contoso.local";
+        _vm.ExpectedWsusHttpPort = "8530";
+        _vm.ExpectedWsusHttpsPort = "8531";
+
+        _mockDashboard
+            .Setup(d => d.GetComputersAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(
+            [
+                new ComputerInfo("", "10.0.0.10", "Online", DateTime.UtcNow, 0, "Windows 11"),
+                new ComputerInfo("   ", "10.0.0.11", "Online", DateTime.UtcNow, 0, "Windows 11")
+            ]);
+
+        await _vm.RunFleetWsusTargetAuditCommand.ExecuteAsync(null);
+
+        _mockClient.Verify(c => c.RunFleetWsusTargetAuditAsync(
+            It.IsAny<IReadOnlyList<string>>(),
+            It.IsAny<string>(),
+            It.IsAny<int>(),
+            It.IsAny<int>(),
+            It.IsAny<IProgress<string>>(),
+            It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // Phase 7: Comprehensive CanExecute and State Tests
     // ═══════════════════════════════════════════════════════════════

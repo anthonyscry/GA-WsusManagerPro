@@ -103,6 +103,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
         return parsed is > 0 and <= 65535 ? parsed : fallback;
     }
 
+    private static bool IsInvalidNonBlankPortInput(string? candidate)
+    {
+        var trimmed = candidate?.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+            return false;
+
+        return !int.TryParse(trimmed, out var parsed) || parsed is <= 0 or > 65535;
+    }
+
     private Task<OperationResult<string>> DeployCreateGpoFilesAsync(
         string wsusHostname,
         int wsusPort,
@@ -1568,6 +1577,16 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string _massHostnames = string.Empty;
 
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunFleetWsusTargetAuditCommand))]
+    private string _expectedWsusHostname = string.Empty;
+
+    [ObservableProperty]
+    private string _expectedWsusHttpPort = "8530";
+
+    [ObservableProperty]
+    private string _expectedWsusHttpsPort = "8531";
+
     /// <summary>
     /// CanExecute helper for remote client operations — requires a hostname and no operation running.
     /// </summary>
@@ -1579,6 +1598,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// </summary>
     private bool CanExecuteMassOperation() =>
         !IsOperationRunning && !string.IsNullOrWhiteSpace(MassHostnames);
+
+    private bool CanExecuteFleetWsusTargetAudit() =>
+        !IsOperationRunning && !string.IsNullOrWhiteSpace(ExpectedWsusHostname);
 
     /// <summary>
     /// Called automatically by CommunityToolkit.Mvvm when ClientHostname changes.
@@ -1721,6 +1743,72 @@ public partial class MainViewModel : ObservableObject, IDisposable
         await RunOperationAsync("Mass GPUpdate", async (progress, ct) =>
         {
             var result = await _clientService.MassForceCheckInAsync(hostnames, progress, ct).ConfigureAwait(false);
+            return result.Success;
+        }).ConfigureAwait(false);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanExecuteFleetWsusTargetAudit))]
+    private async Task RunFleetWsusTargetAudit()
+    {
+        await Navigate("ClientTools").ConfigureAwait(false);
+
+        await RunOperationAsync("Fleet WSUS Target Audit", async (progress, ct) =>
+        {
+            var expectedHostname = ExpectedWsusHostname.Trim();
+            if (IsInvalidNonBlankPortInput(ExpectedWsusHttpPort))
+            {
+                progress.Report($"[ERROR] Invalid HTTP port '{ExpectedWsusHttpPort?.Trim()}'. Enter a value from 1-65535 or leave blank to use default 8530.");
+                return false;
+            }
+
+            if (IsInvalidNonBlankPortInput(ExpectedWsusHttpsPort))
+            {
+                progress.Report($"[ERROR] Invalid HTTPS port '{ExpectedWsusHttpsPort?.Trim()}'. Enter a value from 1-65535 or leave blank to use default 8531.");
+                return false;
+            }
+
+            var expectedHttpPort = NormalizeWsusPort(ExpectedWsusHttpPort, 8530);
+            var expectedHttpsPort = NormalizeWsusPort(ExpectedWsusHttpsPort, 8531);
+
+            var hostnames = (await _dashboardService.GetComputersAsync(ct).ConfigureAwait(false))
+                .Select(c => c.Hostname?.Trim() ?? string.Empty)
+                .Where(h => !string.IsNullOrWhiteSpace(h))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (hostnames.Count == 0)
+            {
+                progress.Report("[ERROR] No valid WSUS client hostnames were found in dashboard inventory. Refresh dashboard data or ensure clients are reporting, then retry.");
+                return false;
+            }
+
+            progress.Report($"Found {hostnames.Count} unique WSUS client hostname(s) in dashboard inventory.");
+
+            var result = await _clientService.RunFleetWsusTargetAuditAsync(
+                hostnames,
+                expectedHostname,
+                expectedHttpPort,
+                expectedHttpsPort,
+                progress,
+                ct).ConfigureAwait(false);
+
+            if (result.Data is not null)
+            {
+                var report = result.Data;
+                progress.Report($"Fleet totals: {report.TotalHosts} total | compliant {report.CompliantHosts} | mismatch {report.MismatchHosts} | unreachable {report.UnreachableHosts} | error {report.ErrorHosts}");
+
+                if (report.GroupedTargets.Count > 0)
+                {
+                    progress.Report("Observed WSUS targets:");
+                    foreach (var grouping in report.GroupedTargets
+                                 .OrderByDescending(kvp => kvp.Value)
+                                 .ThenBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase))
+                    {
+                        progress.Report($"  - {grouping.Key}: {grouping.Value}");
+                    }
+                }
+            }
+
             return result.Success;
         }).ConfigureAwait(false);
     }
@@ -1977,6 +2065,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             RunClientForceCheckInCommand.NotifyCanExecuteChanged();
             RunClientTestConnectivityCommand.NotifyCanExecuteChanged();
             RunClientDiagnosticsCommand.NotifyCanExecuteChanged();
+            RunFleetWsusTargetAuditCommand.NotifyCanExecuteChanged();
             // Phase 15: Mass Operations + Script Generator
             RunMassGpUpdateCommand.NotifyCanExecuteChanged();
             GenerateScriptCommand.NotifyCanExecuteChanged();

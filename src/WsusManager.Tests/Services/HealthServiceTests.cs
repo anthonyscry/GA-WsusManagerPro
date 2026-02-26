@@ -1,4 +1,5 @@
 using System.ServiceProcess;
+using System.Text;
 using Moq;
 using WsusManager.Core.Infrastructure;
 using WsusManager.Core.Logging;
@@ -10,7 +11,7 @@ namespace WsusManager.Tests.Services;
 
 /// <summary>
 /// Tests for HealthService diagnostics pipeline using fully mocked dependencies.
-/// Verifies that all 12 checks run, auto-repair is attempted, and the report summary is correct.
+/// Verifies that all 14 checks run, auto-repair is attempted, and the report summary is correct.
 /// </summary>
 public class HealthServiceTests
 {
@@ -32,6 +33,71 @@ public class HealthServiceTests
 
     private static ServiceStatusInfo StoppedService(string name, string display) =>
         new(name, display, ServiceControllerStatus.Stopped, false);
+
+    private static TestContentSandbox CreateSandbox() => new();
+
+    private sealed class TestContentSandbox : IDisposable
+    {
+        public string ContentPath { get; }
+        public string GpoRootPath => Path.Combine(ContentPath, "WSUS GPO");
+        public string GpoPoliciesPath => Path.Combine(GpoRootPath, "WSUS GPOs");
+        public string SetupScriptPath => Path.Combine(GpoRootPath, "Set-WsusGroupPolicy.ps1");
+        public string WrapperScriptPath => Path.Combine(GpoRootPath, "Run-WsusGpoSetup.ps1");
+
+        public TestContentSandbox()
+        {
+            ContentPath = Path.Combine(
+                Path.GetTempPath(),
+                "WsusManager.HealthServiceTests",
+                Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(ContentPath);
+        }
+
+        public void CreateGpoFolder()
+        {
+            Directory.CreateDirectory(GpoPoliciesPath);
+        }
+
+        public void CreateGpoScripts(bool includeUseHttps = true, bool includeSetWsusGroupPolicy = true)
+        {
+            Directory.CreateDirectory(GpoRootPath);
+            File.WriteAllText(SetupScriptPath, "# mock setup");
+
+            var wrapperContent = new StringBuilder();
+            if (includeSetWsusGroupPolicy)
+            {
+                wrapperContent.AppendLine("Set-WsusGroupPolicy");
+            }
+
+            if (includeUseHttps)
+            {
+                wrapperContent.AppendLine("-UseHttps");
+            }
+
+            File.WriteAllText(WrapperScriptPath, wrapperContent.ToString());
+        }
+
+        public void CreateCompleteGpoBaseline()
+        {
+            CreateGpoFolder();
+            CreateGpoScripts();
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                if (Directory.Exists(ContentPath))
+                {
+                    Directory.Delete(ContentPath, recursive: true);
+                }
+            }
+            catch
+            {
+                // Best effort cleanup for temp test artifacts.
+            }
+        }
+    }
 
     /// <summary>
     /// Sets up all mocks to return healthy/passing results for all checks.
@@ -76,54 +142,57 @@ public class HealthServiceTests
         // but the service handles this gracefully and returns a Fail check result
     }
 
-    // ─── All 12 Checks Run Tests ──────────────────────────────────────────
+    // ─── All 14 Checks Run Tests ──────────────────────────────────────────
 
     [Fact]
-    public async Task RunDiagnosticsAsync_Returns_Exactly_12_Checks()
+    public async Task RunDiagnosticsAsync_Returns_Exactly_14_Checks()
     {
         SetupAllHealthy();
+        using var sandbox = CreateSandbox();
         var service = CreateService();
 
         var progressMessages = new List<string>();
         var progress = new Progress<string>(msg => progressMessages.Add(msg));
 
         var report = await service.RunDiagnosticsAsync(
-            @"C:\WSUS",
+            sandbox.ContentPath,
             @"localhost\SQLEXPRESS",
             progress);
 
-        Assert.Equal(12, report.Checks.Count);
+        Assert.Equal(14, report.Checks.Count);
     }
 
     [Fact]
     public async Task RunDiagnosticsAsync_Reports_Progress_For_Each_Check()
     {
         SetupAllHealthy();
+        using var sandbox = CreateSandbox();
         var service = CreateService();
 
         var progressMessages = new List<string>();
         var progress = new Progress<string>(msg => progressMessages.Add(msg));
 
         await service.RunDiagnosticsAsync(
-            @"C:\WSUS",
+            sandbox.ContentPath,
             @"localhost\SQLEXPRESS",
             progress);
 
-        // At least 12 check lines + 1 summary line
-        Assert.True(progressMessages.Count >= 13,
-            $"Expected at least 13 progress messages, got {progressMessages.Count}");
+        // At least 14 check lines + 1 summary line
+        Assert.True(progressMessages.Count >= 15,
+            $"Expected at least 15 progress messages, got {progressMessages.Count}");
     }
 
     [Fact]
     public async Task RunDiagnosticsAsync_Progress_Uses_StatusTags()
     {
         SetupAllHealthy();
+        using var sandbox = CreateSandbox();
         var service = CreateService();
 
         var progressMessages = new List<string>();
         var progress = new Progress<string>(msg => progressMessages.Add(msg));
 
-        await service.RunDiagnosticsAsync(@"C:\WSUS", @"localhost\SQLEXPRESS", progress);
+        await service.RunDiagnosticsAsync(sandbox.ContentPath, @"localhost\SQLEXPRESS", progress);
 
         // At least some messages should contain [PASS], [FAIL], [WARN], or [SKIP]
         var taggedMessages = progressMessages.Where(m =>
@@ -138,12 +207,13 @@ public class HealthServiceTests
     public async Task RunDiagnosticsAsync_Summary_Line_Reports_Counts()
     {
         SetupAllHealthy();
+        using var sandbox = CreateSandbox();
         var service = CreateService();
 
         var progressMessages = new List<string>();
         var progress = new Progress<string>(msg => progressMessages.Add(msg));
 
-        await service.RunDiagnosticsAsync(@"C:\WSUS", @"localhost\SQLEXPRESS", progress);
+        await service.RunDiagnosticsAsync(sandbox.ContentPath, @"localhost\SQLEXPRESS", progress);
 
         var summaryLine = progressMessages.LastOrDefault();
         Assert.NotNull(summaryLine);
@@ -155,16 +225,92 @@ public class HealthServiceTests
     public async Task RunDiagnosticsAsync_Sets_StartedAt_And_CompletedAt()
     {
         SetupAllHealthy();
+        using var sandbox = CreateSandbox();
         var service = CreateService();
         var before = DateTime.UtcNow;
         var progress = new Progress<string>(_ => { });
 
-        var report = await service.RunDiagnosticsAsync(@"C:\WSUS", @"localhost\SQLEXPRESS", progress);
+        var report = await service.RunDiagnosticsAsync(sandbox.ContentPath, @"localhost\SQLEXPRESS", progress);
 
         var after = DateTime.UtcNow;
         Assert.True(report.StartedAt >= before.AddSeconds(-1));
         Assert.True(report.CompletedAt <= after.AddSeconds(1));
         Assert.True(report.Duration >= TimeSpan.Zero);
+    }
+
+    [Fact]
+    public async Task RunDiagnosticsAsync_Includes_Gpo_Baseline_Checks()
+    {
+        SetupAllHealthy();
+        using var sandbox = CreateSandbox();
+        var service = CreateService();
+        var progress = new Progress<string>(_ => { });
+
+        var report = await service.RunDiagnosticsAsync(sandbox.ContentPath, @"localhost\SQLEXPRESS", progress);
+
+        Assert.Contains(report.Checks, c => c.CheckName == "GPO Deployment Artifacts");
+        Assert.Contains(report.Checks, c => c.CheckName == "GPO Wrapper Baseline");
+    }
+
+    [Fact]
+    public async Task RunDiagnosticsAsync_Gpo_Checks_Fail_When_Baseline_Artifacts_Missing()
+    {
+        SetupAllHealthy();
+        using var sandbox = CreateSandbox();
+        var service = CreateService();
+        var progress = new Progress<string>(_ => { });
+
+        var report = await service.RunDiagnosticsAsync(sandbox.ContentPath, @"localhost\SQLEXPRESS", progress);
+
+        var gpoArtifactsCheck = report.Checks.First(c => c.CheckName == "GPO Deployment Artifacts");
+        var gpoWrapperCheck = report.Checks.First(c => c.CheckName == "GPO Wrapper Baseline");
+
+        Assert.Equal(CheckStatus.Fail, gpoArtifactsCheck.Status);
+        Assert.Equal(CheckStatus.Fail, gpoWrapperCheck.Status);
+        Assert.Contains(sandbox.GpoRootPath, gpoWrapperCheck.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RunDiagnosticsAsync_Gpo_Checks_Use_ContentPath_Baseline()
+    {
+        SetupAllHealthy();
+        using var sandbox = CreateSandbox();
+        sandbox.CreateCompleteGpoBaseline();
+
+        var service = CreateService();
+        var progress = new Progress<string>(_ => { });
+
+        var report = await service.RunDiagnosticsAsync(sandbox.ContentPath, @"localhost\SQLEXPRESS", progress);
+
+        var gpoArtifactsCheck = report.Checks.First(c => c.CheckName == "GPO Deployment Artifacts");
+        var gpoWrapperCheck = report.Checks.First(c => c.CheckName == "GPO Wrapper Baseline");
+
+        Assert.Equal(CheckStatus.Pass, gpoArtifactsCheck.Status);
+        Assert.Equal(CheckStatus.Pass, gpoWrapperCheck.Status);
+        Assert.Contains(sandbox.GpoRootPath, gpoArtifactsCheck.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RunDiagnosticsAsync_Gpo_Folder_Repair_Stays_Inside_Test_Sandbox()
+    {
+        SetupAllHealthy();
+        using var sandbox = CreateSandbox();
+        Directory.CreateDirectory(sandbox.GpoRootPath);
+        sandbox.CreateGpoScripts();
+        if (Directory.Exists(sandbox.GpoPoliciesPath))
+        {
+            Directory.Delete(sandbox.GpoPoliciesPath, recursive: true);
+        }
+
+        var service = CreateService();
+        var progress = new Progress<string>(_ => { });
+
+        var report = await service.RunDiagnosticsAsync(sandbox.ContentPath, @"localhost\SQLEXPRESS", progress);
+        var gpoArtifactsCheck = report.Checks.First(c => c.CheckName == "GPO Deployment Artifacts");
+
+        Assert.True(Directory.Exists(sandbox.GpoPoliciesPath));
+        Assert.True(gpoArtifactsCheck.RepairAttempted);
+        Assert.True(gpoArtifactsCheck.RepairSucceeded);
     }
 
     // ─── Auto-Repair Tests ────────────────────────────────────────────────
@@ -173,6 +319,7 @@ public class HealthServiceTests
     public async Task RunDiagnosticsAsync_Attempts_Repair_For_Stopped_Service()
     {
         SetupAllHealthy();
+        using var sandbox = CreateSandbox();
 
         // Override WSUS service to be stopped
         _mockServiceManager
@@ -186,7 +333,7 @@ public class HealthServiceTests
         var service = CreateService();
         var progress = new Progress<string>(_ => { });
 
-        var report = await service.RunDiagnosticsAsync(@"C:\WSUS", @"localhost\SQLEXPRESS", progress);
+        var report = await service.RunDiagnosticsAsync(sandbox.ContentPath, @"localhost\SQLEXPRESS", progress);
 
         // Verify StartServiceAsync was called for WSUS
         _mockServiceManager.Verify(s => s.StartServiceAsync("WsusService", It.IsAny<CancellationToken>()),
@@ -203,6 +350,7 @@ public class HealthServiceTests
     public async Task RunDiagnosticsAsync_Attempts_Firewall_Rule_Creation_When_Missing()
     {
         SetupAllHealthy();
+        using var sandbox = CreateSandbox();
 
         // Override firewall to return rules missing
         _mockFirewall
@@ -216,7 +364,7 @@ public class HealthServiceTests
         var service = CreateService();
         var progress = new Progress<string>(_ => { });
 
-        var report = await service.RunDiagnosticsAsync(@"C:\WSUS", @"localhost\SQLEXPRESS", progress);
+        var report = await service.RunDiagnosticsAsync(sandbox.ContentPath, @"localhost\SQLEXPRESS", progress);
 
         _mockFirewall.Verify(f => f.CreateWsusRulesAsync(
             It.IsAny<IProgress<string>>(),
@@ -232,6 +380,7 @@ public class HealthServiceTests
     public async Task RunDiagnosticsAsync_Attempts_Permission_Repair_When_Missing()
     {
         SetupAllHealthy();
+        using var sandbox = CreateSandbox();
 
         _mockPermissions
             .Setup(p => p.CheckContentPermissionsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -247,7 +396,7 @@ public class HealthServiceTests
         var service = CreateService();
         var progress = new Progress<string>(_ => { });
 
-        var report = await service.RunDiagnosticsAsync(@"C:\WSUS", @"localhost\SQLEXPRESS", progress);
+        var report = await service.RunDiagnosticsAsync(sandbox.ContentPath, @"localhost\SQLEXPRESS", progress);
 
         _mockPermissions.Verify(p => p.RepairContentPermissionsAsync(
             It.IsAny<string>(),
@@ -266,6 +415,7 @@ public class HealthServiceTests
     public async Task RunDiagnosticsAsync_Sysadmin_Check_Is_Warning_Not_Fail()
     {
         SetupAllHealthy();
+        using var sandbox = CreateSandbox();
 
         _mockPermissions
             .Setup(p => p.CheckSqlSysadminAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -274,7 +424,7 @@ public class HealthServiceTests
         var service = CreateService();
         var progress = new Progress<string>(_ => { });
 
-        var report = await service.RunDiagnosticsAsync(@"C:\WSUS", @"localhost\SQLEXPRESS", progress);
+        var report = await service.RunDiagnosticsAsync(sandbox.ContentPath, @"localhost\SQLEXPRESS", progress);
 
         var sysadminCheck = report.Checks.FirstOrDefault(c => c.CheckName.Contains("Sysadmin"));
         Assert.NotNull(sysadminCheck);
@@ -288,6 +438,7 @@ public class HealthServiceTests
     public async Task DiagnosticReport_RepairedCount_Counts_Successful_Repairs()
     {
         SetupAllHealthy();
+        using var sandbox = CreateSandbox();
 
         // Two services stopped
         _mockServiceManager
@@ -305,7 +456,7 @@ public class HealthServiceTests
         var service = CreateService();
         var progress = new Progress<string>(_ => { });
 
-        var report = await service.RunDiagnosticsAsync(@"C:\WSUS", @"localhost\SQLEXPRESS", progress);
+        var report = await service.RunDiagnosticsAsync(sandbox.ContentPath, @"localhost\SQLEXPRESS", progress);
 
         // At least 2 repairs (SQL and WSUS)
         Assert.True(report.RepairedCount >= 2,
@@ -316,6 +467,7 @@ public class HealthServiceTests
     public async Task DiagnosticReport_IsHealthy_False_When_Non_Fixable_Check_Fails()
     {
         SetupAllHealthy();
+        using var sandbox = CreateSandbox();
 
         // NETWORK SERVICE login missing (non-fixable)
         _mockPermissions
@@ -325,7 +477,7 @@ public class HealthServiceTests
         var service = CreateService();
         var progress = new Progress<string>(_ => { });
 
-        var report = await service.RunDiagnosticsAsync(@"C:\WSUS", @"localhost\SQLEXPRESS", progress);
+        var report = await service.RunDiagnosticsAsync(sandbox.ContentPath, @"localhost\SQLEXPRESS", progress);
 
         // The NETWORK SERVICE check should show as failed
         // (SQL connectivity may also fail in CI environment)
@@ -337,6 +489,7 @@ public class HealthServiceTests
     public async Task DiagnosticReport_IsHealthy_True_When_Only_Warnings()
     {
         SetupAllHealthy();
+        using var sandbox = CreateSandbox();
 
         // Only sysadmin warning — no actual failures
         _mockPermissions
@@ -349,7 +502,7 @@ public class HealthServiceTests
         var service = CreateService();
         var progress = new Progress<string>(_ => { });
 
-        var report = await service.RunDiagnosticsAsync(@"C:\WSUS", @"localhost\SQLEXPRESS", progress);
+        var report = await service.RunDiagnosticsAsync(sandbox.ContentPath, @"localhost\SQLEXPRESS", progress);
 
         // Sysadmin check should be Warning, not Fail
         var sysadminCheck = report.Checks.FirstOrDefault(c => c.CheckName.Contains("Sysadmin"));
@@ -363,6 +516,7 @@ public class HealthServiceTests
     public async Task RunDiagnosticsAsync_Respects_Cancellation()
     {
         SetupAllHealthy();
+        using var sandbox = CreateSandbox();
 
         using var cts = new CancellationTokenSource();
         cts.Cancel();
@@ -371,7 +525,7 @@ public class HealthServiceTests
         var progress = new Progress<string>(_ => { });
 
         await Assert.ThrowsAsync<OperationCanceledException>(
-            () => service.RunDiagnosticsAsync(@"C:\WSUS", @"localhost\SQLEXPRESS", progress, cts.Token));
+            () => service.RunDiagnosticsAsync(sandbox.ContentPath, @"localhost\SQLEXPRESS", progress, cts.Token));
     }
 
     // ─── BUG-01 Fix Tests ─────────────────────────────────────────────────
@@ -381,6 +535,7 @@ public class HealthServiceTests
     {
         // BUG-01 fix: appcmd.exe is NOT on PATH by default — must use full path to inetsrv\appcmd.exe
         SetupAllHealthy();
+        using var sandbox = CreateSandbox();
 
         string? capturedExecutable = null;
         _mockRunner
@@ -396,7 +551,7 @@ public class HealthServiceTests
         var service = CreateService();
         var progress = new Progress<string>(_ => { });
 
-        await service.RunDiagnosticsAsync(@"C:\WSUS", @"localhost\SQLEXPRESS", progress);
+        await service.RunDiagnosticsAsync(sandbox.ContentPath, @"localhost\SQLEXPRESS", progress);
 
         // If appcmd was called, it must use the full path
         if (capturedExecutable is not null)

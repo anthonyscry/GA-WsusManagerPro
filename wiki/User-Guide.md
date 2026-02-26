@@ -312,11 +312,40 @@ Comprehensive health check with automatic repair (combines former Health Check a
 - **Firewall rules**: Creates inbound rules for ports 8530/8531 if missing
 - **Directory permissions**: Sets correct ACLs on WSUS content folder
 - **Application Pool**: Starts WsusPool if stopped
+- **GPO deployment artifacts baseline**: Verifies `C:\WSUS\WSUS GPO` contains required deployment files; can create missing local `WSUS GPOs` folder
+- **GPO wrapper baseline**: Verifies `Run-WsusGpoSetup.ps1` contains required baseline tokens (`-UseHttps`, `Set-WsusGroupPolicy`)
+
+**Safe auto-fix boundary:**
+- Diagnostics only performs local-safe remediations on the WSUS server (services, firewall rules, ACLs, app pool, local folder creation).
+- Diagnostics does not rewrite domain GPO links, bulk-edit client WSUS policy, or push remote registry/domain-wide policy changes.
 
 **Output:**
 - Clear pass/fail status for each check
 - Automatic fix applied when issues detected
 - Summary of all findings at completion
+
+### Client Tools
+
+Tools for validating and remediating WSUS client-side configuration.
+
+#### Fleet WSUS Target Audit
+
+Audits WSUS target settings across all client hostnames currently in dashboard inventory.
+
+**Expected target inputs:**
+- **Hostname**: Expected WSUS server hostname used by clients (required)
+- **HTTP port**: Expected WSUS HTTP port (`1-65535`); leave blank to use default `8530`
+- **HTTPS port**: Expected WSUS HTTPS status port (`1-65535`); leave blank to use default `8531`
+
+**Result statuses:**
+- **Compliant**: `UseWUServer=1` and client WSUS/status URLs match expected hostname and ports
+- **Mismatch**: Client WSUS policy is enabled but URL/port values differ, or `UseWUServer` is not enabled
+- **Unreachable**: Host could not be contacted over WinRM
+- **Error**: Audit failed for that host due to execution/parsing/runtime error
+
+**Grouped target summary:**
+- Operation output includes an **Observed WSUS targets** grouping (target tuple -> host count).
+- Use it to quickly identify drift clusters (for example, many clients pointing to an old hostname/port set) before deciding on GPO or remediation actions.
 
 ### Reset Content
 

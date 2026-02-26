@@ -791,6 +791,66 @@
                                 </StackPanel>
                             </Border>
 
+                            <!-- Fleet WSUS Target Audit -->
+                            <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
+                                    Padding="12" Margin="0,0,0,8">
+                                <StackPanel>
+                                    <TextBlock Text="Fleet WSUS Target Audit" FontSize="14" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
+                                    <TextBlock Text="Audit all discovered WSUS clients against the expected WUServer/WUStatusServer target baseline."
+                                               Foreground="{DynamicResource TextSecondary}" FontSize="12"
+                                               TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="120"/>
+                                            <ColumnDefinition Width="220"/>
+                                            <ColumnDefinition Width="120"/>
+                                            <ColumnDefinition Width="120"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Column="0" Text="Expected Host:"
+                                                   Foreground="{DynamicResource TextSecondary}" FontSize="12"
+                                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBox Grid.Column="1"
+                                                 Style="{StaticResource UniformInputTextBox}"
+                                                 automation:AutomationProperties.AutomationId="ExpectedWsusHostnameTextBox"
+                                                 Text="{Binding ExpectedWsusHostname, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                        <TextBlock Grid.Column="2" Text="HTTP Port:"
+                                                   Foreground="{DynamicResource TextSecondary}" FontSize="12"
+                                                   VerticalAlignment="Center" Margin="12,0,8,0"/>
+                                        <TextBox Grid.Column="3"
+                                                 Style="{StaticResource UniformInputTextBox}"
+                                                 automation:AutomationProperties.AutomationId="ExpectedWsusHttpPortTextBox"
+                                                 Text="{Binding ExpectedWsusHttpPort, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="120"/>
+                                            <ColumnDefinition Width="120"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="HTTPS Port:"
+                                                   Foreground="{DynamicResource TextSecondary}" FontSize="12"
+                                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBox Grid.Column="1"
+                                                 Style="{StaticResource UniformInputTextBox}"
+                                                 automation:AutomationProperties.AutomationId="ExpectedWsusHttpsPortTextBox"
+                                                 Text="{Binding ExpectedWsusHttpsPort, UpdateSourceTrigger=PropertyChanged}"/>
+                                    </Grid>
+
+                                    <Button Content="Run Fleet Audit" Style="{StaticResource BtnGreen}"
+                                            automation:AutomationProperties.AutomationId="FleetWsusTargetAuditButton"
+                                            Padding="12,6" HorizontalAlignment="Left"
+                                            Command="{Binding RunFleetWsusTargetAuditCommand}"
+                                            ToolTip="Audit all clients against expected WSUS host and ports"/>
+                                </StackPanel>
+                            </Border>
+
                             <!-- Script Generator -->
                             <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
                                     Padding="12" Margin="0,0,0,8">

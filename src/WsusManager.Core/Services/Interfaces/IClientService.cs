@@ -89,4 +89,12 @@ public interface IClientService
         IReadOnlyList<string> hostnames,
         IProgress<string> progress,
         CancellationToken ct = default);
+
+    Task<OperationResult<FleetWsusTargetAuditReport>> RunFleetWsusTargetAuditAsync(
+        IReadOnlyList<string> hostnames,
+        string expectedHostname,
+        int expectedHttpPort,
+        int expectedHttpsPort,
+        IProgress<string> progress,
+        CancellationToken ct = default);
 }

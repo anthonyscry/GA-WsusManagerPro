@@ -8,7 +8,7 @@ using WsusManager.Core.Services.Interfaces;
 namespace WsusManager.Core.Services;
 
 /// <summary>
-/// Orchestrates the full 12-check diagnostics pipeline matching the PowerShell
+/// Orchestrates the full diagnostics pipeline matching the PowerShell
 /// Invoke-WsusDiagnostics check list. Auto-repair is always on (matches GUI behavior).
 /// Each check streams its result to the progress reporter as it completes.
 /// </summary>
@@ -100,6 +100,14 @@ public class HealthService : IHealthService
         // Check 12: SQL connectivity test
         await RunCheckAsync(checks, progress, ct, () =>
             CheckSqlConnectivityAsync(sqlInstance, ct)).ConfigureAwait(false);
+
+        // Check 13: GPO deployment artifacts baseline
+        await RunCheckAsync(checks, progress, ct, () =>
+            CheckGpoDeploymentArtifactsAsync(contentPath)).ConfigureAwait(false);
+
+        // Check 14: GPO wrapper script baseline
+        await RunCheckAsync(checks, progress, ct, () =>
+            CheckGpoWrapperBaselineAsync(contentPath)).ConfigureAwait(false);
 
         var completedAt = DateTime.UtcNow;
 
@@ -414,7 +422,130 @@ public class HealthService : IHealthService
         }
     }
 
+    private Task<DiagnosticCheckResult> CheckGpoDeploymentArtifactsAsync(string contentPath)
+    {
+        const string checkName = "GPO Deployment Artifacts";
+        var gpoRootPath = GetGpoRootPath(contentPath);
+
+        var gpoSetupScriptPath = Path.Combine(gpoRootPath, "Set-WsusGroupPolicy.ps1");
+        var gpoWrapperPath = Path.Combine(gpoRootPath, "Run-WsusGpoSetup.ps1");
+        var gpoPoliciesFolderPath = Path.Combine(gpoRootPath, "WSUS GPOs");
+
+        var missingArtifacts = new List<string>();
+        if (!File.Exists(gpoSetupScriptPath))
+        {
+            missingArtifacts.Add("Set-WsusGroupPolicy.ps1");
+        }
+
+        if (!File.Exists(gpoWrapperPath))
+        {
+            missingArtifacts.Add("Run-WsusGpoSetup.ps1");
+        }
+
+        bool folderMissing = !Directory.Exists(gpoPoliciesFolderPath);
+        if (folderMissing)
+        {
+            missingArtifacts.Add("WSUS GPOs folder");
+        }
+
+        if (missingArtifacts.Count == 0)
+        {
+                return Task.FromResult(DiagnosticCheckResult.Pass(
+                    checkName,
+                    $"Required artifacts present under {gpoRootPath}."));
+        }
+
+        if (!folderMissing)
+        {
+            return Task.FromResult(DiagnosticCheckResult.Fail(
+                checkName,
+                $"Missing required artifact(s): {string.Join(", ", missingArtifacts)}.\n\nTo fix: Run Setup > Create GPO to deploy baseline scripts."));
+        }
+
+        try
+        {
+            Directory.CreateDirectory(gpoPoliciesFolderPath);
+
+            if (missingArtifacts.Count == 1)
+            {
+                return Task.FromResult(DiagnosticCheckResult.FailWithRepair(
+                    checkName,
+                    "WSUS GPOs folder missing.",
+                    repairSucceeded: true,
+                    repairMessage: $"Created {gpoPoliciesFolderPath}."));
+            }
+
+            return Task.FromResult(DiagnosticCheckResult.FailWithRepair(
+                checkName,
+                $"Missing required artifact(s): {string.Join(", ", missingArtifacts)}.",
+                repairSucceeded: false,
+                repairMessage: $"Created {gpoPoliciesFolderPath}, but script artifact(s) are still missing. Run Setup > Create GPO."));
+        }
+        catch (Exception ex)
+        {
+            _logService.Warning("GPO artifact check repair failed: {Error}", ex.Message);
+            return Task.FromResult(DiagnosticCheckResult.FailWithRepair(
+                checkName,
+                $"Missing required artifact(s): {string.Join(", ", missingArtifacts)}.",
+                repairSucceeded: false,
+                repairMessage: $"Could not create {gpoPoliciesFolderPath}: {ex.Message}"));
+        }
+    }
+
+    private Task<DiagnosticCheckResult> CheckGpoWrapperBaselineAsync(string contentPath)
+    {
+        const string checkName = "GPO Wrapper Baseline";
+        var gpoRootPath = GetGpoRootPath(contentPath);
+        var gpoWrapperPath = Path.Combine(gpoRootPath, "Run-WsusGpoSetup.ps1");
+
+        if (!File.Exists(gpoWrapperPath))
+        {
+            return Task.FromResult(DiagnosticCheckResult.Fail(
+                checkName,
+                $"Run-WsusGpoSetup.ps1 is missing at {gpoWrapperPath}.\n\nTo fix: Run Setup > Create GPO to regenerate deployment artifacts."));
+        }
+
+        try
+        {
+            var script = File.ReadAllText(gpoWrapperPath);
+            bool hasUseHttps = script.Contains("-UseHttps", StringComparison.OrdinalIgnoreCase);
+            bool hasSetWsusGroupPolicy = script.Contains("Set-WsusGroupPolicy", StringComparison.OrdinalIgnoreCase);
+
+            if (hasUseHttps && hasSetWsusGroupPolicy)
+            {
+                return Task.FromResult(DiagnosticCheckResult.Pass(
+                    checkName,
+                    "Wrapper baseline verified (-UseHttps and Set-WsusGroupPolicy found)."));
+            }
+
+            var missingTokens = new List<string>();
+            if (!hasUseHttps)
+            {
+                missingTokens.Add("-UseHttps");
+            }
+
+            if (!hasSetWsusGroupPolicy)
+            {
+                missingTokens.Add("Set-WsusGroupPolicy");
+            }
+
+            return Task.FromResult(DiagnosticCheckResult.Fail(
+                checkName,
+                $"Wrapper baseline mismatch: missing {string.Join(" and ", missingTokens)}.\n\nTo fix: Regenerate wrapper via Setup > Create GPO and verify script integrity."));
+        }
+        catch (Exception ex)
+        {
+            _logService.Warning("GPO wrapper baseline check failed: {Error}", ex.Message);
+            return Task.FromResult(DiagnosticCheckResult.Fail(
+                checkName,
+                $"Could not read wrapper script at {gpoWrapperPath}: {ex.Message}\n\nTo fix: Verify file permissions and regenerate wrapper via Setup > Create GPO."));
+        }
+    }
+
     // ─── Helpers ────────────────────────────────────────────────────────────
+
+    private static string GetGpoRootPath(string contentPath) =>
+        Path.Combine(contentPath, "WSUS GPO");
 
     private static string BuildConnectionString(string sqlInstance, string database) =>
         $"Data Source={sqlInstance};Initial Catalog={database};" +

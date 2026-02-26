@@ -602,6 +602,235 @@ public class ClientServiceTests
             service.MassForceCheckInAsync(hostnames, progress, cts.Token));
     }
 
+    [Fact]
+    public async Task RunFleetWsusTargetAuditAsync_EmptyHostList_Returns_Failure()
+    {
+        var service = CreateService();
+        var (_, progress) = CreateProgressCapture();
+
+        var result = await service.RunFleetWsusTargetAuditAsync(
+            [],
+            "wsus01",
+            8530,
+            8531,
+            progress,
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Contains("host", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RunFleetWsusTargetAuditAsync_Compliant_When_UseWUServer_And_Urls_Match_Baseline()
+    {
+        _mockRunner
+            .Setup(r => r.RunAsync("powershell.exe",
+                It.Is<string>(a => a.Contains("Test-WSMan")),
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(SuccessResult("WSMan responding"));
+
+        _mockRunner
+            .Setup(r => r.RunAsync("powershell.exe",
+                It.Is<string>(a => a.Contains("Invoke-Command") && a.Contains("host-a")),
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProcessResult(0, [
+                "WSUS=http://wsus01:8530;STATUS=https://wsus01:8531;USE=1"
+            ]));
+
+        var service = CreateService();
+        var (_, progress) = CreateProgressCapture();
+
+        var result = await service.RunFleetWsusTargetAuditAsync(
+            ["host-a"],
+            "wsus01",
+            8530,
+            8531,
+            progress,
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.Data);
+        Assert.Equal(1, result.Data.TotalHosts);
+        Assert.Equal(1, result.Data.CompliantHosts);
+        Assert.Equal(0, result.Data.MismatchHosts);
+        Assert.Equal(0, result.Data.UnreachableHosts);
+        Assert.Equal(0, result.Data.ErrorHosts);
+
+        var item = Assert.Single(result.Data.Items);
+        Assert.Equal("host-a", item.Hostname);
+        Assert.Equal(FleetComplianceStatus.Compliant, item.ComplianceStatus);
+        Assert.Equal("wsus01", item.ReportedWsusHostname);
+        Assert.Equal(8530, item.ReportedHttpPort);
+        Assert.Equal(8531, item.ReportedHttpsPort);
+    }
+
+    [Fact]
+    public async Task RunFleetWsusTargetAuditAsync_Mismatch_When_UseWUServer_False_Or_Urls_Differ()
+    {
+        _mockRunner
+            .Setup(r => r.RunAsync("powershell.exe",
+                It.Is<string>(a => a.Contains("Test-WSMan")),
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(SuccessResult("WSMan responding"));
+
+        _mockRunner
+            .Setup(r => r.RunAsync("powershell.exe",
+                It.Is<string>(a => a.Contains("Invoke-Command") && a.Contains("host-usefalse")),
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProcessResult(0, [
+                "WSUS=http://wsus01:8530;STATUS=https://wsus01:8531;USE=0"
+            ]));
+
+        _mockRunner
+            .Setup(r => r.RunAsync("powershell.exe",
+                It.Is<string>(a => a.Contains("Invoke-Command") && a.Contains("host-wrongurl")),
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProcessResult(0, [
+                "WSUS=http://wrong-wsus:8530;STATUS=https://wrong-wsus:8531;USE=1"
+            ]));
+
+        var service = CreateService();
+        var (_, progress) = CreateProgressCapture();
+
+        var result = await service.RunFleetWsusTargetAuditAsync(
+            ["host-usefalse", "host-wrongurl"],
+            "wsus01",
+            8530,
+            8531,
+            progress,
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.Data);
+        Assert.Equal(2, result.Data.TotalHosts);
+        Assert.Equal(0, result.Data.CompliantHosts);
+        Assert.Equal(2, result.Data.MismatchHosts);
+        Assert.Equal(0, result.Data.UnreachableHosts);
+        Assert.Equal(0, result.Data.ErrorHosts);
+        Assert.All(result.Data.Items, item => Assert.Equal(FleetComplianceStatus.Mismatch, item.ComplianceStatus));
+    }
+
+    [Fact]
+    public async Task RunFleetWsusTargetAuditAsync_Unreachable_When_WinRm_Unavailable()
+    {
+        _mockRunner
+            .Setup(r => r.RunAsync("powershell.exe",
+                It.Is<string>(a => a.Contains("Test-WSMan") && a.Contains("host-down")),
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(WinRmFailResult());
+
+        var service = CreateService();
+        var (_, progress) = CreateProgressCapture();
+
+        var result = await service.RunFleetWsusTargetAuditAsync(
+            ["host-down"],
+            "wsus01",
+            8530,
+            8531,
+            progress,
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.Data);
+        Assert.Equal(1, result.Data.TotalHosts);
+        Assert.Equal(0, result.Data.CompliantHosts);
+        Assert.Equal(0, result.Data.MismatchHosts);
+        Assert.Equal(1, result.Data.UnreachableHosts);
+        Assert.Equal(0, result.Data.ErrorHosts);
+        Assert.Equal(FleetComplianceStatus.Unreachable, Assert.Single(result.Data.Items).ComplianceStatus);
+
+        _mockRunner.Verify(r => r.RunAsync("powershell.exe",
+            It.Is<string>(a => a.Contains("Invoke-Command") && a.Contains("host-down")),
+            It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task RunFleetWsusTargetAuditAsync_GroupedTargets_Returns_Correct_Counts()
+    {
+        _mockRunner
+            .Setup(r => r.RunAsync("powershell.exe",
+                It.Is<string>(a => a.Contains("Test-WSMan")),
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(SuccessResult("WSMan responding"));
+
+        _mockRunner
+            .Setup(r => r.RunAsync("powershell.exe",
+                It.Is<string>(a => a.Contains("Invoke-Command") && a.Contains("host-01")),
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProcessResult(0, [
+                "WSUS=http://wsus01:8530;STATUS=https://wsus01:8531;USE=1"
+            ]));
+
+        _mockRunner
+            .Setup(r => r.RunAsync("powershell.exe",
+                It.Is<string>(a => a.Contains("Invoke-Command") && a.Contains("host-02")),
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProcessResult(0, [
+                "WSUS=http://wsus01:8530;STATUS=https://wsus01:8531;USE=1"
+            ]));
+
+        _mockRunner
+            .Setup(r => r.RunAsync("powershell.exe",
+                It.Is<string>(a => a.Contains("Invoke-Command") && a.Contains("host-03")),
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProcessResult(0, [
+                "WSUS=http://wsus02:8530;STATUS=https://wsus02:8531;USE=1"
+            ]));
+
+        var service = CreateService();
+        var (_, progress) = CreateProgressCapture();
+
+        var result = await service.RunFleetWsusTargetAuditAsync(
+            ["host-01", "host-02", "host-03"],
+            "wsus01",
+            8530,
+            8531,
+            progress,
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.Data);
+        Assert.Equal(2, result.Data.GroupedTargets["http://wsus01:8530|https://wsus01:8531"]);
+        Assert.Equal(1, result.Data.GroupedTargets["http://wsus02:8530|https://wsus02:8531"]);
+    }
+
+    [Fact]
+    public async Task RunFleetWsusTargetAuditAsync_Mismatch_When_Wsus_And_Status_Urls_Are_Swapped()
+    {
+        _mockRunner
+            .Setup(r => r.RunAsync("powershell.exe",
+                It.Is<string>(a => a.Contains("Test-WSMan")),
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(SuccessResult("WSMan responding"));
+
+        _mockRunner
+            .Setup(r => r.RunAsync("powershell.exe",
+                It.Is<string>(a => a.Contains("Invoke-Command") && a.Contains("host-swapped")),
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ProcessResult(0, [
+                "WSUS=https://wsus01:8531;STATUS=http://wsus01:8530;USE=1"
+            ]));
+
+        var service = CreateService();
+        var (_, progress) = CreateProgressCapture();
+
+        var result = await service.RunFleetWsusTargetAuditAsync(
+            ["host-swapped"],
+            "wsus01",
+            8530,
+            8531,
+            progress,
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.Data);
+        Assert.Equal(1, result.Data.TotalHosts);
+        Assert.Equal(0, result.Data.CompliantHosts);
+        Assert.Equal(1, result.Data.MismatchHosts);
+        Assert.Equal(FleetComplianceStatus.Mismatch, Assert.Single(result.Data.Items).ComplianceStatus);
+    }
+
     // ─── Edge Case Tests (Phase 18-02) ────────────────────────────────────────
 
     [Theory]
@@ -655,20 +884,13 @@ public class ClientServiceTests
     [InlineData("../path")]
     public async Task TestConnectivityAsync_Handles_Invalid_Hostnames(string hostname)
     {
-        _mockRunner
-            .Setup(r => r.RunAsync("powershell.exe",
-                It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(SuccessResult());
-
         var (_, progress) = CreateProgressCapture();
         var service = CreateService();
 
         var result = await service.TestConnectivityAsync(hostname, "http://wsus01:8530", progress);
 
-        // Service passes hostname through - WinRM will fail
-        // We just verify it doesn't crash
-        Assert.NotNull(result);
+        Assert.False(result.Success);
+        Assert.Null(result.Data);
     }
 
     [Theory]
@@ -677,36 +899,27 @@ public class ClientServiceTests
     [InlineData("   ")]
     public async Task TestConnectivityAsync_Handles_Null_Empty_Whitespace_WsusServerUrls(string wsusServerUrl)
     {
-        _mockRunner
-            .Setup(r => r.RunAsync("powershell.exe",
-                It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(SuccessResult());
-
         var (_, progress) = CreateProgressCapture();
         var service = CreateService();
 
         var result = await service.TestConnectivityAsync("testhost", wsusServerUrl, progress);
 
-        // Service extracts hostname from URL - null/empty/whitespace may cause issues
-        Assert.NotNull(result);
+        Assert.False(result.Success);
+        Assert.Null(result.Data);
+        Assert.Contains("WSUS", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
     public async Task TestConnectivityAsync_Handles_Invalid_Url_Without_Colon()
     {
-        _mockRunner
-            .Setup(r => r.RunAsync("powershell.exe",
-                It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(SuccessResult());
-
         var (_, progress) = CreateProgressCapture();
         var service = CreateService();
 
-        // "invalid-url" causes ExtractHostname to return null, then WinRMExecutor throws
-        await Assert.ThrowsAsync<NullReferenceException>(
-            () => service.TestConnectivityAsync("testhost", "invalid-url", progress));
+        var result = await service.TestConnectivityAsync("testhost", "invalid-url", progress);
+
+        Assert.False(result.Success);
+        Assert.Null(result.Data);
+        Assert.Contains("WSUS", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -855,7 +1068,8 @@ public class ClientServiceTests
         var longHostname = new string('a', 255);
         var result = await service.MassForceCheckInAsync(new List<string> { longHostname }, progress);
 
-        // Service passes it through - WinRM will fail
-        Assert.NotNull(result);
+        Assert.False(result.Success);
+        Assert.Contains("0/1", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("1 failed", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 }

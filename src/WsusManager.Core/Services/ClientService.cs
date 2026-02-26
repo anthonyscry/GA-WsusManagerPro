@@ -154,11 +154,10 @@ Write-Output 'STEP=Done'
         if (string.IsNullOrWhiteSpace(hostname))
             return OperationResult<ConnectivityTestResult>.Fail("Hostname must not be empty.");
 
-        var wsusServer = ExtractHostname(wsusServerUrl);
-        if (string.IsNullOrWhiteSpace(wsusServer))
+        if (!TryGetWsusServerHostname(wsusServerUrl, out var wsusServer))
         {
             return OperationResult<ConnectivityTestResult>.Fail(
-                $"Cannot extract hostname from WSUS server URL: '{wsusServerUrl}'");
+                $"Invalid WSUS server URL: '{wsusServerUrl}'. Provide a full URL like 'http://wsus-server:8530'.");
         }
 
         _log.Info("ClientService.TestConnectivityAsync: testing from {Hostname} to {WsusServer}",
@@ -324,6 +323,210 @@ $agent = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Wind
     }
 
     /// <inheritdoc />
+    public async Task<OperationResult<FleetWsusTargetAuditReport>> RunFleetWsusTargetAuditAsync(
+        IReadOnlyList<string> hostnames,
+        string expectedHostname,
+        int expectedHttpPort,
+        int expectedHttpsPort,
+        IProgress<string> progress,
+        CancellationToken ct = default)
+    {
+        if (hostnames == null)
+        {
+            return OperationResult<FleetWsusTargetAuditReport>.Fail(
+                "Host list is null. Provide at least one hostname for fleet WSUS target audit.");
+        }
+
+        var validHosts = hostnames
+            .Select(h => h?.Trim())
+            .Where(h => !string.IsNullOrWhiteSpace(h))
+            .Cast<string>()
+            .ToList();
+
+        if (validHosts.Count == 0)
+        {
+            return OperationResult<FleetWsusTargetAuditReport>.Fail(
+                "Host list is empty. Provide at least one hostname for fleet WSUS target audit.");
+        }
+
+        if (string.IsNullOrWhiteSpace(expectedHostname))
+        {
+            return OperationResult<FleetWsusTargetAuditReport>.Fail(
+                "Expected WSUS hostname must not be empty.");
+        }
+
+        if (expectedHttpPort is < 1 or > 65535)
+        {
+            return OperationResult<FleetWsusTargetAuditReport>.Fail(
+                "Expected HTTP port must be in range 1..65535.");
+        }
+
+        if (expectedHttpsPort is < 1 or > 65535)
+        {
+            return OperationResult<FleetWsusTargetAuditReport>.Fail(
+                "Expected HTTPS port must be in range 1..65535.");
+        }
+
+        var expectedHost = expectedHostname.Trim();
+        var expectedHttpUrl = $"http://{expectedHost}:{expectedHttpPort}";
+        var expectedHttpsUrl = $"https://{expectedHost}:{expectedHttpsPort}";
+
+        const string scriptBlock = @"
+$wu = Get-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate' -EA SilentlyContinue
+$au = Get-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' -EA SilentlyContinue
+""WSUS=$($wu.WUServer);STATUS=$($wu.WUStatusServer);USE=$($au.UseWUServer)""
+";
+
+        var items = new List<FleetWsusTargetAuditItem>(validHosts.Count);
+
+        progress.Report($"Running fleet WSUS target audit for {validHosts.Count} host(s)...");
+        progress.Report($"Expected targets: {expectedHttpUrl} and {expectedHttpsUrl}");
+
+        for (int i = 0; i < validHosts.Count; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var hostname = validHosts[i];
+            progress.Report($"[Host {i + 1}/{validHosts.Count}] Auditing {hostname}...");
+
+            try
+            {
+                if (!await _executor.TestWinRmAsync(hostname, ct).ConfigureAwait(false))
+                {
+                    var unreachableMessage = BuildWinRmUnavailableMessage(hostname);
+                    items.Add(new FleetWsusTargetAuditItem
+                    {
+                        Hostname = hostname,
+                        ComplianceStatus = FleetComplianceStatus.Unreachable,
+                        Message = unreachableMessage
+                    });
+
+                    progress.Report($"[Host {i + 1}/{validHosts.Count}] {hostname} -> Unreachable");
+                    continue;
+                }
+
+                var scriptResult = await ExecuteRemoteScriptAsync(
+                    hostname,
+                    scriptBlock,
+                    "Fleet WSUS target audit",
+                    null,
+                    ct).ConfigureAwait(false);
+
+                if (scriptResult == null)
+                {
+                    items.Add(new FleetWsusTargetAuditItem
+                    {
+                        Hostname = hostname,
+                        ComplianceStatus = FleetComplianceStatus.Error,
+                        Message = "Failed to query WSUS target settings on remote host."
+                    });
+
+                    progress.Report($"[Host {i + 1}/{validHosts.Count}] {hostname} -> Error");
+                    continue;
+                }
+
+                var diagnostics = ParseDiagnosticsOutput(scriptResult.OutputLines);
+                var normalizedWsusUrl = NormalizeAuditUrl(diagnostics.WsusServerUrl);
+                var normalizedStatusUrl = NormalizeAuditUrl(diagnostics.WsusStatusServerUrl);
+
+                var reportedHostname =
+                    ExtractHostname(diagnostics.WsusServerUrl) ??
+                    ExtractHostname(diagnostics.WsusStatusServerUrl);
+
+                var reportedHttpPort =
+                    ExtractPortForScheme(diagnostics.WsusServerUrl, Uri.UriSchemeHttp) ??
+                    ExtractPortForScheme(diagnostics.WsusStatusServerUrl, Uri.UriSchemeHttp);
+
+                var reportedHttpsPort =
+                    ExtractPortForScheme(diagnostics.WsusServerUrl, Uri.UriSchemeHttps) ??
+                    ExtractPortForScheme(diagnostics.WsusStatusServerUrl, Uri.UriSchemeHttps);
+
+                var wsusMatchesExpected =
+                    normalizedWsusUrl != null &&
+                    string.Equals(normalizedWsusUrl, expectedHttpUrl, StringComparison.OrdinalIgnoreCase);
+
+                var statusMatchesExpected =
+                    normalizedStatusUrl != null &&
+                    string.Equals(normalizedStatusUrl, expectedHttpsUrl, StringComparison.OrdinalIgnoreCase);
+
+                var status = diagnostics.UseWUServer && wsusMatchesExpected && statusMatchesExpected
+                    ? FleetComplianceStatus.Compliant
+                    : FleetComplianceStatus.Mismatch;
+
+                items.Add(new FleetWsusTargetAuditItem
+                {
+                    Hostname = hostname,
+                    ReportedWsusHostname = reportedHostname,
+                    ReportedHttpPort = reportedHttpPort,
+                    ReportedHttpsPort = reportedHttpsPort,
+                    ComplianceStatus = status,
+                    Message = status == FleetComplianceStatus.Compliant
+                        ? "Client WSUS target matches expected baseline."
+                        : "Client WSUS target does not match expected baseline."
+                });
+
+                progress.Report($"[Host {i + 1}/{validHosts.Count}] {hostname} -> {status}");
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _log.Error(ex,
+                    "ClientService.RunFleetWsusTargetAuditAsync: unexpected error on {Hostname}",
+                    hostname);
+
+                items.Add(new FleetWsusTargetAuditItem
+                {
+                    Hostname = hostname,
+                    ComplianceStatus = FleetComplianceStatus.Error,
+                    Message = ex.Message
+                });
+
+                progress.Report($"[Host {i + 1}/{validHosts.Count}] {hostname} -> Error: {ex.Message}");
+            }
+        }
+
+        var groupedTargets = items
+            .Where(i =>
+                !string.IsNullOrWhiteSpace(i.ReportedWsusHostname) ||
+                i.ReportedHttpPort.HasValue ||
+                i.ReportedHttpsPort.HasValue)
+            .GroupBy(i => BuildGroupedTargetKey(i.ReportedWsusHostname, i.ReportedHttpPort, i.ReportedHttpsPort),
+                StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+
+        var report = new FleetWsusTargetAuditReport
+        {
+            Items = items,
+            TotalHosts = items.Count,
+            CompliantHosts = items.Count(i => i.ComplianceStatus == FleetComplianceStatus.Compliant),
+            MismatchHosts = items.Count(i => i.ComplianceStatus == FleetComplianceStatus.Mismatch),
+            UnreachableHosts = items.Count(i => i.ComplianceStatus == FleetComplianceStatus.Unreachable),
+            ErrorHosts = items.Count(i => i.ComplianceStatus == FleetComplianceStatus.Error),
+            GroupedTargets = groupedTargets
+        };
+
+        var summary =
+            $"Fleet WSUS target audit complete: {report.TotalHosts} host(s), " +
+            $"{report.CompliantHosts} compliant, {report.MismatchHosts} mismatch, " +
+            $"{report.UnreachableHosts} unreachable, {report.ErrorHosts} error.";
+
+        progress.Report(summary);
+
+        _log.Info(
+            "ClientService.RunFleetWsusTargetAuditAsync: complete on {Total} host(s) - compliant={Compliant}, mismatch={Mismatch}, unreachable={Unreachable}, error={Error}",
+            report.TotalHosts,
+            report.CompliantHosts,
+            report.MismatchHosts,
+            report.UnreachableHosts,
+            report.ErrorHosts);
+
+        return OperationResult<FleetWsusTargetAuditReport>.Ok(report, summary);
+    }
+
+    /// <inheritdoc />
     public OperationResult<WsusErrorInfo> LookupErrorCode(string errorCode)
     {
         var info = WsusErrorCodes.Lookup(errorCode);
@@ -416,6 +619,29 @@ $agent = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Wind
 
         var match = _urlHostRegex.Match(url.Trim());
         return match.Success ? match.Groups[1].Value : null;
+    }
+
+    private static bool TryGetWsusServerHostname(string? wsusServerUrl, out string hostname)
+    {
+        hostname = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(wsusServerUrl))
+            return false;
+
+        if (!Uri.TryCreate(wsusServerUrl.Trim(), UriKind.Absolute, out var uri))
+            return false;
+
+        if (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(uri.Host))
+            return false;
+
+        hostname = uri.Host;
+        return true;
     }
 
     /// <summary>
@@ -562,5 +788,52 @@ $agent = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Wind
         if (string.IsNullOrWhiteSpace(value)) return null;
         if (string.Equals(value, "$null", StringComparison.Ordinal)) return null;
         return value;
+    }
+
+    private static int? ExtractPortForScheme(string? url, string scheme)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return null;
+
+        if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri))
+            return null;
+
+        return string.Equals(uri.Scheme, scheme, StringComparison.OrdinalIgnoreCase)
+            ? uri.Port
+            : null;
+    }
+
+    private static string? NormalizeAuditUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return null;
+
+        if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri))
+            return null;
+
+        if (!string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return $"{uri.Scheme}://{uri.Host}:{uri.Port}";
+    }
+
+    private static string BuildGroupedTargetKey(string? hostname, int? httpPort, int? httpsPort)
+    {
+        var normalizedHost = string.IsNullOrWhiteSpace(hostname)
+            ? "(unknown)"
+            : hostname.Trim();
+
+        var httpTarget = httpPort.HasValue
+            ? $"http://{normalizedHost}:{httpPort.Value}"
+            : "(none)";
+
+        var httpsTarget = httpsPort.HasValue
+            ? $"https://{normalizedHost}:{httpsPort.Value}"
+            : "(none)";
+
+        return $"{httpTarget}|{httpsTarget}";
     }
 }
