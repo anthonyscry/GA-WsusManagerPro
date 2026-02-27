@@ -30,7 +30,11 @@ param(
     [Parameter(HelpMessage = "SQL sa password (plain text)")]
     [string]$SaPassword,
     [Parameter(HelpMessage = "Run in non-interactive mode (no dialogs, fail on missing paths/passwords)")]
-    [switch]$NonInteractive
+    [switch]$NonInteractive,
+    [Parameter(HelpMessage = "Configure WSUS for HTTPS after install (default is HTTP on port 8530)")]
+    [switch]$EnableHttps,
+    [Parameter(HelpMessage = "Existing certificate thumbprint used when enabling HTTPS in non-interactive mode")]
+    [string]$CertificateThumbprint
 )
 
 # -------------------------
@@ -207,6 +211,43 @@ function Wait-WithHeartbeat {
     }
     Write-Host ""
     [Console]::Out.Flush()
+}
+
+function Invoke-WsusHttpsSetup {
+    param(
+        [string]$CertificateThumbprint,
+        [switch]$NonInteractive
+    )
+
+    $httpsScriptCandidates = @(
+        (Join-Path $PSScriptRoot "Set-WsusHttps.ps1"),
+        (Join-Path $PSScriptRoot "Scripts\Set-WsusHttps.ps1"),
+        (Join-Path (Split-Path $PSScriptRoot -Parent) "Scripts\Set-WsusHttps.ps1")
+    )
+
+    $httpsScript = $httpsScriptCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if (-not $httpsScript) {
+        throw "Set-WsusHttps.ps1 not found. Searched: $($httpsScriptCandidates -join '; ')"
+    }
+
+    if ($NonInteractive -and [string]::IsNullOrWhiteSpace($CertificateThumbprint)) {
+        throw "-EnableHttps with -NonInteractive requires -CertificateThumbprint."
+    }
+
+    $powershellExe = Join-Path $PSHOME "powershell.exe"
+    if (-not (Test-Path $powershellExe)) {
+        $powershellExe = "powershell.exe"
+    }
+
+    $httpsArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $httpsScript)
+    if (-not [string]::IsNullOrWhiteSpace($CertificateThumbprint)) {
+        $httpsArgs += @("-CertificateThumbprint", $CertificateThumbprint)
+    }
+
+    & $powershellExe @httpsArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "Set-WsusHttps.ps1 exited with code $LASTEXITCODE."
+    }
 }
 
 # Get or retrieve password as SecureString
@@ -489,7 +530,9 @@ if ($sqlcmd) {
 # 10. WSUS POSTINSTALL
 # =====================================================================
 Write-Host "[+] Running WSUS postinstall (this may take several minutes)..."
-# TODO: Add optional HTTP/HTTPS configuration flag (default remains HTTP on port 8530).
+
+$wsusProtocol = "HTTP"
+$wsusPort = 8530
 
 $wsusUtil = "C:\Program Files\Update Services\Tools\wsusutil.exe"
 
@@ -506,6 +549,21 @@ if (Test-Path $wsusUtil) {
     }
 } else {
     Write-Host "    Warning: wsusutil.exe not found at $wsusUtil"
+}
+
+if ($EnableHttps) {
+    Write-Host "[+] HTTPS mode requested. Configuring WSUS for SSL (port 8531)..."
+    try {
+        Invoke-WsusHttpsSetup -CertificateThumbprint $CertificateThumbprint -NonInteractive:$NonInteractive
+        $wsusProtocol = "HTTPS"
+        $wsusPort = 8531
+        Write-Host "    WSUS HTTPS configuration complete."
+    } catch {
+        Write-Host "    ERROR: HTTPS configuration failed: $($_.Exception.Message)" -ForegroundColor Red
+        exit 1
+    }
+} else {
+    Write-Host "    WSUS configured for HTTP on port 8530 (default)."
 }
 
 # =====================================================================
@@ -728,6 +786,8 @@ Write-Host "==============================================================="
 Write-Host ""
 Write-Host " SQL Server Instance: .\SQLEXPRESS"
 Write-Host " TCP Port: 1433"
+Write-Host " WSUS Protocol: $wsusProtocol"
+Write-Host " WSUS Port: $wsusPort"
 Write-Host " WSUS Content: $WSUSContent"
 Write-Host " Full log: $LogFile"
 Write-Host ""

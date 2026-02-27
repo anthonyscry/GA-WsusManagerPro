@@ -228,6 +228,18 @@ Describe "Install-WsusWithSqlExpress.ps1 Parameter Validation" {
             $param = $script:Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'NonInteractive' }
             $param | Should -Not -BeNullOrEmpty
         }
+
+        It "Has EnableHttps switch" {
+            $param = $script:Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'EnableHttps' }
+            $param | Should -Not -BeNullOrEmpty
+            $param.StaticType.Name | Should -Be 'SwitchParameter'
+        }
+
+        It "Has CertificateThumbprint parameter" {
+            $param = $script:Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'CertificateThumbprint' }
+            $param | Should -Not -BeNullOrEmpty
+            $param.StaticType.Name | Should -Be 'String'
+        }
     }
 }
 
