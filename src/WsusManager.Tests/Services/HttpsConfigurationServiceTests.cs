@@ -47,7 +47,7 @@ public class HttpsConfigurationServiceTests
                 "powershell.exe",
                 It.Is<string>(a => a.Contains("Set-WsusHttps.ps1", StringComparison.Ordinal) && a.Contains("THUMBPRINT", StringComparison.Ordinal)),
                 It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(0, []));
 
         var fallback = new LegacyHttpsConfigurationFallback(
@@ -76,7 +76,7 @@ public class HttpsConfigurationServiceTests
             "powershell.exe",
             It.IsAny<string>(),
             It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>()), Times.Once);
+            It.IsAny<CancellationToken>(), It.IsAny<bool>()), Times.Once);
     }
 
     [Fact]
@@ -112,6 +112,6 @@ public class HttpsConfigurationServiceTests
             It.IsAny<string>(),
             It.IsAny<string>(),
             It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<CancellationToken>(), It.IsAny<bool>()), Times.Never);
     }
 }

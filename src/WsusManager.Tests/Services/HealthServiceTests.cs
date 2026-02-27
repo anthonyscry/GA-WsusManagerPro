@@ -135,7 +135,7 @@ public class HealthServiceTests
         _mockRunner
             .Setup(r => r.RunAsync(
                 It.Is<string>(exe => exe.Contains("appcmd", StringComparison.OrdinalIgnoreCase)),
-                It.IsAny<string>(), null, It.IsAny<CancellationToken>()))
+                It.IsAny<string>(), null, It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(0, ["WsusPool"]));
 
         // SQL connectivity and SUSDB check handled via SQL (will fail in CI without SQL)
@@ -543,9 +543,9 @@ public class HealthServiceTests
                 It.IsAny<string>(),
                 It.Is<string>(a => a.Contains("apppool")),
                 It.IsAny<IProgress<string>?>(),
-                It.IsAny<CancellationToken>()))
-            .Callback<string, string, IProgress<string>?, CancellationToken>(
-                (exe, _, _, _) => capturedExecutable = exe)
+                It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Callback<string, string, IProgress<string>?, CancellationToken, bool>(
+                (exe, _, _, _, _) => capturedExecutable = exe)
             .ReturnsAsync(new ProcessResult(0, ["WsusPool"]));
 
         var service = CreateService();

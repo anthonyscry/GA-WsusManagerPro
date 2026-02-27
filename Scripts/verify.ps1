@@ -7,6 +7,8 @@ param(
 
     [switch]$RunPackaging,
 
+    [switch]$CollectCoverage,
+
     [ValidateRange(1, 5)]
     [int]$RestoreRetryCount = 3,
 
@@ -180,6 +182,55 @@ function Write-EnvironmentHeader {
     }
 }
 
+function Get-FormatIncludePaths {
+    $paths = @()
+
+    try {
+        $rawChanged = @()
+
+        if ($env:GITHUB_EVENT_NAME -eq 'pull_request' -and -not [string]::IsNullOrWhiteSpace($env:GITHUB_BASE_REF)) {
+            $baseRef = 'origin/{0}' -f $env:GITHUB_BASE_REF
+
+            & git rev-parse --verify $baseRef 2>$null | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                & git fetch --no-tags --depth=50 origin $env:GITHUB_BASE_REF 2>$null | Out-Null
+            }
+
+            $rawChanged = @(& git diff --name-only "$baseRef...HEAD" 2>$null)
+        } else {
+            $rawChanged = @(& git diff --name-only HEAD~1..HEAD 2>$null)
+            if ($LASTEXITCODE -ne 0) {
+                $rawChanged = @()
+            }
+        }
+
+        foreach ($changedPath in $rawChanged) {
+            if ([string]::IsNullOrWhiteSpace($changedPath)) {
+                continue
+            }
+
+            $normalized = $changedPath.Replace('\\', '/')
+            if ($normalized -notlike 'src/*') {
+                continue
+            }
+
+            $extension = [System.IO.Path]::GetExtension($normalized)
+            if ($extension -notin @('.cs', '.xaml', '.csproj', '.props', '.targets')) {
+                continue
+            }
+
+            $absolutePath = Join-Path $script:RepoRoot $changedPath
+            if (Test-Path -LiteralPath $absolutePath -PathType Leaf) {
+                $paths += $normalized
+            }
+        }
+    } catch {
+        return @()
+    }
+
+    return @($paths | Sort-Object -Unique)
+}
+
 function Invoke-NativeStep {
     param(
         [Parameter(Mandatory = $true)][string]$StepName,
@@ -340,38 +391,58 @@ try {
         Write-Host 'Skipping dotnet format (SkipFormat requested).' -ForegroundColor Yellow
         '{"status":"skipped","reason":"SkipFormat requested"}' | Out-File -FilePath $script:FormatReportPath -Encoding utf8
     } elseif (Test-Path -LiteralPath (Join-Path $script:RepoRoot 'src/.editorconfig')) {
-        Invoke-NativeStep `
-            -StepName 'Format/Lint' `
-            -Executable 'dotnet' `
-            -Arguments @(
+        $formatInclude = @(Get-FormatIncludePaths)
+
+        if ($formatInclude.Count -eq 0) {
+            Write-Host 'No changed .NET source/config files detected; skipping dotnet format.' -ForegroundColor Yellow
+            '{"status":"skipped","reason":"No changed files for format gate"}' | Out-File -FilePath $script:FormatReportPath -Encoding utf8
+        } else {
+            Write-Host ('Running dotnet format against {0} changed file(s).' -f $formatInclude.Count)
+
+            $formatArguments = @(
                 'format',
                 'src/WsusManager.sln',
                 '--verify-no-changes',
                 '--no-restore',
                 '--verbosity', 'minimal',
-                '--report', $script:FormatReportPath
-            ) `
-            -BaseLogPath (Join-Path $script:LogsRoot 'format.log')
+                '--report', $script:FormatReportPath,
+                '--include'
+            ) + $formatInclude
+
+            Invoke-NativeStep `
+                -StepName 'Format/Lint' `
+                -Executable 'dotnet' `
+                -Arguments $formatArguments `
+                -BaseLogPath (Join-Path $script:LogsRoot 'format.log')
+        }
     } else {
         Write-Host 'No src/.editorconfig found; skipping dotnet format.' -ForegroundColor Yellow
         '{"status":"skipped","reason":"src/.editorconfig not found"}' | Out-File -FilePath $script:FormatReportPath -Encoding utf8
     }
 
+    $testArguments = @(
+        'test',
+        'src/WsusManager.Tests/WsusManager.Tests.csproj',
+        '--configuration', $Configuration,
+        '--no-build',
+        '--verbosity', 'minimal',
+        '--logger', 'trx;LogFileName=test-results.trx',
+        '--results-directory', $script:TestResultsRoot,
+        '--blame-hang-timeout', '15m',
+        '--blame-hang-dump-type', 'mini',
+        '--filter', 'FullyQualifiedName!~ExeValidation&FullyQualifiedName!~DistributionPackage'
+    )
+
+    if ($CollectCoverage) {
+        $testArguments += '--settings'
+        $testArguments += 'src/coverlet.runsettings'
+        $testArguments += '--collect:XPlat Code Coverage'
+    }
+
     Invoke-NativeStep `
         -StepName 'Tests' `
         -Executable 'dotnet' `
-        -Arguments @(
-            'test',
-            'src/WsusManager.Tests/WsusManager.Tests.csproj',
-            '--configuration', $Configuration,
-            '--no-build',
-            '--verbosity', 'normal',
-            '--logger', 'trx;LogFileName=test-results.trx',
-            '--results-directory', $script:TestResultsRoot,
-            '--filter', 'FullyQualifiedName!~ExeValidation&FullyQualifiedName!~DistributionPackage',
-            '--settings', 'src/coverlet.runsettings',
-            '--collect:XPlat Code Coverage'
-        ) `
+        -Arguments $testArguments `
         -BaseLogPath (Join-Path $script:LogsRoot 'test.log')
 
     if ($RunPackaging) {

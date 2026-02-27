@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
         Title="Online Sync - Select Profile"
-        Width="480" Height="360"
+        Width="520" Height="620"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         Background="{DynamicResource PrimaryBackground}"
@@ -13,6 +13,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -60,8 +61,60 @@
             </RadioButton>
         </StackPanel>
 
+        <!-- Export Options -->
+        <StackPanel Grid.Row="2" Margin="0,24,0,0">
+            <TextBlock Text="Optional export destinations" FontSize="13" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimary}"/>
+            <TextBlock Text="Specify one or both export paths to copy WSUS content automatically after the sync completes."
+                       Foreground="{DynamicResource TextSecondary}" FontSize="11" TextWrapping="Wrap"/>
+
+            <!-- Full Export Path -->
+            <TextBlock Text="Full Export Path (optional)" Foreground="{DynamicResource TextSecondary}"
+                       FontSize="12" Margin="0,4,0,4"/>
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="TxtFullExportPath" Grid.Column="0"
+                         automation:AutomationProperties.AutomationId="FullExportPathTextBox"
+                         Background="{DynamicResource InputBackground}" Foreground="{DynamicResource TextPrimary}"
+                         BorderBrush="{DynamicResource BorderPrimary}" Padding="6,4" FontSize="12"/>
+                <Button Grid.Column="1" Content="Browse" Style="{StaticResource BtnSec}"
+                        automation:AutomationProperties.AutomationId="BrowseFullExportButton"
+                        Padding="10,4" Margin="6,0,0,0" FontSize="11"
+                        Click="BrowseFullExport_Click"/>
+            </Grid>
+
+            <!-- Differential Export Path -->
+            <TextBlock Text="Differential Export Path (optional)" Foreground="{DynamicResource TextSecondary}"
+                       FontSize="12" Margin="0,4,0,4"/>
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="TxtDiffExportPath" Grid.Column="0"
+                         automation:AutomationProperties.AutomationId="DifferentialExportPathTextBox"
+                         Background="{DynamicResource InputBackground}" Foreground="{DynamicResource TextPrimary}"
+                         BorderBrush="{DynamicResource BorderPrimary}" Padding="6,4" FontSize="12"/>
+                <Button Grid.Column="1" Content="Browse" Style="{StaticResource BtnSec}"
+                        automation:AutomationProperties.AutomationId="BrowseDiffExportButton"
+                        Padding="10,4" Margin="6,0,0,0" FontSize="11"
+                        Click="BrowseDiffExport_Click"/>
+            </Grid>
+
+            <!-- Export Days -->
+            <TextBlock Text="Export Days (for differential)" Foreground="{DynamicResource TextSecondary}"
+                       FontSize="12" Margin="0,4,0,4"/>
+            <TextBox x:Name="TxtExportDays" Text="30" Width="80"
+                     automation:AutomationProperties.AutomationId="ExportDaysTextBox"
+                     Background="{DynamicResource InputBackground}" Foreground="{DynamicResource TextPrimary}"
+                     BorderBrush="{DynamicResource BorderPrimary}" Padding="6,4" FontSize="12"/>
+        </StackPanel>
+
         <!-- Buttons -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right"
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right"
                     Margin="0,16,0,0">
             <Button Content="Cancel" Style="{StaticResource BtnSec}"
                     automation:AutomationProperties.AutomationId="CancelSyncProfileButton"

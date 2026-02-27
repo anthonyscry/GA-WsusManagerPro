@@ -89,7 +89,7 @@ public class RobocopyServiceTests
                 "robocopy.exe",
                 It.IsAny<string>(),
                 It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(exitCode, []));
 
         var result = await _service.CopyAsync(@"C:\Source", @"C:\Dest");
@@ -107,7 +107,7 @@ public class RobocopyServiceTests
                 "robocopy.exe",
                 It.IsAny<string>(),
                 It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(1, []));
 
         await _service.CopyAsync(@"C:\Source", @"C:\Dest", progress: progress);
@@ -124,9 +124,9 @@ public class RobocopyServiceTests
                 "robocopy.exe",
                 It.IsAny<string>(),
                 It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>()))
-            .Callback<string, string, IProgress<string>?, CancellationToken>(
-                (exe, args, p, ct) => capturedArgs = args)
+                It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Callback<string, string, IProgress<string>?, CancellationToken, bool>(
+                (exe, args, p, ct, live) => capturedArgs = args)
             .ReturnsAsync(new ProcessResult(0, []));
 
         await _service.CopyAsync(@"C:\WSUS", @"D:\Export", 30);
@@ -134,5 +134,25 @@ public class RobocopyServiceTests
         Assert.NotNull(capturedArgs);
         Assert.Contains("\"C:\\WSUS\" \"D:\\Export\"", capturedArgs);
         Assert.Contains("/MAXAGE:30", capturedArgs);
+    }
+
+    [Fact]
+    public async Task CopyAsync_OptsInLiveTerminalMode()
+    {
+        _mockRunner.Setup(r => r.RunAsync(
+                "robocopy.exe",
+                It.IsAny<string>(),
+                It.IsAny<IProgress<string>>(),
+                It.IsAny<CancellationToken>(), true))
+            .ReturnsAsync(new ProcessResult(1, []));
+
+        await _service.CopyAsync(@"C:\Source", @"C:\Dest");
+
+        _mockRunner.Verify(r => r.RunAsync(
+            "robocopy.exe",
+            It.IsAny<string>(),
+            It.IsAny<IProgress<string>>(),
+            It.IsAny<CancellationToken>(), true),
+            Times.Once);
     }
 }

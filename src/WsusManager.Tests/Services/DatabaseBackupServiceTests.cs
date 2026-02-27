@@ -428,7 +428,7 @@ public class DatabaseBackupServiceTests
             .ReturnsAsync(OperationResult.Ok("Started."));
 
         _mockRunner
-            .Setup(r => r.RunAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.RunAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(0, []));
 
         var svc = CreateService();
@@ -482,7 +482,7 @@ public class DatabaseBackupServiceTests
             .Setup(s => s.StartServiceAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(OperationResult.Ok("Started."));
         _mockRunner
-            .Setup(r => r.RunAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.RunAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(0, []));
 
         var callOrder = new List<string>();
@@ -547,8 +547,8 @@ public class DatabaseBackupServiceTests
         string? capturedExecutable = null;
         string? capturedArgs = null;
         _mockRunner
-            .Setup(r => r.RunAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
-            .Callback<string, string, IProgress<string>?, CancellationToken>((exe, args, _, _) =>
+            .Setup(r => r.RunAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Callback<string, string, IProgress<string>?, CancellationToken, bool>((exe, args, _, _, _) =>
             {
                 capturedExecutable = exe;
                 capturedArgs = args;
@@ -594,7 +594,7 @@ public class DatabaseBackupServiceTests
             .Setup(s => s.StartServiceAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(OperationResult.Ok("Started."));
         _mockRunner
-            .Setup(r => r.RunAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.RunAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(0, []));
 
         var svc = CreateService();
@@ -954,7 +954,7 @@ public class DatabaseBackupServiceTests
             .Setup(s => s.StartServiceAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(OperationResult.Ok("Started."));
         _mockRunner
-            .Setup(r => r.RunAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .Setup(r => r.RunAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(0, []));
         _mockSql
             .SetupSequence(s => s.ExecuteNonQueryAsync(

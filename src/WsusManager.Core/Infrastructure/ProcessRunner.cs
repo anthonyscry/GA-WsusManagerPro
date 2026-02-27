@@ -27,11 +27,13 @@ public class ProcessRunner : IProcessRunner
         string executable,
         string arguments,
         IProgress<string>? progress = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        bool enableLiveTerminal = false)
     {
         _logService.Debug("Running: {Executable} [arguments hidden]", executable);
 
-        var liveTerminalMode = _settingsService?.Current.LiveTerminalMode ?? false;
+        var globalLiveTerminal = _settingsService?.Current.LiveTerminalMode ?? false;
+        var liveTerminalMode = enableLiveTerminal && globalLiveTerminal;
         if (liveTerminalMode)
         {
             progress?.Report("[INFO] Live Terminal mode enabled for this operation.");
