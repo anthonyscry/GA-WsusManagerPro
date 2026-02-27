@@ -114,4 +114,48 @@ public class HttpsConfigurationServiceTests
             It.IsAny<IProgress<string>>(),
             It.IsAny<CancellationToken>(), It.IsAny<bool>()), Times.Never);
     }
+
+    [Fact]
+    public void LegacyFallback_GetSearchPaths_DoesNotInclude_CurrentDirectory_Candidates()
+    {
+        var fallback = new LegacyHttpsConfigurationFallback(
+            new Mock<IProcessRunner>().Object,
+            new Mock<ILogService>().Object,
+            () => null);
+
+        var originalCurrentDirectory = Directory.GetCurrentDirectory();
+        var tempCurrentDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempCurrentDirectory);
+
+        try
+        {
+            Directory.SetCurrentDirectory(tempCurrentDirectory);
+            var paths = fallback.GetSearchPaths();
+
+            Assert.DoesNotContain(Path.Combine(tempCurrentDirectory, "Scripts", "Set-WsusHttps.ps1"), paths);
+            Assert.DoesNotContain(Path.Combine(tempCurrentDirectory, "Set-WsusHttps.ps1"), paths);
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(originalCurrentDirectory);
+            Directory.Delete(tempCurrentDirectory, true);
+        }
+    }
+
+    [Fact]
+    public void LegacyFallback_GetSearchPaths_Includes_AppDirectory_Parent_Candidates()
+    {
+        var fallback = new LegacyHttpsConfigurationFallback(
+            new Mock<IProcessRunner>().Object,
+            new Mock<ILogService>().Object,
+            () => null);
+
+        var paths = fallback.GetSearchPaths();
+        var appDir = AppContext.BaseDirectory;
+        var parent = new DirectoryInfo(appDir).Parent;
+
+        Assert.NotNull(parent);
+        Assert.Contains(Path.Combine(parent!.FullName, "Scripts", "Set-WsusHttps.ps1"), paths);
+        Assert.Contains(Path.Combine(parent.FullName, "Set-WsusHttps.ps1"), paths);
+    }
 }

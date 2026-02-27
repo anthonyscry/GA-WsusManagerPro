@@ -491,4 +491,69 @@ public class InstallationServiceTests
     {
         Assert.Equal(15, InstallationService.MinPasswordLength);
     }
+
+    [Fact]
+    public void GetSearchPaths_DoesNotInclude_CurrentDirectory_Candidates()
+    {
+        var service = CreateService();
+        var originalCurrentDirectory = Directory.GetCurrentDirectory();
+        var tempCurrentDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempCurrentDirectory);
+
+        try
+        {
+            Directory.SetCurrentDirectory(tempCurrentDirectory);
+            var paths = service.GetSearchPaths();
+
+            Assert.DoesNotContain(Path.Combine(tempCurrentDirectory, "Scripts", InstallationService.InstallScriptName), paths);
+            Assert.DoesNotContain(Path.Combine(tempCurrentDirectory, InstallationService.InstallScriptName), paths);
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(originalCurrentDirectory);
+            Directory.Delete(tempCurrentDirectory, true);
+        }
+    }
+
+    [Fact]
+    public async Task Install_Restores_PasswordEnvironmentVariable_When_ProcessRunner_Throws()
+    {
+        const string envVarName = "WSUS_INSTALL_SA_PASSWORD";
+        const string previousValue = "previous-secret";
+
+        var originalValue = Environment.GetEnvironmentVariable(envVarName, EnvironmentVariableTarget.Process);
+        Environment.SetEnvironmentVariable(envVarName, previousValue, EnvironmentVariableTarget.Process);
+
+        try
+        {
+            _mockNativeInstall
+                .Setup(n => n.InstallAsync(It.IsAny<InstallOptions>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(OperationResult.Fail("Native installation path is not yet implemented."));
+
+            _mockRunner
+                .Setup(r => r.RunAsync(
+                    "powershell.exe",
+                    It.IsAny<string>(),
+                    It.IsAny<IProgress<string>>(),
+                    It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+                .ThrowsAsync(new InvalidOperationException("boom"));
+
+            var service = CreateServiceWithScript(@"C:\WSUS\Scripts\Install-WsusWithSqlExpress.ps1");
+
+            var result = await service.InstallAsync(new InstallOptions
+            {
+                InstallerPath = @"C:\WSUS\SQLDB",
+                SaUsername = "sa",
+                SaPassword = "ValidPassword123!@#"
+            }).ConfigureAwait(false);
+
+            Assert.False(result.Success);
+            Assert.Contains("boom", result.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(previousValue, Environment.GetEnvironmentVariable(envVarName, EnvironmentVariableTarget.Process));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(envVarName, originalValue, EnvironmentVariableTarget.Process);
+        }
+    }
 }

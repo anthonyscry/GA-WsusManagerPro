@@ -44,8 +44,9 @@ public class ScheduledTaskService : IScheduledTaskService
             var scriptPath = _locateScript();
             if (scriptPath is null)
             {
+                var searchPaths = GetSearchPaths();
                 var msg = $"Maintenance script not found. Searched for '{MaintenanceScriptName}' in:\n" +
-                          $"  {GetSearchPaths()[0]}\n  {GetSearchPaths()[1]}";
+                          $"  {string.Join("\n  ", searchPaths)}";
                 _logService.Warning(msg);
                 progress?.Report($"[FAIL] {msg}");
                 return OperationResult.Fail(msg);
@@ -177,11 +178,16 @@ public class ScheduledTaskService : IScheduledTaskService
     /// </summary>
     internal static string BuildCreateArguments(ScheduledTaskOptions options, string taskAction)
     {
-        var args = $"/Create /TN \"{options.TaskName}\" " +
-                   $"/TR \"{taskAction}\" " +
+        var safeTaskName = EscapeForSchtasksQuotedArgument(options.TaskName);
+        var safeTaskAction = EscapeForSchtasksQuotedArgument(taskAction);
+        var safeUsername = EscapeForSchtasksQuotedArgument(options.Username);
+        var safePassword = EscapeForSchtasksQuotedArgument(options.Password);
+
+        var args = $"/Create /TN \"{safeTaskName}\" " +
+                   $"/TR \"{safeTaskAction}\" " +
                    $"/ST {options.Time} " +
-                   $"/RU \"{options.Username}\" " +
-                   $"/RP \"{options.Password}\" " +
+                   $"/RU \"{safeUsername}\" " +
+                   $"/RP \"{safePassword}\" " +
                    $"/RL HIGHEST /F";
 
         switch (options.Schedule)
@@ -215,26 +221,21 @@ public class ScheduledTaskService : IScheduledTaskService
         _ => "SAT"
     };
 
+    internal static string EscapeForSchtasksQuotedArgument(string value)
+    {
+        return value.Replace("\"", "\\\"", StringComparison.Ordinal);
+    }
+
     /// <summary>
     /// Locates the maintenance script relative to the current executable directory.
     /// </summary>
     internal string? LocateScript()
     {
-        foreach (var path in GetSearchPaths())
-        {
-            if (File.Exists(path))
-                return path;
-        }
-        return null;
+        return ScriptPathLocator.LocateScript(MaintenanceScriptName);
     }
 
     internal string[] GetSearchPaths()
     {
-        var appDir = AppContext.BaseDirectory;
-        return
-        [
-            Path.Combine(appDir, "Scripts", MaintenanceScriptName),
-            Path.Combine(appDir, MaintenanceScriptName)
-        ];
+        return ScriptPathLocator.GetScriptSearchPaths(MaintenanceScriptName);
     }
 }

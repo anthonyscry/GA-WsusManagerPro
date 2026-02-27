@@ -113,6 +113,20 @@ public class ScheduledTaskServiceTests
         Assert.Contains("/ST 02:00", args);
     }
 
+    [Fact]
+    public void BuildArgs_Escapes_Quotes_In_TaskAction_And_Password()
+    {
+        var options = DefaultOptions() with
+        {
+            Password = "Test\"Pass"
+        };
+
+        var args = ScheduledTaskService.BuildCreateArguments(options, "powershell.exe -File \"C:\\Path\\Script.ps1\"");
+
+        Assert.Contains("/TR \"powershell.exe -File \\\"C:\\Path\\Script.ps1\\\"\"", args);
+        Assert.Contains("/RP \"Test\\\"Pass\"", args);
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // DayOfWeekToSchtasks Tests
     // ═══════════════════════════════════════════════════════════════
@@ -230,19 +244,21 @@ public class ScheduledTaskServiceTests
     [Fact]
     public async Task Create_Returns_Failure_When_Script_Not_Found()
     {
-        var service = CreateService();
+        var service = new ScheduledTaskService(
+            _mockRunner.Object,
+            _mockLog.Object,
+            _mockCommandBuilder.Object,
+            () => null);
 
-        // Delete step will be called first (returns anything)
-        _mockRunner
-            .Setup(r => r.RunAsync("schtasks.exe", It.Is<string>(a => a.Contains("/Delete")),
-                null, It.IsAny<CancellationToken>(), It.IsAny<bool>()))
-            .ReturnsAsync(new ProcessResult(0, []));
-
-        // Script won't be found in test environment
         var result = await service.CreateTaskAsync(DefaultOptions());
 
         Assert.False(result.Success);
         Assert.Contains("script not found", result.Message, StringComparison.OrdinalIgnoreCase);
+        _mockRunner.Verify(r => r.RunAsync(
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<IProgress<string>>(),
+            It.IsAny<CancellationToken>(), It.IsAny<bool>()), Times.Never);
     }
 
     [Fact]
@@ -277,5 +293,42 @@ public class ScheduledTaskServiceTests
     public void MaintenanceScriptName_Is_Correct()
     {
         Assert.Equal("Invoke-WsusMonthlyMaintenance.ps1", ScheduledTaskService.MaintenanceScriptName);
+    }
+
+    [Fact]
+    public void GetSearchPaths_DoesNotInclude_CurrentDirectory_Candidates()
+    {
+        var service = CreateService();
+        var originalCurrentDirectory = Directory.GetCurrentDirectory();
+        var tempCurrentDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempCurrentDirectory);
+
+        try
+        {
+            Directory.SetCurrentDirectory(tempCurrentDirectory);
+            var paths = service.GetSearchPaths();
+
+            Assert.DoesNotContain(Path.Combine(tempCurrentDirectory, "Scripts", ScheduledTaskService.MaintenanceScriptName), paths);
+            Assert.DoesNotContain(Path.Combine(tempCurrentDirectory, ScheduledTaskService.MaintenanceScriptName), paths);
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(originalCurrentDirectory);
+            Directory.Delete(tempCurrentDirectory, true);
+        }
+    }
+
+    [Fact]
+    public void GetSearchPaths_Includes_AppDirectory_Parent_Candidates()
+    {
+        var service = CreateService();
+
+        var paths = service.GetSearchPaths();
+        var appDir = AppContext.BaseDirectory;
+        var parent = new DirectoryInfo(appDir).Parent;
+
+        Assert.NotNull(parent);
+        Assert.Contains(Path.Combine(parent!.FullName, "Scripts", ScheduledTaskService.MaintenanceScriptName), paths);
+        Assert.Contains(Path.Combine(parent.FullName, ScheduledTaskService.MaintenanceScriptName), paths);
     }
 }

@@ -216,12 +216,7 @@ public class InstallationService : IInstallationService
     /// </summary>
     internal string? LocateScript()
     {
-        foreach (var path in GetSearchPaths())
-        {
-            if (File.Exists(path))
-                return path;
-        }
-        return null;
+        return ScriptPathLocator.LocateScript(InstallScriptName);
     }
 
     private static string EncodePowerShellCommand(string command)
@@ -232,26 +227,7 @@ public class InstallationService : IInstallationService
 
     internal string[] GetSearchPaths()
     {
-        var appDir = AppContext.BaseDirectory;
-        var currentDir = Directory.GetCurrentDirectory();
-
-        var searchPaths = new List<string>
-        {
-            Path.Combine(appDir, "Scripts", InstallScriptName),
-            Path.Combine(appDir, InstallScriptName),
-            Path.Combine(currentDir, "Scripts", InstallScriptName),
-            Path.Combine(currentDir, InstallScriptName)
-        };
-
-        var parent = new DirectoryInfo(appDir).Parent;
-        for (var i = 0; i < 6 && parent is not null; i++)
-        {
-            searchPaths.Add(Path.Combine(parent.FullName, "Scripts", InstallScriptName));
-            searchPaths.Add(Path.Combine(parent.FullName, InstallScriptName));
-            parent = parent.Parent;
-        }
-
-        return [.. searchPaths];
+        return ScriptPathLocator.GetScriptSearchPaths(InstallScriptName);
     }
 
     private static string EscapePowerShellSingleQuotedString(string value)

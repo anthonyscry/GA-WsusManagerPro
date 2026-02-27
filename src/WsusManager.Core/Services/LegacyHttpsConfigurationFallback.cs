@@ -39,7 +39,7 @@ public class LegacyHttpsConfigurationFallback
         if (scriptPath is null)
         {
             var paths = GetSearchPaths();
-            var message = $"HTTPS script not found. Searched for '{ScriptName}' in:\n  {paths[0]}\n  {paths[1]}";
+            var message = $"HTTPS script not found. Searched for '{ScriptName}' in:\n  {string.Join("\n  ", paths)}";
             _logService.Warning(message);
             progress?.Report(message);
             return OperationResult.Fail(message);
@@ -68,24 +68,11 @@ public class LegacyHttpsConfigurationFallback
 
     internal string? LocateScript()
     {
-        foreach (var path in GetSearchPaths())
-        {
-            if (File.Exists(path))
-            {
-                return path;
-            }
-        }
-
-        return null;
+        return ScriptPathLocator.LocateScript(ScriptName);
     }
 
     internal string[] GetSearchPaths()
     {
-        var appDir = AppContext.BaseDirectory;
-        return
-        [
-            Path.Combine(appDir, "Scripts", ScriptName),
-            Path.Combine(appDir, ScriptName)
-        ];
+        return ScriptPathLocator.GetScriptSearchPaths(ScriptName);
     }
 }
