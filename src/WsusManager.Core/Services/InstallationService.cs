@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 using WsusManager.Core.Infrastructure;
 using WsusManager.Core.Logging;
@@ -14,6 +15,8 @@ namespace WsusManager.Core.Services;
 /// </summary>
 public class InstallationService : IInstallationService
 {
+    private const string InstallPasswordEnvironmentVariable = "WSUS_INSTALL_SA_PASSWORD";
+
     private readonly IProcessRunner _processRunner;
     private readonly ILogService _logService;
     private readonly INativeInstallationService _nativeInstallationService;
@@ -110,21 +113,30 @@ public class InstallationService : IInstallationService
             }
 
             var allowFallback = _settingsService?.Current.EnableLegacyFallbackForInstall ?? true;
+            var nativePathUnavailable = native.Message?.Contains("not yet implemented", StringComparison.OrdinalIgnoreCase) == true;
+            var nativeReason = native.Message ?? "Unknown reason";
+
             if (!allowFallback)
             {
-                _logService.Warning("Native install failed and fallback is disabled. Reason: {Reason}", native.Message);
-                return native;
+                var fallbackDisabledMessage = nativePathUnavailable
+                    ? "Native installation path is unavailable and legacy fallback is disabled; installation cannot proceed."
+                    : $"Native installation failed and legacy fallback is disabled. Reason: {nativeReason}";
+
+                _logService.Warning(fallbackDisabledMessage);
+                progress?.Report(fallbackDisabledMessage);
+                return OperationResult.Fail(fallbackDisabledMessage);
             }
 
             progress?.Report("[FALLBACK] Native install failed; using legacy PowerShell install path.");
-            _logService.Warning("Native install path failed; using legacy PowerShell fallback. Reason: {Reason}", native.Message);
+            _logService.Warning("Native install path failed; using legacy PowerShell fallback. Reason: {Reason}", nativeReason);
 
             // Locate the PowerShell install script
             var scriptPath = _locateScript();
             if (scriptPath is null)
             {
+                var searchPaths = GetSearchPaths();
                 var msg = $"Install script not found. Searched for '{InstallScriptName}' in:\n" +
-                          $"  {GetSearchPaths()[0]}\n  {GetSearchPaths()[1]}";
+                          $"  {string.Join("\n  ", searchPaths)}";
                 _logService.Warning(msg);
                 progress?.Report(msg);
                 return OperationResult.Fail(msg);
@@ -133,22 +145,45 @@ public class InstallationService : IInstallationService
             _logService.Info("Starting WSUS installation via {Script}", scriptPath);
             progress?.Report($"Script: {scriptPath}");
             progress?.Report($"Installer path: {options.InstallerPath}");
-            progress?.Report($"SA Username: {options.SaUsername}");
+            var saUsername = string.IsNullOrWhiteSpace(options.SaUsername) ? "sa" : options.SaUsername;
+            progress?.Report($"SA Username: {saUsername}");
             progress?.Report("Starting installation (this may take 30+ minutes)...");
             progress?.Report("");
 
-            // Build PowerShell arguments
-            var arguments = $"-ExecutionPolicy Bypass -File \"{scriptPath}\" " +
-                            $"-NonInteractive " +
-                            $"-InstallerPath \"{options.InstallerPath}\" " +
-                            $"-SaUsername \"{options.SaUsername}\" " +
-                            $"-SaPassword \"{options.SaPassword}\"";
+            // Build PowerShell arguments using environment variable password passing.
+            // This mirrors legacy GUI behavior and avoids exposing plaintext in command-line arguments.
+            var scriptPathSafe = EscapePowerShellSingleQuotedString(scriptPath);
+            var installerPathSafe = EscapePowerShellSingleQuotedString(options.InstallerPath);
+            var saUsernameSafe = EscapePowerShellSingleQuotedString(saUsername);
 
-            var result = await _processRunner.RunAsync(
-                "powershell.exe",
-                arguments,
-                progress,
-                ct).ConfigureAwait(false);
+            var command =
+                $"& '{scriptPathSafe}' -InstallerPath '{installerPathSafe}' -SaUsername '{saUsernameSafe}' " +
+                $"-SaPassword $env:{InstallPasswordEnvironmentVariable} -NonInteractive; " +
+                $"Remove-Item Env:\\{InstallPasswordEnvironmentVariable} -ErrorAction SilentlyContinue";
+
+            var encodedCommand = EncodePowerShellCommand(command);
+            var arguments = $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}";
+
+            var previousPassword = Environment.GetEnvironmentVariable(InstallPasswordEnvironmentVariable, EnvironmentVariableTarget.Process);
+            Environment.SetEnvironmentVariable(InstallPasswordEnvironmentVariable, options.SaPassword, EnvironmentVariableTarget.Process);
+
+            ProcessResult result;
+            try
+            {
+                result = await _processRunner.RunAsync(
+                    "powershell.exe",
+                    arguments,
+                    progress,
+                    ct,
+                    enableLiveTerminal: true).ConfigureAwait(false);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable(
+                    InstallPasswordEnvironmentVariable,
+                    previousPassword,
+                    EnvironmentVariableTarget.Process);
+            }
 
             if (result.Success)
             {
@@ -189,13 +224,38 @@ public class InstallationService : IInstallationService
         return null;
     }
 
+    private static string EncodePowerShellCommand(string command)
+    {
+        var bytes = Encoding.Unicode.GetBytes(command);
+        return Convert.ToBase64String(bytes);
+    }
+
     internal string[] GetSearchPaths()
     {
         var appDir = AppContext.BaseDirectory;
-        return
-        [
+        var currentDir = Directory.GetCurrentDirectory();
+
+        var searchPaths = new List<string>
+        {
             Path.Combine(appDir, "Scripts", InstallScriptName),
-            Path.Combine(appDir, InstallScriptName)
-        ];
+            Path.Combine(appDir, InstallScriptName),
+            Path.Combine(currentDir, "Scripts", InstallScriptName),
+            Path.Combine(currentDir, InstallScriptName)
+        };
+
+        var parent = new DirectoryInfo(appDir).Parent;
+        for (var i = 0; i < 6 && parent is not null; i++)
+        {
+            searchPaths.Add(Path.Combine(parent.FullName, "Scripts", InstallScriptName));
+            searchPaths.Add(Path.Combine(parent.FullName, InstallScriptName));
+            parent = parent.Parent;
+        }
+
+        return [.. searchPaths];
+    }
+
+    private static string EscapePowerShellSingleQuotedString(string value)
+    {
+        return value.Replace("'", "''", StringComparison.Ordinal);
     }
 }

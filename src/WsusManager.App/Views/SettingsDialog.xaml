@@ -108,6 +108,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="160"/>
@@ -173,6 +174,21 @@
                          BorderBrush="{DynamicResource BorderPrimary}"
                          Padding="6,4" FontSize="12"
                          InputScope="Number"/>
+
+                <!-- Live Terminal Mode -->
+                <TextBlock Grid.Row="3" Grid.Column="0"
+                           Text="Live Terminal Mode"
+                           Foreground="{DynamicResource TextSecondary}" FontSize="12"
+                           VerticalAlignment="Center">
+                    <TextBlock.ToolTip>
+                        <ToolTip Content="When enabled, operations open in an external PowerShell terminal instead of redirecting output."/>
+                    </TextBlock.ToolTip>
+                </TextBlock>
+                <CheckBox x:Name="ChkLiveTerminalMode"
+                          Grid.Row="3" Grid.Column="1"
+                          automation:AutomationProperties.AutomationId="LiveTerminalModeCheckBox"
+                          Content="Use visible PowerShell terminal"
+                          VerticalAlignment="Center"/>
             </Grid>
         </GroupBox>
 

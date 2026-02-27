@@ -228,7 +228,7 @@ public class ExportServiceTests
     }
 
     [Fact]
-    public async Task ExportAsync_Succeeds_Even_When_Full_Export_Fails()
+    public async Task ExportAsync_Fails_When_Full_Export_Fails()
     {
         var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Directory.CreateDirectory(tempDir);
@@ -258,8 +258,8 @@ public class ExportServiceTests
 
             var result = await _service.ExportAsync(options, _progress, CancellationToken.None);
 
-            // Export should still succeed (with warnings)
-            Assert.True(result.Success);
+            // Export should report failure when underlying copy fails
+            Assert.False(result.Success);
             Assert.Contains("warning", result.Message, StringComparison.OrdinalIgnoreCase);
         }
         finally

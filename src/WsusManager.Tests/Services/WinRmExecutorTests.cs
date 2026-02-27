@@ -153,7 +153,7 @@ public class WinRmExecutorTests
                 "powershell.exe",
                 It.IsAny<string>(),
                 It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(
                 1,
                 new[] { "WinRM cannot complete the operation", "Error code 0x803380E4" }));
@@ -177,7 +177,7 @@ public class WinRmExecutorTests
                 "powershell.exe",
                 It.IsAny<string>(),
                 It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(
                 1,
                 new[] { "Access is denied", "Connecting to remote server failed" }));
@@ -199,7 +199,7 @@ public class WinRmExecutorTests
                 "powershell.exe",
                 It.IsAny<string>(),
                 It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(
                 0,
                 new[] { "Service1", "Service2", "Service3" }));
@@ -253,7 +253,7 @@ public class WinRmExecutorTests
                 "powershell.exe",
                 It.IsAny<string>(),
                 It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(0, Array.Empty<string>()));
 
         var result = await executor.TestWinRmAsync("server01");
@@ -271,7 +271,7 @@ public class WinRmExecutorTests
                 "powershell.exe",
                 It.IsAny<string>(),
                 It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(1, new[] { "WinRM error" }));
 
         var result = await executor.TestWinRmAsync("server01");
@@ -294,7 +294,7 @@ public class WinRmExecutorTests
                 "powershell.exe",
                 It.IsAny<string>(),
                 It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(
                 1,
                 new[] { "Script error: variable not defined" }));
@@ -320,7 +320,7 @@ public class WinRmExecutorTests
                 "powershell.exe",
                 It.IsAny<string>(),
                 It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(
                 1,
                 new[] { "WSManFault: Cannot connect to destination" }));

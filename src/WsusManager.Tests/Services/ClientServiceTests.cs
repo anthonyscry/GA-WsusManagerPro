@@ -87,13 +87,13 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult("WSMan responding"));
 
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Invoke-Command")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult("STEP=StopServices\nSTEP=ClearCache\nSTEP=RestartServices\nSTEP=Done"));
 
         var (_, progress) = CreateProgressCapture();
@@ -114,7 +114,7 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(WinRmFailResult());
 
         var (messages, progress) = CreateProgressCapture();
@@ -130,7 +130,7 @@ public class ClientServiceTests
         // Should not have made a remote command call
         _mockRunner.Verify(r => r.RunAsync("powershell.exe",
             It.Is<string>(a => a.Contains("Invoke-Command")),
-            It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()),
+            It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
             Times.Never);
     }
 
@@ -151,7 +151,7 @@ public class ClientServiceTests
         // No process should have been launched
         _mockRunner.Verify(r => r.RunAsync(
             It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()),
+            It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
             Times.Never);
     }
 
@@ -166,13 +166,13 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult());
 
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Invoke-Command")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult("STEP=GpUpdate\nSTEP=ResetAuth\nSTEP=DetectNow\nSTEP=ReportNow\nSTEP=Done"));
 
         var service = CreateService();
@@ -193,13 +193,13 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult());
 
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Invoke-Command")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(0, [
                 "STEP=GpUpdate",
                 "STEP=ResetAuth",
@@ -230,13 +230,13 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult());
 
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Invoke-Command")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(0, ["PORT8530=True;PORT8531=False;LATENCY=5"]));
 
         var (_, progress) = CreateProgressCapture();
@@ -261,7 +261,7 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(WinRmFailResult());
 
         var (_, progress) = CreateProgressCapture();
@@ -300,7 +300,7 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult());
 
         // Simulate output with known values
@@ -310,7 +310,7 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Invoke-Command")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(0, [diagnosticOutput]));
 
         var (_, progress) = CreateProgressCapture();
@@ -339,7 +339,7 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult());
 
         // Simulate PowerShell output where registry keys are not present (empty/null values)
@@ -349,7 +349,7 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Invoke-Command")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(0, [minimalOutput]));
 
         var (_, progress) = CreateProgressCapture();
@@ -467,13 +467,13 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult());
 
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Invoke-Command")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult("STEP=GpUpdate\nSTEP=ResetAuth\nSTEP=DetectNow\nSTEP=ReportNow\nSTEP=Done"));
 
         var hostnames = new List<string> { "host01", "host02", "host03" };
@@ -503,19 +503,19 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan") && a.Contains("host-ok")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult());
 
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan") && a.Contains("host-fail")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(WinRmFailResult());
 
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Invoke-Command")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult("STEP=Done"));
 
         var hostnames = new List<string> { "host-ok", "host-fail" };
@@ -549,7 +549,7 @@ public class ClientServiceTests
         // No process should have been launched
         _mockRunner.Verify(r => r.RunAsync(
             It.IsAny<string>(), It.IsAny<string>(),
-            It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()),
+            It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
             Times.Never);
     }
 
@@ -578,7 +578,7 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(() =>
             {
                 callCount++;
@@ -590,7 +590,7 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Invoke-Command")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult("STEP=Done"));
 
         var hostnames = new List<string> { "host01", "host02", "host03" };
@@ -626,13 +626,13 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult("WSMan responding"));
 
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Invoke-Command") && a.Contains("host-a")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(0, [
                 "WSUS=http://wsus01:8530;STATUS=https://wsus01:8531;USE=1"
             ]));
@@ -670,13 +670,13 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult("WSMan responding"));
 
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Invoke-Command") && a.Contains("host-usefalse")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(0, [
                 "WSUS=http://wsus01:8530;STATUS=https://wsus01:8531;USE=0"
             ]));
@@ -684,7 +684,7 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Invoke-Command") && a.Contains("host-wrongurl")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(0, [
                 "WSUS=http://wrong-wsus:8530;STATUS=https://wrong-wsus:8531;USE=1"
             ]));
@@ -716,7 +716,7 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan") && a.Contains("host-down")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(WinRmFailResult());
 
         var service = CreateService();
@@ -741,7 +741,7 @@ public class ClientServiceTests
 
         _mockRunner.Verify(r => r.RunAsync("powershell.exe",
             It.Is<string>(a => a.Contains("Invoke-Command") && a.Contains("host-down")),
-            It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()),
+            It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()),
             Times.Never);
     }
 
@@ -751,13 +751,13 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult("WSMan responding"));
 
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Invoke-Command") && a.Contains("host-01")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(0, [
                 "WSUS=http://wsus01:8530;STATUS=https://wsus01:8531;USE=1"
             ]));
@@ -765,7 +765,7 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Invoke-Command") && a.Contains("host-02")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(0, [
                 "WSUS=http://wsus01:8530;STATUS=https://wsus01:8531;USE=1"
             ]));
@@ -773,7 +773,7 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Invoke-Command") && a.Contains("host-03")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(0, [
                 "WSUS=http://wsus02:8530;STATUS=https://wsus02:8531;USE=1"
             ]));
@@ -801,13 +801,13 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult("WSMan responding"));
 
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Invoke-Command") && a.Contains("host-swapped")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new ProcessResult(0, [
                 "WSUS=https://wsus01:8531;STATUS=http://wsus01:8530;USE=1"
             ]));
@@ -928,7 +928,7 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult());
 
         var (_, progress) = CreateProgressCapture();
@@ -951,7 +951,7 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult());
 
         var (_, progress) = CreateProgressCapture();
@@ -1001,13 +1001,13 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult());
 
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Invoke-Command")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult("STEP=Done"));
 
         var service = CreateService();
@@ -1026,13 +1026,13 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult());
 
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Invoke-Command")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult("STEP=Done"));
 
         var service = CreateService();
@@ -1052,13 +1052,13 @@ public class ClientServiceTests
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Test-WSMan")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult());
 
         _mockRunner
             .Setup(r => r.RunAsync("powershell.exe",
                 It.Is<string>(a => a.Contains("Invoke-Command")),
-                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(SuccessResult("STEP=Done"));
 
         var service = CreateService();

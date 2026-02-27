@@ -23,8 +23,8 @@ public partial class SettingsDialog : Window
 
     /// <summary>
     /// The updated settings collected from the dialog. Only valid when DialogResult is true.
-    /// The caller must copy LogPanelExpanded and LiveTerminalMode from the current settings
-    /// before persisting, as those fields are not shown in this dialog.
+    /// The caller must copy LogPanelExpanded from the current settings
+    /// before persisting, as that field is not shown in this dialog.
     /// </summary>
     public AppSettings? Result { get; private set; }
 
@@ -87,6 +87,7 @@ public partial class SettingsDialog : Window
         ChkEnableLegacyFallbackForInstall.IsChecked = current.EnableLegacyFallbackForInstall;
         ChkEnableLegacyFallbackForHttps.IsChecked = current.EnableLegacyFallbackForHttps;
         ChkEnableLegacyFallbackForCleanup.IsChecked = current.EnableLegacyFallbackForCleanup;
+        ChkLiveTerminalMode.IsChecked = current.LiveTerminalMode;
 
         // Wire up validation handlers
         TxtLogRetentionDays.LostFocus += (s, e) => ValidateNumericTextBox(
@@ -297,11 +298,9 @@ string.Equals(selected.Content?.ToString(), "Air-Gap", StringComparison.Ordinal)
             ContentPath = TxtContentPath.Text.Trim(),
             SqlInstance = TxtSqlInstance.Text.Trim(),
             SelectedTheme = _previewTheme,
-            // These fields are not shown in this dialog.
-            // The caller (MainViewModel.OpenSettings) will overwrite these
-            // with the current in-memory values before saving to disk.
+            // Log panel expansion is not shown in this dialog; the caller preserves it.
             LogPanelExpanded = true,
-            LiveTerminalMode = false,
+            LiveTerminalMode = ChkLiveTerminalMode.IsChecked ?? false,
             // New properties
             DefaultSyncProfile = ParseDefaultSyncProfile(),
             LogLevel = ParseLogLevel(),
@@ -374,6 +373,7 @@ string.Equals(selected.Content?.ToString(), "Air-Gap", StringComparison.Ordinal)
         ChkEnableLegacyFallbackForInstall.IsChecked = defaults.EnableLegacyFallbackForInstall;
         ChkEnableLegacyFallbackForHttps.IsChecked = defaults.EnableLegacyFallbackForHttps;
         ChkEnableLegacyFallbackForCleanup.IsChecked = defaults.EnableLegacyFallbackForCleanup;
+        ChkLiveTerminalMode.IsChecked = defaults.LiveTerminalMode;
 
         // Reset theme
         _previewTheme = defaults.SelectedTheme;

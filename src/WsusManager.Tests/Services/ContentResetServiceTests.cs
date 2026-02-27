@@ -79,7 +79,7 @@ public class ContentResetServiceTests
                 tempExe);
 
             _mockRunner
-                .Setup(r => r.RunAsync(tempExe, "reset", It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                .Setup(r => r.RunAsync(tempExe, "reset", It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
                 .ReturnsAsync(SuccessResult());
 
             var result = await mockService.ResetContentAsync().ConfigureAwait(false);
@@ -90,7 +90,7 @@ public class ContentResetServiceTests
                 tempExe,
                 "reset",
                 It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>()),
+                It.IsAny<CancellationToken>(), It.IsAny<bool>()),
                 Times.Once);
         }
         finally
@@ -113,7 +113,7 @@ public class ContentResetServiceTests
                 tempExe);
 
             _mockRunner
-                .Setup(r => r.RunAsync(tempExe, "reset", It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                .Setup(r => r.RunAsync(tempExe, "reset", It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
                 .ReturnsAsync(FailResult());
 
             var result = await mockService.ResetContentAsync().ConfigureAwait(false);
@@ -141,7 +141,7 @@ public class ContentResetServiceTests
                 tempExe);
 
             _mockRunner
-                .Setup(r => r.RunAsync(tempExe, "reset", It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                .Setup(r => r.RunAsync(tempExe, "reset", It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
                 .ReturnsAsync(SuccessResult());
 
             var messages = new List<string>();
@@ -178,7 +178,7 @@ public class ContentResetServiceTests
             cts.Cancel();
 
             _mockRunner
-                .Setup(r => r.RunAsync(tempExe, "reset", It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                .Setup(r => r.RunAsync(tempExe, "reset", It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
                 .ThrowsAsync(new OperationCanceledException());
 
             await Assert.ThrowsAsync<OperationCanceledException>(
@@ -207,7 +207,7 @@ public class ContentResetServiceTests
 
             // Empty output array
             _mockRunner
-                .Setup(r => r.RunAsync(tempExe, "reset", It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                .Setup(r => r.RunAsync(tempExe, "reset", It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
                 .ReturnsAsync(new ProcessResult(0, [])); // Empty output
 
             var result = await mockService.ResetContentAsync().ConfigureAwait(false);
@@ -239,7 +239,7 @@ public class ContentResetServiceTests
                 tempExe);
 
             _mockRunner
-                .Setup(r => r.RunAsync(tempExe, "reset", It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+                .Setup(r => r.RunAsync(tempExe, "reset", It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
                 .ReturnsAsync(SuccessResult());
 
             var result = await mockService.ResetContentAsync().ConfigureAwait(false);

@@ -14,6 +14,7 @@ using WsusManager.App.Services;
 using WsusManager.App.Views;
 using WsusManager.Core.Logging;
 using WsusManager.Core.Models;
+using WsusManager.Core.Services;
 using WsusManager.Core.Services.Interfaces;
 
 namespace WsusManager.App.ViewModels;
@@ -357,6 +358,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     private string _logOutput = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LiveTerminalToggleLabel))]
+    private bool _liveTerminalMode;
+
+    public string LiveTerminalToggleLabel => LiveTerminalMode ? "Live Terminal: On" : "Live Terminal: Off";
 
     [ObservableProperty]
     private string _currentOperationName = string.Empty;
@@ -744,6 +751,16 @@ public partial class MainViewModel : ObservableObject, IDisposable
         IsLogPanelExpanded = !IsLogPanelExpanded;
         _settings.LogPanelExpanded = IsLogPanelExpanded;
         await SaveSettingsAsync().ConfigureAwait(false);
+    }
+
+    [RelayCommand]
+    private async Task ToggleLiveTerminalMode()
+    {
+        LiveTerminalMode = !LiveTerminalMode;
+        _settings.LiveTerminalMode = LiveTerminalMode;
+        await SaveSettingsAsync().ConfigureAwait(false);
+        var state = LiveTerminalMode ? "enabled" : "disabled";
+        AppendLog($"Live Terminal mode {state}.");
     }
 
     [RelayCommand]
@@ -1270,7 +1287,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private async Task RunOnlineSync()
     {
         // Dialog before panel switch (per CLAUDE.md pattern)
-        var dialog = new SyncProfileDialog();
+        var dialog = new SyncProfileDialog(_settings.DefaultSyncProfile);
         if (Application.Current.MainWindow is not null)
             dialog.Owner = Application.Current.MainWindow;
 
@@ -1279,10 +1296,36 @@ public partial class MainViewModel : ObservableObject, IDisposable
         var profile = dialog.SelectedProfile;
         await Navigate("Sync").ConfigureAwait(false);
 
-        await RunOperationAsync("Online Sync", async (progress, ct) =>
+        await RunOnlineSyncWorkflowAsync(profile, dialog.ExportOptions).ConfigureAwait(false);
+    }
+
+    private async Task<bool> RunOnlineSyncWorkflowAsync(SyncProfile profile, ExportOptions? exportOptions)
+    {
+        var orchestrator = new OnlineSyncOrchestrationService(_syncService, _exportService);
+
+        return await RunOperationAsync("Online Sync", async (progress, ct) =>
         {
-            var result = await _syncService.RunSyncAsync(
-                profile, MaxAutoApproveCount, progress, ct).ConfigureAwait(false);
+            var effectiveExportOptions = exportOptions is null
+                ? null
+                : exportOptions with
+                {
+                    SourcePath = string.IsNullOrWhiteSpace(_settings.ContentPath) ? @"C:\WSUS" : _settings.ContentPath,
+                    ExportDays = exportOptions.ExportDays > 0 ? exportOptions.ExportDays : 30,
+                    IncludeDatabaseBackup = true
+                };
+
+            var result = await orchestrator.RunAsync(
+                profile,
+                MaxAutoApproveCount,
+                effectiveExportOptions,
+                progress,
+                ct).ConfigureAwait(false);
+
+            if (!result.Success && !string.IsNullOrWhiteSpace(result.Message))
+            {
+                progress.Report($"[FAIL] {result.Message}");
+            }
+
             return result.Success;
         }).ConfigureAwait(false);
     }
@@ -2145,7 +2188,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         // Preserve fields not shown in dialog
         updated.LogPanelExpanded = _settings.LogPanelExpanded;
-        updated.LiveTerminalMode = _settings.LiveTerminalMode;
 
         // Check if refresh interval changed (need timer restart)
         var intervalChanged = updated.RefreshIntervalSeconds != _settings.RefreshIntervalSeconds ||
@@ -2196,6 +2238,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void ApplySettings(AppSettings settings)
     {
         IsLogPanelExpanded = settings.LogPanelExpanded;
+        LiveTerminalMode = settings.LiveTerminalMode;
         IsOnline = string.Equals(settings.ServerMode, "Online", StringComparison.Ordinal);
         // Activate override on startup when saved mode is AirGap so auto-detection
         // doesn't flip it back to Online on the first ping check.

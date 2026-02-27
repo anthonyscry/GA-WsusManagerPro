@@ -108,7 +108,7 @@ public class ExportService : IExportService
             ? "Export completed with warnings."
             : "Export completed successfully.";
         progress.Report(finalMsg);
-        return anyFailure ? OperationResult.Ok(finalMsg) : OperationResult.Ok(finalMsg);
+        return anyFailure ? OperationResult.Fail(finalMsg) : OperationResult.Ok(finalMsg);
     }
 
     private async Task CopyDatabaseBackupAsync(

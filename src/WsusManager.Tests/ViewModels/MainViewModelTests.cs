@@ -216,6 +216,31 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task ToggleLiveTerminalModeCommand_Toggles_LiveTerminalMode_And_Saves()
+    {
+        _mockSettings.Setup(s => s.SaveAsync(It.IsAny<AppSettings>())).Returns(Task.CompletedTask);
+
+        var initialState = _vm.LiveTerminalMode;
+
+        await _vm.ToggleLiveTerminalModeCommand.ExecuteAsync(null);
+
+        Assert.Equal(!initialState, _vm.LiveTerminalMode);
+        _mockSettings.Verify(
+            s => s.SaveAsync(It.Is<AppSettings>(settings => settings.LiveTerminalMode == _vm.LiveTerminalMode)),
+            Times.Once);
+    }
+
+    [Fact]
+    public void LiveTerminalToggleLabel_Reflects_Current_State()
+    {
+        _vm.LiveTerminalMode = false;
+        Assert.Equal("Live Terminal: Off", _vm.LiveTerminalToggleLabel);
+
+        _vm.LiveTerminalMode = true;
+        Assert.Equal("Live Terminal: On", _vm.LiveTerminalToggleLabel);
+    }
+
+    [Fact]
     public async Task RunOperationAsync_Reports_Progress()
     {
         await _vm.RunOperationAsync("ProgressTest", async (progress, ct) =>
@@ -695,7 +720,7 @@ public class MainViewModelTests
             .Setup(d => d.RunAsync(
                 It.IsAny<string>(),
                 It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(OperationResult.Ok("Cleanup complete."));
 
         _mockDashboard
@@ -716,7 +741,7 @@ public class MainViewModelTests
             .Setup(d => d.RunAsync(
                 It.IsAny<string>(),
                 It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>()))
+                It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(OperationResult.Ok("Cleanup complete."));
 
         await _vm.RunDeepCleanupCommand.ExecuteAsync(null);
@@ -724,7 +749,7 @@ public class MainViewModelTests
         _mockDeepCleanup.Verify(d => d.RunAsync(
             It.IsAny<string>(),
             It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>()),
+            It.IsAny<CancellationToken>(), It.IsAny<bool>()),
             Times.Once);
     }
 
@@ -807,6 +832,89 @@ public class MainViewModelTests
         _vm.IsOnline = true;
 
         Assert.True(_vm.RunOnlineSyncCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task RunOnlineSyncWorkflow_Exports_When_Paths_Are_Provided()
+    {
+        _vm.IsWsusInstalled = true;
+
+        _mockSync
+            .Setup(s => s.RunSyncAsync(
+                It.IsAny<SyncProfile>(),
+                It.IsAny<int>(),
+                It.IsAny<IProgress<string>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OperationResult.Ok("Sync complete."));
+
+        _mockExport
+            .Setup(e => e.ExportAsync(
+                It.IsAny<ExportOptions>(),
+                It.IsAny<IProgress<string>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OperationResult.Ok("Export complete."));
+
+        var method = typeof(MainViewModel).GetMethod(
+            "RunOnlineSyncWorkflowAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.NotNull(method);
+
+        var exportOptions = new ExportOptions
+        {
+            SourcePath = @"C:\WSUS",
+            FullExportPath = @"C:\Exports\Full",
+            ExportDays = 30
+        };
+
+        var task = (Task<bool>)method!.Invoke(_vm, new object?[] { SyncProfile.FullSync, exportOptions })!;
+        var result = await task;
+
+        Assert.True(result);
+        _mockSync.Verify(s => s.RunSyncAsync(
+            It.IsAny<SyncProfile>(),
+            It.IsAny<int>(),
+            It.IsAny<IProgress<string>>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+        _mockExport.Verify(e => e.ExportAsync(
+            It.IsAny<ExportOptions>(),
+            It.IsAny<IProgress<string>>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RunOnlineSyncWorkflow_Skips_Export_When_No_Paths()
+    {
+        _vm.IsWsusInstalled = true;
+
+        _mockSync
+            .Setup(s => s.RunSyncAsync(
+                It.IsAny<SyncProfile>(),
+                It.IsAny<int>(),
+                It.IsAny<IProgress<string>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OperationResult.Ok("Sync complete."));
+
+        var method = typeof(MainViewModel).GetMethod(
+            "RunOnlineSyncWorkflowAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.NotNull(method);
+
+        var exportOptions = new ExportOptions
+        {
+            SourcePath = @"C:\WSUS",
+            ExportDays = 30
+        };
+
+        var task = (Task<bool>)method!.Invoke(_vm, new object?[] { SyncProfile.FullSync, exportOptions })!;
+        var result = await task;
+
+        Assert.True(result);
+        _mockExport.Verify(e => e.ExportAsync(
+            It.IsAny<ExportOptions>(),
+            It.IsAny<IProgress<string>>(),
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
