@@ -120,6 +120,22 @@ Installs WSUS with SQL Server Express from scratch.
 - No existing WSUS installation
 - Administrator privileges
 
+### Install Script Flags
+
+The GUI invokes `Scripts/Install-WsusWithSqlExpress.ps1` for new installations. The script includes optional switches such as `-EnableHttps` and `-CertificateThumbprint` so you can pre-configure HTTPS without prompts. When running in non-interactive mode, omit `-EnableHttps` to keep the default HTTP install, or provide both `-EnableHttps` and `-CertificateThumbprint` to enable HTTPS.
+
+> **Guardrail:** If you add `-EnableHttps` alongside `-NonInteractive`, `-CertificateThumbprint` is required; the script cannot proceed without a thumbprint.
+
+**Examples:**
+
+```powershell
+.\Scripts\Install-WsusWithSqlExpress.ps1 -InstallerPath "C:\WSUS\SQLDB" -SaPassword "<StrongPassword>" -NonInteractive
+```
+
+```powershell
+.\Scripts\Install-WsusWithSqlExpress.ps1 -InstallerPath "C:\WSUS\SQLDB" -SaPassword "<StrongPassword>" -NonInteractive -EnableHttps -CertificateThumbprint "ABCDEF1234567890ABCDEF1234567890ABCDEF12"
+```
+
 ### Create GPO
 
 Copies Group Policy Objects to `C:\WSUS\WSUS GPO` for transfer to a Domain Controller.

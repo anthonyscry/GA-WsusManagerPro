@@ -146,6 +146,22 @@ Get-ChildItem -Path "C:\WSUS" -Recurse -Include *.ps1,*.psm1 | Unblock-File
 | 4 | Right-click `WsusManager.exe` → Run as Administrator |
 | 5 | Click **Install WSUS** and follow prompts |
 
+### Install Script Flags
+
+`WsusManager.exe` calls `Scripts/Install-WsusWithSqlExpress.ps1` during the initial setup. The installer script accepts optional `-EnableHttps` and `-CertificateThumbprint` flags so HTTPS configuration can be pre-seeded before the GUI hands off to IIS. The default behavior (no `-EnableHttps`) installs WSUS over HTTP.
+
+> **Guardrail:** When running the script non-interactively, supplying `-EnableHttps` requires a matching `-CertificateThumbprint` value; the operation will halt without it.
+
+**Non-interactive examples:**
+
+```powershell
+.\Scripts\Install-WsusWithSqlExpress.ps1 -InstallerPath "C:\WSUS\SQLDB" -SaPassword "<StrongPassword>" -NonInteractive
+```
+
+```powershell
+.\Scripts\Install-WsusWithSqlExpress.ps1 -InstallerPath "C:\WSUS\SQLDB" -SaPassword "<StrongPassword>" -NonInteractive -EnableHttps -CertificateThumbprint "ABCDEF1234567890ABCDEF1234567890ABCDEF12"
+```
+
 ### Deployment Layout
 
 | Path | Purpose |
