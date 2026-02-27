@@ -233,6 +233,20 @@ Run `WsusManager.exe` as Administrator. The main dashboard shows:
 4. **Air-Gap Sync:** Navigate to WSUS Operations → "Transfer" → Export/Import
 5. **Client Management:** Navigate to Client Tools → select operation
 
+### Install Script Flags (PowerShell)
+
+Use `Scripts/Install-WsusWithSqlExpress.ps1` for scripted installs:
+
+```powershell
+# HTTP install (default, port 8530)
+powershell -ExecutionPolicy Bypass -File .\Scripts\Install-WsusWithSqlExpress.ps1 -InstallerPath "C:\WSUS\SQLDB" -SaPassword "<StrongPassword>" -NonInteractive
+
+# HTTPS install (port 8531)
+powershell -ExecutionPolicy Bypass -File .\Scripts\Install-WsusWithSqlExpress.ps1 -InstallerPath "C:\WSUS\SQLDB" -SaPassword "<StrongPassword>" -EnableHttps -CertificateThumbprint "<CertThumbprint>" -NonInteractive
+```
+
+When `-EnableHttps` is used with `-NonInteractive`, `-CertificateThumbprint` is required.
+
 **Note:** CLI interface is planned for v4.5. Use GUI for all operations.
 
 ### Themes

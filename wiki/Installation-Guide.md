@@ -145,6 +145,21 @@ The installer performs these operations:
 
 Logs are saved to `C:\WSUS\Logs\` with timestamps.
 
+### Optional: Scripted Installation (PowerShell)
+
+Use the install script for unattended automation:
+
+```powershell
+# HTTP install (default, port 8530)
+powershell -ExecutionPolicy Bypass -File .\Scripts\Install-WsusWithSqlExpress.ps1 -InstallerPath "C:\WSUS\SQLDB" -SaPassword "<StrongPassword>" -NonInteractive
+
+# HTTPS install (port 8531)
+powershell -ExecutionPolicy Bypass -File .\Scripts\Install-WsusWithSqlExpress.ps1 -InstallerPath "C:\WSUS\SQLDB" -SaPassword "<StrongPassword>" -EnableHttps -CertificateThumbprint "<CertThumbprint>" -NonInteractive
+```
+
+`-EnableHttps` keeps the same install flow and then configures SSL for WSUS.
+If `-NonInteractive` is used with `-EnableHttps`, `-CertificateThumbprint` is required.
+
 ---
 
 ## SQL Server Configuration

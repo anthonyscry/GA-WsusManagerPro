@@ -208,6 +208,7 @@ Describe "Invoke-WsusManagement.ps1 Parameter Validation" {
 Describe "Install-WsusWithSqlExpress.ps1 Parameter Validation" {
     BeforeAll {
         $script:InstallScript = Join-Path $script:ScriptsPath "Install-WsusWithSqlExpress.ps1"
+        $script:InstallContent = Get-Content $script:InstallScript -Raw
 
         # Parse the script to get parameter information
         $ast = [System.Management.Automation.Language.Parser]::ParseFile(
@@ -239,6 +240,16 @@ Describe "Install-WsusWithSqlExpress.ps1 Parameter Validation" {
             $param = $script:Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'CertificateThumbprint' }
             $param | Should -Not -BeNullOrEmpty
             $param.StaticType.Name | Should -Be 'String'
+        }
+    }
+
+    Context "HTTPS Guardrails" {
+        It "Requires CertificateThumbprint when EnableHttps and NonInteractive are both used" {
+            $script:InstallContent | Should -Match 'if \(\$NonInteractive -and \[string\]::IsNullOrWhiteSpace\(\$CertificateThumbprint\)\)'
+        }
+
+        It "Provides clear error guidance for missing CertificateThumbprint" {
+            $script:InstallContent | Should -Match '-EnableHttps with -NonInteractive requires -CertificateThumbprint'
         }
     }
 }
