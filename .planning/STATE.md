@@ -83,7 +83,7 @@ See: .planning/PROJECT.md (updated 2026-02-22)
 
 ### Pending Todos
 
-None.
+None for v4.5. Next milestone work is tracked in `.planning/milestones/v4.6-ROADMAP.md`.
 
 ### v4.5 Requirements Summary
 
@@ -103,7 +103,7 @@ None.
 - WCAG 2.1 AA compliance verification
 - Dialog centering behavior
 
-**Phase 27 - Visual Feedback Polish (UX-06 to UX-10):** PENDING
+**Phase 27 - Visual Feedback Polish (UX-06 to UX-10):** ✅ COMPLETE
 - Estimated time remaining for long operations
 - Loading indicators on buttons
 - Actionable error messages
@@ -128,13 +128,13 @@ None.
 - Filter state persistence
 - Mock data for UI testing
 
-**Phase 30 - Data Export (DAT-05 to DAT-08):** PLANNED
-- 30-01-PLAN.md — CSV Export Service (DAT-05, DAT-06, DAT-07)
-- 30-02-PLAN.md — Export Button UI (DAT-05, DAT-06)
-- 30-03-PLAN.md — Export Progress Dialog (DAT-08)
-- Status: 3/3 plans created, ready for implementation
+**Phase 30 - Data Export (DAT-05 to DAT-08):** ✅ COMPLETE
+- CSV export service for computers and updates
+- UTF-8 BOM output for Excel compatibility
+- Export actions from data panels with progress and cancellation support
+- Timestamped report files written to Documents folder
 
-**Phase 31 - Testing & Documentation:**
+**Phase 31 - Testing & Documentation:** ✅ COMPLETE
 - Performance benchmarks
 - Keyboard navigation tests
 - Settings persistence tests
