@@ -1630,6 +1630,33 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string _expectedWsusHttpsPort = "8531";
 
+    [ObservableProperty]
+    private int _clientToolsSelectedSubtabIndex;
+
+    private static readonly IReadOnlyList<string> ClientToolsOperationsCards =
+    [
+        "TargetHost",
+        "RemoteOperations",
+        "MassOperations"
+    ];
+
+    private static readonly IReadOnlyList<string> ClientToolsAuditCards =
+    [
+        "FleetAudit",
+        "ScriptGenerator"
+    ];
+
+    private static readonly IReadOnlyList<string> ClientToolsUtilityCards =
+    [
+        "ErrorCodeLookup"
+    ];
+
+    public IReadOnlyList<string> ClientToolsOperationsCardKeys => ClientToolsOperationsCards;
+
+    public IReadOnlyList<string> ClientToolsAuditCardKeys => ClientToolsAuditCards;
+
+    public IReadOnlyList<string> ClientToolsUtilityCardKeys => ClientToolsUtilityCards;
+
     /// <summary>
     /// CanExecute helper for remote client operations — requires a hostname and no operation running.
     /// </summary>

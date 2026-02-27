@@ -294,6 +294,28 @@ public class MainViewModelTests
         Assert.Equal("Dashboard", _vm.PageTitle);
     }
 
+    [Fact]
+    public void ClientToolsOperationsCardKeys_Are_In_Expected_Order()
+    {
+        Assert.Equal(
+            ["TargetHost", "RemoteOperations", "MassOperations"],
+            _vm.ClientToolsOperationsCardKeys);
+    }
+
+    [Fact]
+    public void ClientToolsAuditCardKeys_Are_In_Expected_Order()
+    {
+        Assert.Equal(
+            ["FleetAudit", "ScriptGenerator"],
+            _vm.ClientToolsAuditCardKeys);
+    }
+
+    [Fact]
+    public void ClientToolsUtilityCardKeys_Are_In_Expected_Order()
+    {
+        Assert.Equal(["ErrorCodeLookup"], _vm.ClientToolsUtilityCardKeys);
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // Dashboard Card Threshold Tests
     // ═══════════════════════════════════════════════════════════════

@@ -695,10 +695,8 @@
                 <Border x:Name="ClientToolsPanel"
                         automation:AutomationProperties.AutomationId="ClientToolsPanel"
                         Visibility="{Binding IsClientToolsPanelVisible}">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
-                        <StackPanel>
-
-                            <!-- Target Host -->
+                    <Border.Resources>
+                        <DataTemplate x:Key="ClientToolsTargetHostCardTemplate">
                             <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
                                     Padding="12" Margin="0,0,0,8">
                                 <StackPanel>
@@ -716,17 +714,18 @@
                                                    Foreground="{DynamicResource TextSecondary}" FontSize="13"
                                                    VerticalAlignment="Center"/>
                                         <TextBox Grid.Column="1"
-                                                  Width="320"
-                                                  HorizontalAlignment="Left"
-                                                  MaxWidth="360"
-                                                  Style="{StaticResource UniformInputTextBox}"
-                                                  automation:AutomationProperties.AutomationId="ClientHostnameTextBox"
-                                                  Text="{Binding ClientHostname, UpdateSourceTrigger=PropertyChanged}"/>
+                                                 Width="320"
+                                                 HorizontalAlignment="Left"
+                                                 MaxWidth="360"
+                                                 Style="{StaticResource UniformInputTextBox}"
+                                                 automation:AutomationProperties.AutomationId="ClientHostnameTextBox"
+                                                 Text="{Binding ClientHostname, UpdateSourceTrigger=PropertyChanged}"/>
                                     </Grid>
                                 </StackPanel>
                             </Border>
+                        </DataTemplate>
 
-                            <!-- Remote Operations -->
+                        <DataTemplate x:Key="ClientToolsRemoteOperationsCardTemplate">
                             <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
                                     Padding="12" Margin="0,0,0,8">
                                 <StackPanel>
@@ -737,7 +736,7 @@
                                                 automation:AutomationProperties.AutomationId="CancelStuckJobsButton"
                                                 Padding="12,6" Margin="0,0,6,6"
                                                 Command="{Binding RunClientCancelStuckJobsCommand}"
-                                                ToolTip="Stop WU services, clear cache, restart — fixes stuck update jobs"/>
+                                                ToolTip="Stop WU services, clear cache, restart - fixes stuck update jobs"/>
                                         <Button Content="Force Check-In" Style="{StaticResource BtnSec}"
                                                 automation:AutomationProperties.AutomationId="RemoteGpUpdateButton"
                                                 Padding="12,6" Margin="0,0,6,6"
@@ -756,8 +755,9 @@
                                     </WrapPanel>
                                 </StackPanel>
                             </Border>
+                        </DataTemplate>
 
-                            <!-- Mass Operations -->
+                        <DataTemplate x:Key="ClientToolsMassOperationsCardTemplate">
                             <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
                                     Padding="12" Margin="0,0,0,8">
                                 <StackPanel>
@@ -766,7 +766,7 @@
                                     <TextBlock Text="Enter hostnames (one per line, or comma-separated) or load from a text file. Mass GPUpdate runs gpupdate + WSUS check-in on every host."
                                                Foreground="{DynamicResource TextSecondary}" FontSize="12"
                                                TextWrapping="Wrap" Margin="0,0,0,12"/>
-                                    <TextBox 
+                                    <TextBox
                                              automation:AutomationProperties.AutomationId="MassHostnamesTextBox"
                                              Text="{Binding MassHostnames, UpdateSourceTrigger=PropertyChanged}"
                                              Background="{DynamicResource InputBackground}"
@@ -776,7 +776,7 @@
                                              AcceptsReturn="True" TextWrapping="Wrap"
                                              MinHeight="80" MaxHeight="150"
                                              VerticalScrollBarVisibility="Auto"/>
-                                     <WrapPanel Margin="0,6,0,0">
+                                    <WrapPanel Margin="0,6,0,0">
                                         <Button Content="Load from File" Style="{StaticResource BtnSec}"
                                                 automation:AutomationProperties.AutomationId="LoadFromFileButton"
                                                 Padding="12,6" Margin="0,0,6,0"
@@ -790,8 +790,9 @@
                                     </WrapPanel>
                                 </StackPanel>
                             </Border>
+                        </DataTemplate>
 
-                            <!-- Fleet WSUS Target Audit -->
+                        <DataTemplate x:Key="ClientToolsFleetAuditCardTemplate">
                             <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
                                     Padding="12" Margin="0,0,0,8">
                                 <StackPanel>
@@ -850,8 +851,9 @@
                                             ToolTip="Audit all clients against expected WSUS host and ports"/>
                                 </StackPanel>
                             </Border>
+                        </DataTemplate>
 
-                            <!-- Script Generator -->
+                        <DataTemplate x:Key="ClientToolsScriptGeneratorCardTemplate">
                             <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
                                     Padding="12" Margin="0,0,0,8">
                                 <StackPanel>
@@ -880,10 +882,11 @@
                                     </Grid>
                                 </StackPanel>
                             </Border>
+                        </DataTemplate>
 
-                            <!-- Error Code Lookup -->
+                        <DataTemplate x:Key="ClientToolsErrorCodeLookupCardTemplate">
                             <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
-                                    Padding="12">
+                                    Padding="12" Margin="0,0,0,8">
                                 <StackPanel>
                                     <TextBlock Text="Error Code Lookup" FontSize="14" FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
@@ -904,7 +907,7 @@
                                                   IsTextSearchEnabled="True"
                                                   StaysOpenOnEdit="False"/>
                                     </Grid>
-                                    <TextBox 
+                                    <TextBox
                                              automation:AutomationProperties.AutomationId="ErrorCodeResultTextBox"
                                              Text="{Binding ErrorCodeResult, Mode=OneWay}"
                                              Background="{DynamicResource PrimaryBackground}"
@@ -915,6 +918,56 @@
                                              Padding="8" MinHeight="60"/>
                                 </StackPanel>
                             </Border>
+                        </DataTemplate>
+
+                        <DataTemplate x:Key="ClientToolsCardTemplateSelector">
+                            <ContentControl Content="{Binding}">
+                                <ContentControl.Style>
+                                    <Style TargetType="ContentControl">
+                                        <Setter Property="ContentTemplate" Value="{StaticResource ClientToolsTargetHostCardTemplate}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding}" Value="TargetHost">
+                                                <Setter Property="ContentTemplate" Value="{StaticResource ClientToolsTargetHostCardTemplate}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding}" Value="RemoteOperations">
+                                                <Setter Property="ContentTemplate" Value="{StaticResource ClientToolsRemoteOperationsCardTemplate}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding}" Value="MassOperations">
+                                                <Setter Property="ContentTemplate" Value="{StaticResource ClientToolsMassOperationsCardTemplate}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding}" Value="FleetAudit">
+                                                <Setter Property="ContentTemplate" Value="{StaticResource ClientToolsFleetAuditCardTemplate}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding}" Value="ScriptGenerator">
+                                                <Setter Property="ContentTemplate" Value="{StaticResource ClientToolsScriptGeneratorCardTemplate}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding}" Value="ErrorCodeLookup">
+                                                <Setter Property="ContentTemplate" Value="{StaticResource ClientToolsErrorCodeLookupCardTemplate}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ContentControl.Style>
+                            </ContentControl>
+                        </DataTemplate>
+                    </Border.Resources>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+                        <StackPanel>
+                            <TabControl SelectedIndex="{Binding ClientToolsSelectedSubtabIndex}"
+                                        automation:AutomationProperties.AutomationId="ClientToolsSubtabs">
+                                <TabItem Header="Operations">
+                                    <ItemsControl ItemsSource="{Binding ClientToolsOperationsCardKeys}"
+                                                  ItemTemplate="{StaticResource ClientToolsCardTemplateSelector}"/>
+                                </TabItem>
+                                <TabItem Header="Audit &amp; Scripts">
+                                    <ItemsControl ItemsSource="{Binding ClientToolsAuditCardKeys}"
+                                                  ItemTemplate="{StaticResource ClientToolsCardTemplateSelector}"/>
+                                </TabItem>
+                                <TabItem Header="Utilities">
+                                    <ItemsControl ItemsSource="{Binding ClientToolsUtilityCardKeys}"
+                                                  ItemTemplate="{StaticResource ClientToolsCardTemplateSelector}"/>
+                                </TabItem>
+                            </TabControl>
 
                         </StackPanel>
                     </ScrollViewer>
