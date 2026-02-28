@@ -175,7 +175,7 @@ Describe "Version Consistency" {
     }
 
     It "Workflow DEFAULT_VERSION is current" {
-        $workflowPath = Join-Path $script:RepoRoot ".github" "workflows" "build.yml"
+        $workflowPath = Join-Path (Join-Path (Join-Path $script:RepoRoot ".github") "workflows") "build.yml"
         $content = Get-Content $workflowPath -Raw
         $content | Should -Match "DEFAULT_VERSION:\s*'3\.8\.6'"
     }

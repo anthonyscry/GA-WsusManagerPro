@@ -21,9 +21,9 @@ BeforeDiscovery {
     # Check multiple possible locations for the exe
     $possiblePaths = @(
         (Join-Path $script:RepoRoot $script:ExeName),
-        (Join-Path $script:RepoRoot "dist" $script:ExeName),
+        (Join-Path (Join-Path $script:RepoRoot "dist") $script:ExeName),
         (Join-Path $script:RepoRoot "GA-WsusManager.exe"),
-        (Join-Path $script:RepoRoot "dist" "GA-WsusManager.exe")
+        (Join-Path (Join-Path $script:RepoRoot "dist") "GA-WsusManager.exe")
     )
 
     foreach ($path in $possiblePaths) {
@@ -44,9 +44,9 @@ BeforeAll {
 
     $possiblePaths = @(
         (Join-Path $script:RepoRoot $script:ExeName),
-        (Join-Path $script:RepoRoot "dist" $script:ExeName),
+        (Join-Path (Join-Path $script:RepoRoot "dist") $script:ExeName),
         (Join-Path $script:RepoRoot "GA-WsusManager.exe"),
-        (Join-Path $script:RepoRoot "dist" "GA-WsusManager.exe")
+        (Join-Path (Join-Path $script:RepoRoot "dist") "GA-WsusManager.exe")
     )
 
     foreach ($path in $possiblePaths) {
@@ -148,7 +148,7 @@ Describe "EXE Validation Tests" {
     Context "Startup Benchmark" -Tag "Benchmark", "CI" -Skip:(-not $script:ExeExists) {
         It "Should start within acceptable time (< 10 seconds)" {
             # We can't actually run the GUI in CI, but we can verify the script parses quickly
-            $guiScript = Join-Path $script:RepoRoot "Scripts" "WsusManagementGui.ps1"
+            $guiScript = Join-Path (Join-Path $script:RepoRoot "Scripts") "WsusManagementGui.ps1"
             if (-not (Test-Path $guiScript)) { Set-ItResult -Skipped -Because "GUI script not found" }
 
             $parseStart = Get-Date
@@ -159,7 +159,7 @@ Describe "EXE Validation Tests" {
         }
 
         It "Should have no syntax errors in main script" {
-            $guiScript = Join-Path $script:RepoRoot "Scripts" "WsusManagementGui.ps1"
+            $guiScript = Join-Path (Join-Path $script:RepoRoot "Scripts") "WsusManagementGui.ps1"
             if (-not (Test-Path $guiScript)) { Set-ItResult -Skipped -Because "GUI script not found" }
 
             $errors = $null
@@ -173,7 +173,7 @@ Describe "EXE Validation Tests" {
 Describe "AsyncHelpers Module Validation" {
     BeforeAll {
         $script:RepoRoot = Split-Path -Parent $PSScriptRoot
-        $script:AsyncModulePath = Join-Path $script:RepoRoot "Modules" "AsyncHelpers.psm1"
+        $script:AsyncModulePath = Join-Path (Join-Path $script:RepoRoot "Modules") "AsyncHelpers.psm1"
     }
 
     Context "Module Loading" {
