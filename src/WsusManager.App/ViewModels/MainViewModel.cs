@@ -1459,7 +1459,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         await RunOperationAsync("Create GPO", async (progress, ct) =>
         {
-            var result = await _gpoDeploymentService.DeployGpoFilesAsync(wsusHostname, wsusPort, progress, ct).ConfigureAwait(false);
+            var result = await _gpoDeploymentService.DeployGpoFilesAsync(wsusHostname, httpPort: wsusPort, progress: progress, ct: ct).ConfigureAwait(false);
 
             if (result.Success && result.Data is not null)
             {

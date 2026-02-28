@@ -157,8 +157,7 @@ public class ScheduledTaskServiceTests
             .Setup(r => r.RunAsync(
                 "schtasks.exe",
                 It.Is<string>(a => a.Contains("/Delete") && a.Contains("/F")),
-                It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+                It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ProcessResult(0, ["Task deleted."]));
 
         var result = await service.DeleteTaskAsync("Test Task");
@@ -167,8 +166,7 @@ public class ScheduledTaskServiceTests
         _mockRunner.Verify(r => r.RunAsync(
             "schtasks.exe",
             It.Is<string>(a => a.Contains("/Delete") && a.Contains("/F") && a.Contains("Test Task")),
-            It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -185,8 +183,7 @@ public class ScheduledTaskServiceTests
             .Setup(r => r.RunAsync(
                 "schtasks.exe",
                 It.IsAny<string>(),
-                null,
-                It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+                null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ProcessResult(0, [@"""WSUS Monthly Maintenance"",""3/15/2026 2:00:00 AM"",""Ready"""]));
 
         var result = await service.QueryTaskAsync("WSUS Monthly Maintenance");
@@ -201,7 +198,7 @@ public class ScheduledTaskServiceTests
         var service = CreateService();
 
         _mockRunner
-            .Setup(r => r.RunAsync("schtasks.exe", It.IsAny<string>(), null, It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("schtasks.exe", It.IsAny<string>(), null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ProcessResult(0, [@"""Task"",""N/A"",""Running"""]));
 
         var result = await service.QueryTaskAsync("Task");
@@ -215,7 +212,7 @@ public class ScheduledTaskServiceTests
         var service = CreateService();
 
         _mockRunner
-            .Setup(r => r.RunAsync("schtasks.exe", It.IsAny<string>(), null, It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("schtasks.exe", It.IsAny<string>(), null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ProcessResult(0, [@"""Task"",""N/A"",""Disabled"""]));
 
         var result = await service.QueryTaskAsync("Task");
@@ -229,7 +226,7 @@ public class ScheduledTaskServiceTests
         var service = CreateService();
 
         _mockRunner
-            .Setup(r => r.RunAsync("schtasks.exe", It.IsAny<string>(), null, It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("schtasks.exe", It.IsAny<string>(), null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ProcessResult(1, ["ERROR: The system cannot find the file specified."]));
 
         var result = await service.QueryTaskAsync("NonExistent");
@@ -257,8 +254,7 @@ public class ScheduledTaskServiceTests
         _mockRunner.Verify(r => r.RunAsync(
             It.IsAny<string>(),
             It.IsAny<string>(),
-            It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>(), It.IsAny<bool>()), Times.Never);
+            It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -270,11 +266,11 @@ public class ScheduledTaskServiceTests
             .Returns("powershell.exe -ExecutionPolicy Bypass -File \"C:\\WSUS\\Scripts\\Invoke-WsusMonthlyMaintenance.ps1\" -Unattended -MaintenanceProfile Full");
 
         _mockRunner
-            .Setup(r => r.RunAsync("schtasks.exe", It.Is<string>(a => a.Contains("/Delete")), null, It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("schtasks.exe", It.Is<string>(a => a.Contains("/Delete")), null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ProcessResult(0, []));
 
         _mockRunner
-            .Setup(r => r.RunAsync("schtasks.exe", It.Is<string>(a => a.Contains("/Create")), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("schtasks.exe", It.Is<string>(a => a.Contains("/Create")), It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ProcessResult(0, ["SUCCESS"]));
 
         var service = new ScheduledTaskService(

@@ -1,10 +1,9 @@
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Input;
+using WsusManager.App.Services;
 
 namespace WsusManager.App.Views;
-
-public sealed record HttpsDialogResult(string ServerName, string CertificateThumbprint);
 
 /// <summary>
 /// Collects WSUS server and certificate thumbprint for HTTPS configuration.

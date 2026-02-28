@@ -21,6 +21,6 @@ public class HttpsDialogService : IHttpsDialogService
             return null;
         }
 
-        return new HttpsDialogResult(dialog.ServerName, dialog.CertificateThumbprint);
+        return dialog.Result;
     }
 }

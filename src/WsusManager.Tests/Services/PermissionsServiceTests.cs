@@ -67,7 +67,7 @@ public class PermissionsServiceTests
     public async Task RepairContentPermissionsAsync_Runs_IcaclsForNetworkService()
     {
         _mockRunner
-            .Setup(r => r.RunAsync("icacls", It.IsAny<string>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("icacls", It.IsAny<string>(), It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(SuccessResult());
 
         var service = CreateService();
@@ -77,8 +77,7 @@ public class PermissionsServiceTests
         _mockRunner.Verify(r => r.RunAsync(
             "icacls",
             It.Is<string>(a => a.Contains("NETWORK SERVICE")),
-            It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -86,7 +85,7 @@ public class PermissionsServiceTests
     public async Task RepairContentPermissionsAsync_Runs_IcaclsForIisIusrs()
     {
         _mockRunner
-            .Setup(r => r.RunAsync("icacls", It.IsAny<string>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("icacls", It.IsAny<string>(), It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(SuccessResult());
 
         var service = CreateService();
@@ -96,8 +95,7 @@ public class PermissionsServiceTests
         _mockRunner.Verify(r => r.RunAsync(
             "icacls",
             It.Is<string>(a => a.Contains("IIS_IUSRS")),
-            It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -105,7 +103,7 @@ public class PermissionsServiceTests
     public async Task RepairContentPermissionsAsync_Uses_FullControl_And_Inheritance_Flags()
     {
         _mockRunner
-            .Setup(r => r.RunAsync("icacls", It.IsAny<string>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("icacls", It.IsAny<string>(), It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(SuccessResult());
 
         var service = CreateService();
@@ -115,8 +113,7 @@ public class PermissionsServiceTests
         _mockRunner.Verify(r => r.RunAsync(
             "icacls",
             It.Is<string>(a => a.Contains("(OI)(CI)F") && a.Contains("/T")),
-            It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()),
             Times.Exactly(2));
     }
 
@@ -124,7 +121,7 @@ public class PermissionsServiceTests
     public async Task RepairContentPermissionsAsync_Returns_Failure_When_NetworkService_Icacls_Fails()
     {
         _mockRunner
-            .Setup(r => r.RunAsync("icacls", It.Is<string>(a => a.Contains("NETWORK SERVICE")), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("icacls", It.Is<string>(a => a.Contains("NETWORK SERVICE")), It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(FailResult("Access Denied"));
 
         var service = CreateService();
@@ -137,7 +134,7 @@ public class PermissionsServiceTests
     public async Task RepairContentPermissionsAsync_Reports_Progress()
     {
         _mockRunner
-            .Setup(r => r.RunAsync("icacls", It.IsAny<string>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("icacls", It.IsAny<string>(), It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(SuccessResult());
 
         var messages = new List<string>();

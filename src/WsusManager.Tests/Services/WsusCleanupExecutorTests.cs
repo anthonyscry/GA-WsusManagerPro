@@ -28,8 +28,8 @@ public class WsusCleanupExecutorTests
         mockRunner.Verify(r => r.RunAsync(
             It.IsAny<string>(),
             It.IsAny<string>(),
-            It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>(), It.IsAny<bool>()), Times.Never);
+            It.IsAny<IProgress<string>?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -47,8 +47,8 @@ public class WsusCleanupExecutorTests
             .Setup(r => r.RunAsync(
                 "powershell.exe",
                 It.IsAny<string>(),
-                It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+                It.IsAny<IProgress<string>?>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ProcessResult(0, []));
 
         var executor = new WsusCleanupExecutor(mockRunner.Object, mockLog.Object, mockSettings.Object);
@@ -58,7 +58,7 @@ public class WsusCleanupExecutorTests
         mockRunner.Verify(r => r.RunAsync(
             "powershell.exe",
             It.IsAny<string>(),
-            It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>(), It.IsAny<bool>()), Times.Once);
+            It.IsAny<IProgress<string>?>(),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 }

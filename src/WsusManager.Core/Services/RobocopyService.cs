@@ -46,9 +46,9 @@ public class RobocopyService : IRobocopyService
         var result = await _processRunner.RunAsync(
             "robocopy.exe",
             arguments,
-            progress,
-            ct,
-            enableLiveTerminal: true).ConfigureAwait(false);
+            allowVisibleTerminal: true,
+            progress: progress,
+            ct: ct).ConfigureAwait(false);
 
         // Robocopy exit codes 0-7 are success, 8+ are errors
         if (result.ExitCode < 8)

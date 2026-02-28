@@ -18,7 +18,7 @@ public class MigrationParityTests
 
         mockNative
             .Setup(n => n.InstallAsync(It.IsAny<InstallOptions>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(OperationResult.Ok("Native install success."));
+            .ReturnsAsync(NativeInstallationResult.Ok("Native install success."));
 
         var lines = new List<string>();
         var progress = new Progress<string>(line => lines.Add(line));
@@ -27,8 +27,7 @@ public class MigrationParityTests
             mockRunner.Object,
             mockLog.Object,
             mockNative.Object,
-            null,
-            () => @"C:\WSUS\Scripts\Install-WsusWithSqlExpress.ps1");
+            @"C:\WSUS\Scripts\Install-WsusWithSqlExpress.ps1");
 
         var result = await service.InstallAsync(new InstallOptions
         {
@@ -42,7 +41,7 @@ public class MigrationParityTests
         mockRunner.Verify(r => r.RunAsync(
             "powershell.exe",
             It.IsAny<string>(),
-            It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>(), It.IsAny<bool>()), Times.Never);
+            It.IsAny<IProgress<string>?>(),
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 }

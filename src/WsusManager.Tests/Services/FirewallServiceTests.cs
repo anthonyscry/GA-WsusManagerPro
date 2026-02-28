@@ -30,11 +30,11 @@ public class FirewallServiceTests
     public async Task CheckWsusRulesExistAsync_Returns_True_When_Both_Rules_Found()
     {
         _mockRunner
-            .Setup(r => r.RunAsync("netsh", It.Is<string>(a => a.Contains("WSUS HTTP\"")), null, It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("netsh", It.Is<string>(a => a.Contains("WSUS HTTP\"")), null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(SuccessResult("Rule Name: WSUS HTTP"));
 
         _mockRunner
-            .Setup(r => r.RunAsync("netsh", It.Is<string>(a => a.Contains("WSUS HTTPS\"")), null, It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("netsh", It.Is<string>(a => a.Contains("WSUS HTTPS\"")), null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(SuccessResult("Rule Name: WSUS HTTPS"));
 
         var service = CreateService();
@@ -49,11 +49,11 @@ public class FirewallServiceTests
     public async Task CheckWsusRulesExistAsync_Returns_False_When_Http_Rule_Missing()
     {
         _mockRunner
-            .Setup(r => r.RunAsync("netsh", It.Is<string>(a => a.Contains("WSUS HTTP\"")), null, It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("netsh", It.Is<string>(a => a.Contains("WSUS HTTP\"")), null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(FailResult());
 
         _mockRunner
-            .Setup(r => r.RunAsync("netsh", It.Is<string>(a => a.Contains("WSUS HTTPS\"")), null, It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("netsh", It.Is<string>(a => a.Contains("WSUS HTTPS\"")), null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(SuccessResult("Rule Name: WSUS HTTPS"));
 
         var service = CreateService();
@@ -68,7 +68,7 @@ public class FirewallServiceTests
     public async Task CheckWsusRulesExistAsync_Returns_False_When_Both_Rules_Missing()
     {
         _mockRunner
-            .Setup(r => r.RunAsync("netsh", It.IsAny<string>(), null, It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("netsh", It.IsAny<string>(), null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(FailResult());
 
         var service = CreateService();
@@ -82,7 +82,7 @@ public class FirewallServiceTests
     public async Task CheckWsusRulesExistAsync_Returns_Failure_On_Exception()
     {
         _mockRunner
-            .Setup(r => r.RunAsync(It.IsAny<string>(), It.IsAny<string>(), null, It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync(It.IsAny<string>(), It.IsAny<string>(), null, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Process error"));
 
         var service = CreateService();
@@ -98,7 +98,7 @@ public class FirewallServiceTests
     public async Task CreateWsusRulesAsync_Runs_Correct_NetshCommands()
     {
         _mockRunner
-            .Setup(r => r.RunAsync("netsh", It.IsAny<string>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("netsh", It.IsAny<string>(), It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(SuccessResult("Ok."));
 
         var service = CreateService();
@@ -110,16 +110,14 @@ public class FirewallServiceTests
         _mockRunner.Verify(r => r.RunAsync(
             "netsh",
             It.Is<string>(a => a.Contains("8530")),
-            It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()),
             Times.Once);
 
         // Verify HTTPS rule (port 8531) was created
         _mockRunner.Verify(r => r.RunAsync(
             "netsh",
             It.Is<string>(a => a.Contains("8531")),
-            It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -127,7 +125,7 @@ public class FirewallServiceTests
     public async Task CreateWsusRulesAsync_Uses_Inbound_Allow_Protocol()
     {
         _mockRunner
-            .Setup(r => r.RunAsync("netsh", It.IsAny<string>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("netsh", It.IsAny<string>(), It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(SuccessResult("Ok."));
 
         var service = CreateService();
@@ -137,8 +135,7 @@ public class FirewallServiceTests
         _mockRunner.Verify(r => r.RunAsync(
             "netsh",
             It.Is<string>(a => a.Contains("dir=in") && a.Contains("action=allow") && a.Contains("protocol=TCP")),
-            It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()),
             Times.Exactly(2));
     }
 
@@ -146,7 +143,7 @@ public class FirewallServiceTests
     public async Task CreateWsusRulesAsync_Reports_Progress_For_Each_Rule()
     {
         _mockRunner
-            .Setup(r => r.RunAsync("netsh", It.IsAny<string>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("netsh", It.IsAny<string>(), It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(SuccessResult("Ok."));
 
         var progressMessages = new List<string>();
@@ -175,7 +172,7 @@ public class FirewallServiceTests
     public async Task CreateWsusRulesAsync_Returns_Failure_When_Http_Rule_Creation_Fails()
     {
         _mockRunner
-            .Setup(r => r.RunAsync("netsh", It.Is<string>(a => a.Contains("8530")), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("netsh", It.Is<string>(a => a.Contains("8530")), It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(FailResult("Error: Access Denied"));
 
         var service = CreateService();
@@ -189,11 +186,11 @@ public class FirewallServiceTests
     public async Task CreateWsusRulesAsync_Returns_Failure_When_Https_Rule_Creation_Fails()
     {
         _mockRunner
-            .Setup(r => r.RunAsync("netsh", It.Is<string>(a => a.Contains("8530")), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("netsh", It.Is<string>(a => a.Contains("8530")), It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(SuccessResult("Ok."));
 
         _mockRunner
-            .Setup(r => r.RunAsync("netsh", It.Is<string>(a => a.Contains("8531")), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("netsh", It.Is<string>(a => a.Contains("8531")), It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(FailResult("Error: Access Denied"));
 
         var service = CreateService();
@@ -206,7 +203,7 @@ public class FirewallServiceTests
     public async Task CreateWsusRulesAsync_Uses_WSUS_Rule_Names()
     {
         _mockRunner
-            .Setup(r => r.RunAsync("netsh", It.IsAny<string>(), It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+            .Setup(r => r.RunAsync("netsh", It.IsAny<string>(), It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(SuccessResult("Ok."));
 
         var service = CreateService();
@@ -217,15 +214,13 @@ public class FirewallServiceTests
         _mockRunner.Verify(r => r.RunAsync(
             "netsh",
             It.Is<string>(a => a.Contains("8530")),
-            It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()),
             Times.Once);
 
         _mockRunner.Verify(r => r.RunAsync(
             "netsh",
             It.Is<string>(a => a.Contains("8531")),
-            It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 }
