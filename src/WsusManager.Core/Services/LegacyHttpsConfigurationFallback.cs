@@ -5,74 +5,129 @@ using WsusManager.Core.Models;
 namespace WsusManager.Core.Services;
 
 /// <summary>
-/// Legacy adapter that configures HTTPS by running Set-WsusHttps.ps1.
+/// Fallback adapter that delegates HTTPS configuration to the legacy Set-WsusHttps.ps1 script.
 /// </summary>
 public class LegacyHttpsConfigurationFallback
 {
-    private const string ScriptName = "Set-WsusHttps.ps1";
     private readonly IProcessRunner _processRunner;
     private readonly ILogService _logService;
-    private readonly Func<string?> _locateScript;
+    private readonly string? _scriptPathOverride;
 
-    public LegacyHttpsConfigurationFallback(
+    public const string ScriptName = "Set-WsusHttps.ps1";
+
+    internal LegacyHttpsConfigurationFallback(
         IProcessRunner processRunner,
         ILogService logService,
-        Func<string?>? locateScript = null)
+        string? scriptPathOverride)
     {
         _processRunner = processRunner;
         _logService = logService;
-        _locateScript = locateScript ?? LocateScript;
+        _scriptPathOverride = scriptPathOverride;
     }
 
-    public virtual async Task<OperationResult> ConfigureAsync(
-        string wsusServer,
-        string certThumbprint,
-        IProgress<string>? progress,
-        CancellationToken ct)
+    public LegacyHttpsConfigurationFallback(IProcessRunner processRunner, ILogService logService)
+        : this(processRunner, logService, scriptPathOverride: null)
     {
-        if (string.IsNullOrWhiteSpace(certThumbprint))
-        {
-            return OperationResult.Fail("Certificate thumbprint is required.");
-        }
+    }
 
-        var scriptPath = _locateScript();
-        if (scriptPath is null)
+    public async Task<OperationResult> ConfigureAsync(
+        string? serverName,
+        string? certificateThumbprint,
+        IProgress<string>? progress = null,
+        CancellationToken ct = default)
+    {
+        try
         {
-            var paths = GetSearchPaths();
-            var message = $"HTTPS script not found. Searched for '{ScriptName}' in:\n  {string.Join("\n  ", paths)}";
+            var scriptPath = LocateScript();
+            if (scriptPath is null)
+            {
+                var msg = $"Legacy HTTPS script not found. Expected '{ScriptName}'.";
+                _logService.Warning(msg);
+                return OperationResult.Fail(msg);
+            }
+
+            var arguments = $"-ExecutionPolicy Bypass -File \"{scriptPath}\"";
+            if (!string.IsNullOrWhiteSpace(serverName))
+            {
+                arguments += $" -ServerName \"{serverName.Trim()}\"";
+            }
+
+            if (!string.IsNullOrWhiteSpace(certificateThumbprint))
+            {
+                arguments += $" -CertificateThumbprint \"{certificateThumbprint.Trim()}\"";
+            }
+
+            var result = await _processRunner.RunAsync(
+                "powershell.exe",
+                arguments,
+                progress,
+                ct).ConfigureAwait(false);
+
+            if (result.Success)
+            {
+                return OperationResult.Ok("HTTPS configuration completed via legacy fallback.");
+            }
+
+            var outputSummary = BuildSafeOutputSummary(result);
+            var message = $"Legacy HTTPS fallback failed with exit code {result.ExitCode}.{outputSummary}";
             _logService.Warning(message);
-            progress?.Report(message);
             return OperationResult.Fail(message);
         }
-
-        progress?.Report("[FALLBACK] Running legacy HTTPS configuration script.");
-
-        var arguments = $"-ExecutionPolicy Bypass -File \"{scriptPath}\" -CertificateThumbprint \"{certThumbprint}\"";
-
-        var result = await _processRunner.RunAsync(
-            "powershell.exe",
-            arguments,
-            progress,
-            ct).ConfigureAwait(false);
-
-        if (result.Success)
+        catch (OperationCanceledException)
         {
-            _logService.Info("Legacy HTTPS fallback completed for {Server}", wsusServer);
-            return OperationResult.Ok("HTTPS configured via legacy script.");
+            throw;
         }
-
-        var failMessage = $"Legacy HTTPS fallback failed with exit code {result.ExitCode}.";
-        _logService.Warning(failMessage);
-        return OperationResult.Fail(failMessage);
+        catch (Exception ex)
+        {
+            _logService.Error(ex, "Legacy HTTPS fallback failed with unexpected error");
+            return OperationResult.Fail($"Legacy HTTPS fallback failed: {ex.Message}", ex);
+        }
     }
 
     internal string? LocateScript()
     {
-        return ScriptPathLocator.LocateScript(ScriptName);
+        if (!string.IsNullOrWhiteSpace(_scriptPathOverride) && File.Exists(_scriptPathOverride))
+        {
+            return _scriptPathOverride;
+        }
+
+        foreach (var path in GetSearchPaths())
+        {
+            if (File.Exists(path))
+            {
+                return path;
+            }
+        }
+
+        return null;
     }
 
     internal string[] GetSearchPaths()
     {
-        return ScriptPathLocator.GetScriptSearchPaths(ScriptName);
+        var appDir = AppContext.BaseDirectory;
+        return
+        [
+            Path.Combine(appDir, "Scripts", ScriptName),
+            Path.Combine(appDir, ScriptName)
+        ];
+    }
+
+    private static string BuildSafeOutputSummary(ProcessResult result)
+    {
+        var firstLine = result.OutputLines
+            .FirstOrDefault(line => !string.IsNullOrWhiteSpace(line));
+
+        if (string.IsNullOrWhiteSpace(firstLine))
+        {
+            return string.Empty;
+        }
+
+        var sanitized = firstLine.Replace('\r', ' ').Replace('\n', ' ').Trim();
+        if (sanitized.Length > 200)
+        {
+            sanitized = sanitized[..200];
+        }
+
+        return $" Output: {sanitized}";
     }
 }

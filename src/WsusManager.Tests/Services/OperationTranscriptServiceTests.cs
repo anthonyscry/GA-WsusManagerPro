@@ -2,59 +2,100 @@ using WsusManager.Core.Services;
 
 namespace WsusManager.Tests.Services;
 
-public class OperationTranscriptServiceTests : IDisposable
+public sealed class OperationTranscriptServiceTests : IDisposable
 {
-    private readonly string _tempDir;
+    private readonly string _tempDirectory;
 
     public OperationTranscriptServiceTests()
     {
-        _tempDir = Path.Combine(Path.GetTempPath(), $"WsusManagerTranscriptTests_{Guid.NewGuid():N}");
-        Directory.CreateDirectory(_tempDir);
+        _tempDirectory = Path.Combine(Path.GetTempPath(), $"WsusManagerTranscriptTests_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(_tempDirectory);
     }
 
     public void Dispose()
     {
         try
         {
-            Directory.Delete(_tempDir, recursive: true);
+            Directory.Delete(_tempDirectory, recursive: true);
         }
         catch
         {
-            // Ignore cleanup errors in test environments.
+            // Ignore cleanup failures for locked files.
         }
     }
 
     [Fact]
-    public async Task WriteLineAsync_CreatesOperationTranscriptFile()
+    public void StartOperation_ShouldCreateTranscriptFile()
     {
-        var service = new OperationTranscriptService(_tempDir);
-        var opId = Guid.NewGuid();
+        using var service = new OperationTranscriptService(_tempDirectory);
 
-        await service.WriteLineAsync(opId, "Diagnostics", "[Step 1/3] Start", CancellationToken.None);
-        var file = service.GetTranscriptPath(opId, "Diagnostics");
+        var transcriptPath = service.StartOperation("Diagnostics");
 
-        Assert.True(File.Exists(file));
-        Assert.Contains("[Step 1/3] Start", File.ReadAllText(file), StringComparison.Ordinal);
+        Assert.True(File.Exists(transcriptPath));
+        Assert.StartsWith(_tempDirectory, transcriptPath, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task WriteLineAsync_ParallelWrites_ProduceAllLines()
+    public void WriteLine_ShouldAppendLinesToCurrentTranscript()
     {
-        var service = new OperationTranscriptService(_tempDir);
-        var opId = Guid.NewGuid();
+        using var service = new OperationTranscriptService(_tempDirectory);
+        var transcriptPath = service.StartOperation("Export");
 
-        var tasks = Enumerable.Range(1, 50)
-            .Select(i => service.WriteLineAsync(opId, "Diagnostics", $"line-{i}", CancellationToken.None));
+        service.WriteLine("First line");
+        service.WriteLine("Second line");
+        service.EndOperation();
 
-        await Task.WhenAll(tasks).ConfigureAwait(false);
+        var content = File.ReadAllText(transcriptPath);
+        Assert.Contains("First line", content);
+        Assert.Contains("Second line", content);
+    }
 
-        var file = service.GetTranscriptPath(opId, "Diagnostics");
-        Assert.True(File.Exists(file));
+    [Fact]
+    public void StartOperation_Twice_ShouldCreateSeparateFilesPerOperation()
+    {
+        using var service = new OperationTranscriptService(_tempDirectory);
 
-        var content = File.ReadAllText(file);
-        for (var i = 1; i <= 50; i++)
-        {
-            Assert.Contains($"line-{i}", content, StringComparison.Ordinal);
-        }
+        var firstPath = service.StartOperation("Repair Health");
+        service.WriteLine("repair line");
+
+        var secondPath = service.StartOperation("Deep Cleanup");
+        service.WriteLine("cleanup line");
+        service.EndOperation();
+
+        Assert.NotEqual(firstPath, secondPath);
+
+        var firstContent = File.ReadAllText(firstPath);
+        var secondContent = File.ReadAllText(secondPath);
+
+        Assert.Contains("repair line", firstContent);
+        Assert.DoesNotContain("cleanup line", firstContent);
+        Assert.Contains("cleanup line", secondContent);
+    }
+
+    [Fact]
+    public void StartOperation_SameOperationWithinSameSecond_ShouldStillCreateUniquePath()
+    {
+        using var service = new OperationTranscriptService(_tempDirectory);
+
+        var firstPath = service.StartOperation("Diagnostics");
+        var secondPath = service.StartOperation("Diagnostics");
+
+        Assert.NotEqual(firstPath, secondPath);
+        Assert.True(File.Exists(firstPath));
+        Assert.True(File.Exists(secondPath));
+    }
+
+    [Fact]
+    public void StartOperation_ShouldApplyRetentionPolicy()
+    {
+        using var service = new OperationTranscriptService(_tempDirectory, maxTranscriptFiles: 2);
+
+        service.StartOperation("Operation One");
+        service.StartOperation("Operation Two");
+        service.StartOperation("Operation Three");
+        service.EndOperation();
+
+        var transcripts = Directory.GetFiles(_tempDirectory, "*.log", SearchOption.TopDirectoryOnly);
+        Assert.Equal(2, transcripts.Length);
     }
 }

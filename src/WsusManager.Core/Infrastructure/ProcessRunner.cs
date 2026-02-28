@@ -13,95 +13,72 @@ namespace WsusManager.Core.Infrastructure;
 public class ProcessRunner : IProcessRunner
 {
     private readonly ILogService _logService;
-    private readonly ISettingsService? _settingsService;
+    private readonly ISettingsService _settingsService;
 
-    internal ProcessStartInfo? LastStartInfoSnapshot { get; private set; }
-
-    public ProcessRunner(ILogService logService, ISettingsService? settingsService = null)
+    public ProcessRunner(ILogService logService, ISettingsService settingsService)
     {
         _logService = logService;
         _settingsService = settingsService;
     }
 
-    public Task<ProcessResult> RunAsync(
-        string executable,
-        string arguments,
-        IProgress<string>? progress = null,
-        CancellationToken ct = default,
-        bool enableLiveTerminal = false)
+    internal ProcessStartInfo CreateStartInfo(string executable, string arguments, bool useVisibleTerminal = false)
     {
-        return RunAsync(executable, arguments, progress, ct, enableLiveTerminal, null);
+        return new ProcessStartInfo(executable, arguments)
+        {
+            RedirectStandardOutput = !useVisibleTerminal,
+            RedirectStandardError = !useVisibleTerminal,
+            UseShellExecute = useVisibleTerminal,
+            CreateNoWindow = !useVisibleTerminal
+        };
     }
 
     public async Task<ProcessResult> RunAsync(
         string executable,
         string arguments,
+        IProgress<string>? progress = null,
+        CancellationToken ct = default)
+    {
+        return await RunAsync(executable, arguments, allowVisibleTerminal: false, progress, ct).ConfigureAwait(false);
+    }
+
+    public async Task<ProcessResult> RunAsync(
+        string executable,
+        string arguments,
+        bool allowVisibleTerminal,
+        IProgress<string>? progress = null,
+        CancellationToken ct = default)
+    {
+        var useVisibleTerminal = allowVisibleTerminal && _settingsService.Current.LiveTerminalMode;
+        return await RunCoreAsync(executable, arguments, progress, useVisibleTerminal, ct).ConfigureAwait(false);
+    }
+
+    public async Task<ProcessResult> RunVisibleAsync(
+        string executable,
+        string arguments,
+        CancellationToken ct = default)
+    {
+        _logService.Debug("Visible terminal execution requested (setting: {LiveTerminalMode})", _settingsService.Current.LiveTerminalMode);
+        return await RunAsync(executable, arguments, allowVisibleTerminal: true, progress: null, ct).ConfigureAwait(false);
+    }
+
+    private async Task<ProcessResult> RunCoreAsync(
+        string executable,
+        string arguments,
         IProgress<string>? progress,
-        CancellationToken ct,
-        bool enableLiveTerminal,
-        IReadOnlyDictionary<string, string?>? environmentVariables)
+        bool useVisibleTerminal,
+        CancellationToken ct)
     {
         _logService.Debug("Running: {Executable} [arguments hidden]", executable);
 
-        var globalLiveTerminal = _settingsService?.Current.LiveTerminalMode ?? false;
-        var requiresChildEnvironment = environmentVariables is { Count: > 0 };
-        var liveTerminalMode = enableLiveTerminal && globalLiveTerminal;
-        if (requiresChildEnvironment && liveTerminalMode)
-        {
-            liveTerminalMode = false;
-            progress?.Report("[INFO] Live Terminal mode disabled for this operation because scoped environment variables are required.");
-        }
-
-        if (liveTerminalMode)
-        {
-            progress?.Report("[INFO] Live Terminal mode enabled for this operation.");
-        }
-
-        var startInfo = new ProcessStartInfo(executable, arguments)
-        {
-            RedirectStandardOutput = !liveTerminalMode,
-            RedirectStandardError = !liveTerminalMode,
-            UseShellExecute = liveTerminalMode,
-            CreateNoWindow = !liveTerminalMode
-        };
-
-        if (requiresChildEnvironment)
-        {
-            foreach (var variable in environmentVariables!)
-            {
-                if (string.IsNullOrWhiteSpace(variable.Key))
-                {
-                    continue;
-                }
-
-                if (variable.Value is null)
-                {
-                    startInfo.Environment.Remove(variable.Key);
-                }
-                else
-                {
-                    startInfo.Environment[variable.Key] = variable.Value;
-                }
-            }
-        }
-
-        LastStartInfoSnapshot = new ProcessStartInfo(startInfo.FileName, startInfo.Arguments)
-        {
-            RedirectStandardOutput = startInfo.RedirectStandardOutput,
-            RedirectStandardError = startInfo.RedirectStandardError,
-            UseShellExecute = startInfo.UseShellExecute,
-            CreateNoWindow = startInfo.CreateNoWindow
-        };
-
         using var proc = new Process
         {
-            StartInfo = startInfo
+            StartInfo = CreateStartInfo(executable, arguments, useVisibleTerminal)
         };
 
         var outputLines = new List<string>();
         var outputLock = new object();
 
-        if (!liveTerminalMode)
+        if (!useVisibleTerminal)
         {
             proc.OutputDataReceived += (_, e) =>
             {
@@ -126,9 +103,13 @@ public class ProcessRunner : IProcessRunner
         }
 
         proc.Start();
-        if (!liveTerminalMode)
+        if (proc.StartInfo.RedirectStandardOutput)
         {
             proc.BeginOutputReadLine();
+        }
+
+        if (proc.StartInfo.RedirectStandardError)
+        {
             proc.BeginErrorReadLine();
         }
 

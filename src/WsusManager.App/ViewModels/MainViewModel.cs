@@ -14,7 +14,6 @@ using WsusManager.App.Services;
 using WsusManager.App.Views;
 using WsusManager.Core.Logging;
 using WsusManager.Core.Models;
-using WsusManager.Core.Services;
 using WsusManager.Core.Services.Interfaces;
 
 namespace WsusManager.App.ViewModels;
@@ -28,7 +27,6 @@ namespace WsusManager.App.ViewModels;
 public partial class MainViewModel : ObservableObject, IDisposable
 {
     private readonly ILogService _logService;
-    private readonly IOperationTranscriptService _operationTranscriptService;
     private readonly ISettingsService _settingsService;
     private readonly IDashboardService _dashboardService;
     private readonly IHealthService _healthService;
@@ -41,15 +39,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly IImportService _importService;
     private readonly IInstallationService _installationService;
     private readonly IScheduledTaskService _scheduledTaskService;
-    private readonly IHttpsConfigurationService _httpsConfigurationService;
     private readonly IGpoDeploymentService _gpoDeploymentService;
-    private readonly IHttpsDialogService _httpsDialogService;
     private readonly IClientService _clientService;
     private readonly IScriptGeneratorService _scriptGeneratorService;
     private readonly IThemeService _themeService;
     private readonly IBenchmarkTimingService _benchmarkTimingService;
     private readonly ISettingsValidationService _validationService;
     private readonly ICsvExportService _csvExportService;
+    private readonly IOperationTranscriptService _operationTranscriptService;
+    private readonly IHttpsConfigurationService _httpsConfigurationService;
     private readonly StringBuilder _logBuilder = new();
     private readonly Queue<string> _logBatchQueue = new();
     private DispatcherTimer? _logBatchTimer;
@@ -96,41 +94,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         return $"{(int)ts.TotalSeconds}s";
     }
 
-    private static int NormalizeWsusPort(string? candidate, int fallback)
-    {
-        if (!int.TryParse(candidate?.Trim(), out var parsed))
-            return fallback;
-
-        return parsed is > 0 and <= 65535 ? parsed : fallback;
-    }
-
-    private static bool IsInvalidNonBlankPortInput(string? candidate)
-    {
-        var trimmed = candidate?.Trim();
-        if (string.IsNullOrWhiteSpace(trimmed))
-            return false;
-
-        return !int.TryParse(trimmed, out var parsed) || parsed is <= 0 or > 65535;
-    }
-
-    private Task<OperationResult<string>> DeployCreateGpoFilesAsync(
-        string wsusHostname,
-        int wsusPort,
-        int wsusHttpsPort,
-        IProgress<string> progress,
-        CancellationToken ct)
-    {
-        return _gpoDeploymentService.DeployGpoFilesAsync(
-            wsusHostname,
-            httpPort: wsusPort,
-            httpsPort: wsusHttpsPort,
-            progress: progress,
-            ct: ct);
-    }
-
     public MainViewModel(
         ILogService logService,
-        IOperationTranscriptService operationTranscriptService,
         ISettingsService settingsService,
         IDashboardService dashboardService,
         IHealthService healthService,
@@ -143,18 +108,17 @@ public partial class MainViewModel : ObservableObject, IDisposable
         IImportService importService,
         IInstallationService installationService,
         IScheduledTaskService scheduledTaskService,
-        IHttpsConfigurationService httpsConfigurationService,
         IGpoDeploymentService gpoDeploymentService,
-        IHttpsDialogService httpsDialogService,
         IClientService clientService,
         IScriptGeneratorService scriptGeneratorService,
         IThemeService themeService,
         IBenchmarkTimingService benchmarkTimingService,
         ISettingsValidationService validationService,
-        ICsvExportService csvExportService)
+        ICsvExportService csvExportService,
+        IOperationTranscriptService operationTranscriptService,
+        IHttpsConfigurationService httpsConfigurationService)
     {
         _logService = logService;
-        _operationTranscriptService = operationTranscriptService;
         _settingsService = settingsService;
         _dashboardService = dashboardService;
         _healthService = healthService;
@@ -167,15 +131,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _importService = importService;
         _installationService = installationService;
         _scheduledTaskService = scheduledTaskService;
-        _httpsConfigurationService = httpsConfigurationService;
         _gpoDeploymentService = gpoDeploymentService;
-        _httpsDialogService = httpsDialogService;
         _clientService = clientService;
         _scriptGeneratorService = scriptGeneratorService;
         _themeService = themeService;
         _benchmarkTimingService = benchmarkTimingService;
         _validationService = validationService;
         _csvExportService = csvExportService;
+        _operationTranscriptService = operationTranscriptService;
+        _httpsConfigurationService = httpsConfigurationService;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -230,6 +194,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             "Transfer" => "Export / Import",
             "Sync" => "Online Sync",
             "Schedule" => "Schedule Task",
+            "SetHttps" => "Set HTTPS",
             "Diagnostics" => "Diagnostics",
             "Database" => "Database Operations",
             "Cleanup" => "Deep Cleanup",
@@ -360,12 +325,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private string _logOutput = string.Empty;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(LiveTerminalToggleLabel))]
-    private bool _liveTerminalMode;
-
-    public string LiveTerminalToggleLabel => LiveTerminalMode ? "Live Terminal: On" : "Live Terminal: Off";
-
-    [ObservableProperty]
     private string _currentOperationName = string.Empty;
 
     /// <summary>
@@ -471,45 +430,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
         // Auto-expand log panel when operation starts
         IsLogPanelExpanded = true;
 
-        var telemetry = new OperationTelemetryContext(operationName);
-        var transcriptTasks = new List<Task>();
-        var transcriptTasksLock = new object();
-
-        void EnqueueTranscriptLine(string line)
-        {
-            try
-            {
-                var writeTask = _operationTranscriptService.WriteLineAsync(
-                    telemetry.OperationId,
-                    telemetry.OperationName,
-                    line,
-                    CancellationToken.None);
-
-                lock (transcriptTasksLock)
-                {
-                    transcriptTasks.Add(writeTask);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logService.Warning(
-                    "Failed to queue operation transcript entry {OperationId}: {Error}",
-                    telemetry.OperationId,
-                    ex.Message);
-            }
-        }
-
+        var telemetryContext = OperationTelemetryContext.Start(operationName);
         _logService.Info(
-            "Starting operation: {OperationName} OperationId={OperationId}",
-            operationName,
-            telemetry.OperationId);
-        AppendLog($"=== {operationName} ===");
-        EnqueueTranscriptLine($"=== {operationName} ===");
+            "Starting operation: {Operation} [OperationId: {OperationId}]",
+            telemetryContext.OperationName,
+            telemetryContext.OperationId);
 
         var progress = new Progress<string>(line =>
         {
             AppendLog(line);
-            EnqueueTranscriptLine(line);
 
             // Parse "[Step N/M]" prefix to update step text in the log header
             if (line.StartsWith("[Step ", StringComparison.OrdinalIgnoreCase))
@@ -534,108 +463,85 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         try
         {
+            TryStartOperationTranscript(operationName);
+            AppendLog($"=== {operationName} ===");
+
             var success = await operation(progress, _operationCts.Token).ConfigureAwait(false);
 
             if (success)
             {
+                var elapsed = telemetryContext.GetElapsed();
                 StatusMessage = $"{operationName} completed successfully.";
                 StatusBannerText = $"✓ {operationName} completed successfully.";
                 StatusBannerColor = GetThemeBrush("StatusSuccess", Color.FromRgb(0x3F, 0xB9, 0x50));
                 AppendLog($"=== ✓ {operationName} completed ===");
-                EnqueueTranscriptLine($"=== ✓ {operationName} completed ===");
                 _logService.Info(
-                    "Operation finished {OperationName} OperationId={OperationId} Success={Success} DurationMs={DurationMs}",
-                    operationName,
-                    telemetry.OperationId,
-                    true,
-                    (int)telemetry.Elapsed.TotalMilliseconds);
+                    "Operation completed: {Operation} [OperationId: {OperationId}] [ElapsedMs: {ElapsedMs}]",
+                    telemetryContext.OperationName,
+                    telemetryContext.OperationId,
+                    (long)elapsed.TotalMilliseconds);
             }
             else
             {
+                var elapsed = telemetryContext.GetElapsed();
                 StatusMessage = $"{operationName} failed.";
                 StatusBannerText = $"✗ {operationName} failed.";
                 StatusBannerColor = GetThemeBrush("StatusError", Color.FromRgb(0xF8, 0x51, 0x49));
                 AppendLog($"=== ✗ {operationName} FAILED ===");
-                EnqueueTranscriptLine($"=== ✗ {operationName} FAILED ===");
                 _logService.Warning(
-                    "Operation failed {OperationName} OperationId={OperationId} Success={Success} DurationMs={DurationMs}",
-                    operationName,
-                    telemetry.OperationId,
-                    false,
-                    (int)telemetry.Elapsed.TotalMilliseconds);
+                    "Operation failed: {Operation} [OperationId: {OperationId}] [ElapsedMs: {ElapsedMs}]",
+                    telemetryContext.OperationName,
+                    telemetryContext.OperationId,
+                    (long)elapsed.TotalMilliseconds);
             }
 
             return success;
         }
         catch (OperationCanceledException)
         {
+            var elapsed = telemetryContext.GetElapsed();
             StatusMessage = $"{operationName} cancelled.";
             StatusBannerText = $"⚠ {operationName} cancelled.";
             StatusBannerColor = GetThemeBrush("StatusWarning", Color.FromRgb(0xD2, 0x99, 0x22));
             AppendLog($"=== ⚠ {operationName} CANCELLED ===");
-            EnqueueTranscriptLine($"=== ⚠ {operationName} CANCELLED ===");
             _logService.Info(
-                "Operation cancelled {OperationName} OperationId={OperationId} DurationMs={DurationMs}",
-                operationName,
-                telemetry.OperationId,
-                (int)telemetry.Elapsed.TotalMilliseconds);
+                "Operation cancelled: {Operation} [OperationId: {OperationId}] [ElapsedMs: {ElapsedMs}]",
+                telemetryContext.OperationName,
+                telemetryContext.OperationId,
+                (long)elapsed.TotalMilliseconds);
             return false;
         }
         catch (Exception ex)
         {
+            var elapsed = telemetryContext.GetElapsed();
             StatusMessage = $"{operationName} failed with error.";
             StatusBannerText = $"✗ {operationName} failed.";
             StatusBannerColor = GetThemeBrush("StatusError", Color.FromRgb(0xF8, 0x51, 0x49));
             AppendLog($"[ERROR] {ex.Message}");
             AppendLog($"=== ✗ {operationName} FAILED ===");
-            EnqueueTranscriptLine($"[ERROR] {ex.Message}");
-            EnqueueTranscriptLine($"=== ✗ {operationName} FAILED ===");
-            _logService.Error(ex,
-                "Operation error {OperationName} OperationId={OperationId} DurationMs={DurationMs}",
-                operationName,
-                telemetry.OperationId,
-                (int)telemetry.Elapsed.TotalMilliseconds);
+            _logService.Error(
+                ex,
+                "Operation error: {Operation} [OperationId: {OperationId}] [ElapsedMs: {ElapsedMs}]",
+                telemetryContext.OperationName,
+                telemetryContext.OperationId,
+                (long)elapsed.TotalMilliseconds);
             return false;
         }
         finally
         {
+            TryEndOperationTranscript();
             IsOperationRunning = false;
             CurrentOperationName = string.Empty;
             OperationStepText = string.Empty;
             EstimatedTimeRemaining = string.Empty;
+            _operationCts?.Dispose();
+            _operationCts = null;
 
             // Ensure final batch is displayed
             FlushLogBatch();
 
-            List<Task> pendingTranscriptTasks;
-            lock (transcriptTasksLock)
-            {
-                pendingTranscriptTasks = transcriptTasks.ToList();
-                transcriptTasks.Clear();
-            }
-
-            await FlushOperationTranscriptsAsync(pendingTranscriptTasks).ConfigureAwait(false);
-
-            _operationCts?.Dispose();
-            _operationCts = null;
-
             // Notify all operation commands to re-evaluate CanExecute (re-enables buttons after operation)
             NotifyCommandCanExecuteChanged();
-        }
-    }
-
-    private static async Task FlushOperationTranscriptsAsync(List<Task> transcriptTasks)
-    {
-        if (transcriptTasks.Count == 0)
-            return;
-
-        try
-        {
-            await Task.WhenAll(transcriptTasks).ConfigureAwait(false);
-        }
-        catch
-        {
-            // Transcript failures should never block app operations.
         }
     }
 
@@ -646,6 +552,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// </summary>
     public void AppendLog(string line)
     {
+        TryWriteTranscriptLine(line);
+
         // Add to batch queue
         lock (_logBatchQueue)
         {
@@ -661,6 +569,45 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 // Start timer on first queued item
                 StartLogBatchTimer();
             }
+        }
+    }
+
+    private void TryStartOperationTranscript(string operationName)
+    {
+        try
+        {
+            _operationTranscriptService.StartOperation(operationName);
+        }
+        catch (Exception ex)
+        {
+            _logService.Warning(
+                "Operation transcript start failed for {Operation}: {Message}",
+                operationName,
+                ex.Message);
+        }
+    }
+
+    private void TryWriteTranscriptLine(string line)
+    {
+        try
+        {
+            _operationTranscriptService.WriteLine(line);
+        }
+        catch (Exception ex)
+        {
+            _logService.Debug("Operation transcript write skipped: {Message}", ex.Message);
+        }
+    }
+
+    private void TryEndOperationTranscript()
+    {
+        try
+        {
+            _operationTranscriptService.EndOperation();
+        }
+        catch (Exception ex)
+        {
+            _logService.Debug("Operation transcript end skipped: {Message}", ex.Message);
         }
     }
 
@@ -751,16 +698,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         IsLogPanelExpanded = !IsLogPanelExpanded;
         _settings.LogPanelExpanded = IsLogPanelExpanded;
         await SaveSettingsAsync().ConfigureAwait(false);
-    }
-
-    [RelayCommand]
-    private async Task ToggleLiveTerminalMode()
-    {
-        LiveTerminalMode = !LiveTerminalMode;
-        _settings.LiveTerminalMode = LiveTerminalMode;
-        await SaveSettingsAsync().ConfigureAwait(false);
-        var state = LiveTerminalMode ? "enabled" : "disabled";
-        AppendLog($"Live Terminal mode {state}.");
     }
 
     [RelayCommand]
@@ -862,9 +799,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             _logService?.Debug("Loading updates...");
 
-            var updates = await _dashboardService
-                .GetUpdatesAsync(_settings, pageNumber: 1, pageSize: 100, ct)
-                .ConfigureAwait(true);
+            var updates = await _dashboardService.GetUpdatesAsync(ct).ConfigureAwait(true);
 
             await Application.Current.Dispatcher.InvokeAsync(() =>
             {
@@ -1074,21 +1009,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanExecuteWsusOperation))]
     private async Task ResetContent()
     {
-        if (_settings.RequireConfirmationDestructive)
-        {
-            var confirm = MessageBox.Show(
-                "Reset Content will re-verify every WSUS content file against the database.\n\n" +
-                "WARNING: This operation may run for hours on air-gapped systems and disrupt database performance.\n\n" +
-                "Use this only when clients report content mismatch or stuck download states.\n\n" +
-                "Do you want to continue?",
-                "Confirm Content Reset",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning,
-                MessageBoxResult.No);
-
-            if (confirm != MessageBoxResult.Yes)
-                return;
-        }
+        // Confirm before running destructive operation
+        if (!ConfirmDestructiveOperation("Content Reset"))
+            return;
 
         await Navigate("Diagnostics").ConfigureAwait(false);
 
@@ -1136,9 +1059,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanExecuteWsusOperation))]
     private async Task RunDeepCleanup()
     {
+        // Confirm before running destructive operation
+        if (!ConfirmDestructiveOperation("Deep Cleanup"))
+            return;
+
         await Navigate("Database").ConfigureAwait(false);
 
-        await RunOperationAsync("WSUS Cleanup", async (progress, ct) =>
+        await RunOperationAsync("Deep Cleanup", async (progress, ct) =>
         {
             var result = await _deepCleanupService.RunAsync(
                 _settings.SqlInstance,
@@ -1283,7 +1210,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private async Task RunOnlineSync()
     {
         // Dialog before panel switch (per CLAUDE.md pattern)
-        var dialog = new SyncProfileDialog(_settings.DefaultSyncProfile);
+        var dialog = new SyncProfileDialog();
         if (Application.Current.MainWindow is not null)
             dialog.Owner = Application.Current.MainWindow;
 
@@ -1292,36 +1219,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
         var profile = dialog.SelectedProfile;
         await Navigate("Sync").ConfigureAwait(false);
 
-        await RunOnlineSyncWorkflowAsync(profile, dialog.ExportOptions).ConfigureAwait(false);
-    }
-
-    private async Task<bool> RunOnlineSyncWorkflowAsync(SyncProfile profile, ExportOptions? exportOptions)
-    {
-        var orchestrator = new OnlineSyncOrchestrationService(_syncService, _exportService);
-
-        return await RunOperationAsync("Online Sync", async (progress, ct) =>
+        await RunOperationAsync("Online Sync", async (progress, ct) =>
         {
-            var effectiveExportOptions = exportOptions is null
-                ? null
-                : exportOptions with
-                {
-                    SourcePath = string.IsNullOrWhiteSpace(_settings.ContentPath) ? @"C:\WSUS" : _settings.ContentPath,
-                    ExportDays = exportOptions.ExportDays > 0 ? exportOptions.ExportDays : 30,
-                    IncludeDatabaseBackup = exportOptions.IncludeDatabaseBackup
-                };
-
-            var result = await orchestrator.RunAsync(
-                profile,
-                MaxAutoApproveCount,
-                effectiveExportOptions,
-                progress,
-                ct).ConfigureAwait(false);
-
-            if (!result.Success && !string.IsNullOrWhiteSpace(result.Message))
-            {
-                progress.Report($"[FAIL] {result.Message}");
-            }
-
+            var result = await _syncService.RunSyncAsync(
+                profile, MaxAutoApproveCount, progress, ct).ConfigureAwait(false);
             return result.Success;
         }).ConfigureAwait(false);
     }
@@ -1369,8 +1270,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         var dialog = new InstallDialog();
         if (Application.Current.MainWindow is not null)
             dialog.Owner = Application.Current.MainWindow;
-
-        _themeService.ApplyTitleBarColorsToWindow(dialog, _settings.SelectedTheme);
 
         if (dialog.ShowDialog() != true || dialog.Options is null) return;
 
@@ -1434,22 +1333,42 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanExecuteWsusOperation))]
     private async Task RunSetHttps()
     {
-        var dialogResult = _httpsDialogService.ShowDialog();
-        if (dialogResult is null) return;
+        // Dialog before panel switch (per CLAUDE.md pattern)
+        var dialog = new HttpsDialog();
+        if (Application.Current.MainWindow is not null)
+            dialog.Owner = Application.Current.MainWindow;
 
-        await Navigate("Install").ConfigureAwait(false);
+        if (dialog.ShowDialog() != true || dialog.Result is null) return;
 
-        await RunOperationAsync("Set HTTPS", async (progress, ct) =>
+        await RunSetHttpsWithInputsAsync(
+            dialog.Result.ServerName,
+            dialog.Result.CertificateThumbprint).ConfigureAwait(false);
+    }
+
+    internal async Task<bool> RunSetHttpsWithInputsAsync(string serverName, string certificateThumbprint)
+    {
+        var normalizedServerName = serverName?.Trim() ?? string.Empty;
+        var normalizedThumbprint = certificateThumbprint?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(normalizedServerName) || string.IsNullOrWhiteSpace(normalizedThumbprint))
         {
-            var result = await _httpsConfigurationService.ConfigureAsync(
-                dialogResult.ServerName,
-                dialogResult.CertificateThumbprint,
+            return false;
+        }
+
+        await Navigate("SetHttps").ConfigureAwait(false);
+
+        return await RunOperationAsync("Set HTTPS", async (progress, ct) =>
+        {
+            progress.Report($"Applying HTTPS configuration for WSUS server '{normalizedServerName}'...");
+
+            var result = await _httpsConfigurationService.ConfigureHttpsAsync(
+                normalizedServerName,
+                normalizedThumbprint,
                 progress,
                 ct).ConfigureAwait(false);
 
-            if (!result.Success && !string.IsNullOrWhiteSpace(result.Message))
+            if (!string.IsNullOrWhiteSpace(result.Message))
             {
-                progress.Report($"[FAIL] {result.Message}");
+                progress.Report(result.Success ? $"[OK] {result.Message}" : $"[FAIL] {result.Message}");
             }
 
             return result.Success;
@@ -1462,7 +1381,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         // Show hostname + port input dialog on UI thread before starting operation
         string? wsusHostname = null;
         int wsusPort = 8530;
-        int wsusHttpsPort = 8531;
 
         Application.Current.Dispatcher.Invoke(() =>
         {
@@ -1470,7 +1388,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             {
                 Title = "Create GPO — WSUS Server",
                 Width = 400,
-                Height = 300,
+                Height = 220,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 ResizeMode = ResizeMode.NoResize,
                 Background = Application.Current.FindResource("PrimaryBackground") as System.Windows.Media.Brush
@@ -1479,8 +1397,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 dialog.Owner = Application.Current.MainWindow;
 
             var grid = new System.Windows.Controls.Grid { Margin = new Thickness(20) };
-            grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
-            grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
             grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
             grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
             grid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
@@ -1504,16 +1420,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
             System.Windows.Controls.Grid.SetRow(portBox, 3);
             grid.Children.Add(portBox);
 
-            var httpsPortLabel = new System.Windows.Controls.TextBlock { Text = "HTTPS Port", FontSize = 12, Foreground = Application.Current.FindResource("TextSecondary") as System.Windows.Media.Brush, Margin = new Thickness(0, 0, 0, 4) };
-            System.Windows.Controls.Grid.SetRow(httpsPortLabel, 4);
-            grid.Children.Add(httpsPortLabel);
-
-            var httpsPortBox = new System.Windows.Controls.TextBox { Text = "8531", FontSize = 12, Padding = new Thickness(6, 4, 6, 4), Background = Application.Current.FindResource("InputBackground") as System.Windows.Media.Brush, Foreground = Application.Current.FindResource("TextPrimary") as System.Windows.Media.Brush, BorderBrush = Application.Current.FindResource("BorderPrimary") as System.Windows.Media.Brush, Margin = new Thickness(0, 0, 0, 12) };
-            System.Windows.Controls.Grid.SetRow(httpsPortBox, 5);
-            grid.Children.Add(httpsPortBox);
-
             var btnPanel = new System.Windows.Controls.StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-            System.Windows.Controls.Grid.SetRow(btnPanel, 7);
+            System.Windows.Controls.Grid.SetRow(btnPanel, 5);
 
             var cancelBtn = new System.Windows.Controls.Button { Content = "Cancel", Padding = new Thickness(20, 8, 20, 8), Margin = new Thickness(0, 0, 8, 0) };
             cancelBtn.Click += (s, e) =>
@@ -1539,8 +1447,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
             if (dialog.ShowDialog() == true)
             {
                 wsusHostname = hostnameBox.Text.Trim();
-                wsusPort = NormalizeWsusPort(portBox.Text, 8530);
-                wsusHttpsPort = NormalizeWsusPort(httpsPortBox.Text, 8531);
+                if (int.TryParse(portBox.Text.Trim(), out var p) && p > 0 && p <= 65535)
+                    wsusPort = p;
             }
         });
 
@@ -1551,12 +1459,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         await RunOperationAsync("Create GPO", async (progress, ct) =>
         {
-            var result = await DeployCreateGpoFilesAsync(
-                wsusHostname,
-                wsusPort,
-                wsusHttpsPort,
-                progress,
-                ct).ConfigureAwait(false);
+            var result = await _gpoDeploymentService.DeployGpoFilesAsync(wsusHostname, wsusPort, progress, ct).ConfigureAwait(false);
 
             if (result.Success && result.Data is not null)
             {
@@ -1587,71 +1490,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private string _errorCodeResult = string.Empty;
 
-    partial void OnErrorCodeInputChanged(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            ErrorCodeResult = string.Empty;
-            return;
-        }
-
-        LookupErrorCode();
-    }
-
-    public IReadOnlyList<string> CommonErrorCodes =>
-    [
-        "0x80072EE2",
-        "0x80244022",
-        "0x80244010",
-        "0x80070005",
-        "0x80240022",
-        "0x80070643",
-        "0x80242016"
-    ];
-
     /// <summary>
     /// Hostnames for mass GPUpdate. Can be comma, semicolon, or newline separated.
     /// Bound to the multi-line TextBox in the Mass Operations card.
     /// </summary>
     [ObservableProperty]
     private string _massHostnames = string.Empty;
-
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(RunFleetWsusTargetAuditCommand))]
-    private string _expectedWsusHostname = string.Empty;
-
-    [ObservableProperty]
-    private string _expectedWsusHttpPort = "8530";
-
-    [ObservableProperty]
-    private string _expectedWsusHttpsPort = "8531";
-
-    [ObservableProperty]
-    private int _clientToolsSelectedSubtabIndex;
-
-    private static readonly IReadOnlyList<string> ClientToolsOperationsCards =
-    [
-        "TargetHost",
-        "RemoteOperations",
-        "MassOperations"
-    ];
-
-    private static readonly IReadOnlyList<string> ClientToolsAuditCards =
-    [
-        "FleetAudit",
-        "ScriptGenerator"
-    ];
-
-    private static readonly IReadOnlyList<string> ClientToolsUtilityCards =
-    [
-        "ErrorCodeLookup"
-    ];
-
-    public IReadOnlyList<string> ClientToolsOperationsCardKeys => ClientToolsOperationsCards;
-
-    public IReadOnlyList<string> ClientToolsAuditCardKeys => ClientToolsAuditCards;
-
-    public IReadOnlyList<string> ClientToolsUtilityCardKeys => ClientToolsUtilityCards;
 
     /// <summary>
     /// CanExecute helper for remote client operations — requires a hostname and no operation running.
@@ -1664,9 +1508,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// </summary>
     private bool CanExecuteMassOperation() =>
         !IsOperationRunning && !string.IsNullOrWhiteSpace(MassHostnames);
-
-    private bool CanExecuteFleetWsusTargetAudit() =>
-        !IsOperationRunning && !string.IsNullOrWhiteSpace(ExpectedWsusHostname);
 
     /// <summary>
     /// Called automatically by CommunityToolkit.Mvvm when ClientHostname changes.
@@ -1809,72 +1650,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
         await RunOperationAsync("Mass GPUpdate", async (progress, ct) =>
         {
             var result = await _clientService.MassForceCheckInAsync(hostnames, progress, ct).ConfigureAwait(false);
-            return result.Success;
-        }).ConfigureAwait(false);
-    }
-
-    [RelayCommand(CanExecute = nameof(CanExecuteFleetWsusTargetAudit))]
-    private async Task RunFleetWsusTargetAudit()
-    {
-        await Navigate("ClientTools").ConfigureAwait(false);
-
-        await RunOperationAsync("Fleet WSUS Target Audit", async (progress, ct) =>
-        {
-            var expectedHostname = ExpectedWsusHostname.Trim();
-            if (IsInvalidNonBlankPortInput(ExpectedWsusHttpPort))
-            {
-                progress.Report($"[ERROR] Invalid HTTP port '{ExpectedWsusHttpPort?.Trim()}'. Enter a value from 1-65535 or leave blank to use default 8530.");
-                return false;
-            }
-
-            if (IsInvalidNonBlankPortInput(ExpectedWsusHttpsPort))
-            {
-                progress.Report($"[ERROR] Invalid HTTPS port '{ExpectedWsusHttpsPort?.Trim()}'. Enter a value from 1-65535 or leave blank to use default 8531.");
-                return false;
-            }
-
-            var expectedHttpPort = NormalizeWsusPort(ExpectedWsusHttpPort, 8530);
-            var expectedHttpsPort = NormalizeWsusPort(ExpectedWsusHttpsPort, 8531);
-
-            var hostnames = (await _dashboardService.GetComputersAsync(ct).ConfigureAwait(false))
-                .Select(c => c.Hostname?.Trim() ?? string.Empty)
-                .Where(h => !string.IsNullOrWhiteSpace(h))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            if (hostnames.Count == 0)
-            {
-                progress.Report("[ERROR] No valid WSUS client hostnames were found in dashboard inventory. Refresh dashboard data or ensure clients are reporting, then retry.");
-                return false;
-            }
-
-            progress.Report($"Found {hostnames.Count} unique WSUS client hostname(s) in dashboard inventory.");
-
-            var result = await _clientService.RunFleetWsusTargetAuditAsync(
-                hostnames,
-                expectedHostname,
-                expectedHttpPort,
-                expectedHttpsPort,
-                progress,
-                ct).ConfigureAwait(false);
-
-            if (result.Data is not null)
-            {
-                var report = result.Data;
-                progress.Report($"Fleet totals: {report.TotalHosts} total | compliant {report.CompliantHosts} | mismatch {report.MismatchHosts} | unreachable {report.UnreachableHosts} | error {report.ErrorHosts}");
-
-                if (report.GroupedTargets.Count > 0)
-                {
-                    progress.Report("Observed WSUS targets:");
-                    foreach (var grouping in report.GroupedTargets
-                                 .OrderByDescending(kvp => kvp.Value)
-                                 .ThenBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase))
-                    {
-                        progress.Report($"  - {grouping.Key}: {grouping.Value}");
-                    }
-                }
-            }
-
             return result.Success;
         }).ConfigureAwait(false);
     }
@@ -2101,7 +1876,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// </summary>
     private void NotifyCommandCanExecuteChanged()
     {
-        void NotifyAllCommands()
+        Application.Current.Dispatcher.InvokeAsync(() =>
         {
             QuickDiagnosticsCommand.NotifyCanExecuteChanged();
             QuickCleanupCommand.NotifyCanExecuteChanged();
@@ -2131,20 +1906,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
             RunClientForceCheckInCommand.NotifyCanExecuteChanged();
             RunClientTestConnectivityCommand.NotifyCanExecuteChanged();
             RunClientDiagnosticsCommand.NotifyCanExecuteChanged();
-            RunFleetWsusTargetAuditCommand.NotifyCanExecuteChanged();
             // Phase 15: Mass Operations + Script Generator
             RunMassGpUpdateCommand.NotifyCanExecuteChanged();
             GenerateScriptCommand.NotifyCanExecuteChanged();
-        }
-
-        var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher is null || dispatcher.CheckAccess())
-        {
-            NotifyAllCommands();
-            return;
-        }
-
-        _ = dispatcher.InvokeAsync(NotifyAllCommands, System.Windows.Threading.DispatcherPriority.Normal);
+        }, System.Windows.Threading.DispatcherPriority.Normal);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -2211,6 +1976,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         // Preserve fields not shown in dialog
         updated.LogPanelExpanded = _settings.LogPanelExpanded;
+        updated.LiveTerminalMode = _settings.LiveTerminalMode;
 
         // Check if refresh interval changed (need timer restart)
         var intervalChanged = updated.RefreshIntervalSeconds != _settings.RefreshIntervalSeconds ||
@@ -2261,7 +2027,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void ApplySettings(AppSettings settings)
     {
         IsLogPanelExpanded = settings.LogPanelExpanded;
-        LiveTerminalMode = settings.LiveTerminalMode;
         IsOnline = string.Equals(settings.ServerMode, "Online", StringComparison.Ordinal);
         // Activate override on startup when saved mode is AirGap so auto-detection
         // doesn't flip it back to Online on the first ping check.

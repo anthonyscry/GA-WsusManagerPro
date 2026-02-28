@@ -61,11 +61,10 @@
                         <TextBlock Text="Create GPO"/>
                     </StackPanel>
                 </Button>
-                <Button DockPanel.Dock="Top" ToolTip="Configure WSUS HTTPS binding and SSL settings"
+                <Button DockPanel.Dock="Top" ToolTip="Configure WSUS HTTPS on port 8531"
                         Style="{StaticResource NavBtn}" x:Name="BtnSetHttps"
                         automation:AutomationProperties.AutomationId="SetHttpsButton"
-                        Command="{Binding RunSetHttpsCommand}"
-                        IsEnabled="{Binding IsWsusInstalled}">
+                        Command="{Binding RunSetHttpsCommand}">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="🔒" Width="22" TextAlignment="Center"/>
                         <TextBlock Text="Set HTTPS"/>
@@ -695,78 +694,77 @@
                 <Border x:Name="ClientToolsPanel"
                         automation:AutomationProperties.AutomationId="ClientToolsPanel"
                         Visibility="{Binding IsClientToolsPanelVisible}">
-                    <Border.Resources>
-                        <DataTemplate x:Key="ClientToolsTargetHostCardTemplate">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
+                        <StackPanel>
+
+                            <!-- Target Host -->
                             <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
-                                    Padding="12" Margin="0,0,0,8">
+                                    Padding="16" Margin="0,0,0,12">
                                 <StackPanel>
                                     <TextBlock Text="Target Host" FontSize="14" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,6"/>
-                                    <TextBlock Text="Hostname for remote operations via WinRM."
+                                               Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
+                                    <TextBlock Text="Enter the hostname of the client machine to manage. Operations use WinRM (Windows Remote Management)."
                                                Foreground="{DynamicResource TextSecondary}" FontSize="12"
-                                               TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                               TextWrapping="Wrap" Margin="0,0,0,12"/>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="80"/>
-                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Grid.Column="0" Text="Hostname:"
                                                    Foreground="{DynamicResource TextSecondary}" FontSize="13"
                                                    VerticalAlignment="Center"/>
                                         <TextBox Grid.Column="1"
-                                                 Width="320"
-                                                 HorizontalAlignment="Left"
-                                                 MaxWidth="360"
-                                                 Style="{StaticResource UniformInputTextBox}"
-                                                 automation:AutomationProperties.AutomationId="ClientHostnameTextBox"
-                                                 Text="{Binding ClientHostname, UpdateSourceTrigger=PropertyChanged}"/>
+                                                 Text="{Binding ClientHostname, UpdateSourceTrigger=PropertyChanged}"
+                                                 Background="{DynamicResource InputBackground}"
+                                                 Foreground="{DynamicResource TextPrimary}"
+                                                 BorderBrush="{DynamicResource BorderPrimary}"
+                                                 Padding="8,6" FontSize="13"/>
                                     </Grid>
                                 </StackPanel>
                             </Border>
-                        </DataTemplate>
 
-                        <DataTemplate x:Key="ClientToolsRemoteOperationsCardTemplate">
+                            <!-- Remote Operations -->
                             <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
-                                    Padding="12" Margin="0,0,0,8">
+                                    Padding="16" Margin="0,0,0,12">
                                 <StackPanel>
                                     <TextBlock Text="Remote Operations" FontSize="14" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
+                                               Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,12"/>
                                     <WrapPanel>
                                         <Button Content="Cancel Stuck Jobs" Style="{StaticResource BtnSec}"
                                                 automation:AutomationProperties.AutomationId="CancelStuckJobsButton"
-                                                Padding="12,6" Margin="0,0,6,6"
+                                                Padding="16,8" Margin="0,0,8,8"
                                                 Command="{Binding RunClientCancelStuckJobsCommand}"
-                                                ToolTip="Stop WU services, clear cache, restart - fixes stuck update jobs"/>
+                                                ToolTip="Stop WU services, clear cache, restart — fixes stuck update jobs"/>
                                         <Button Content="Force Check-In" Style="{StaticResource BtnSec}"
                                                 automation:AutomationProperties.AutomationId="RemoteGpUpdateButton"
-                                                Padding="12,6" Margin="0,0,6,6"
+                                                Padding="16,8" Margin="0,0,8,8"
                                                 Command="{Binding RunClientForceCheckInCommand}"
                                                 ToolTip="Run gpupdate, resetauthorization, detectnow, reportnow"/>
                                         <Button Content="Test Connectivity" Style="{StaticResource BtnSec}"
                                                 automation:AutomationProperties.AutomationId="TestConnectivityButton"
-                                                Padding="12,6" Margin="0,0,6,6"
+                                                Padding="16,8" Margin="0,0,8,8"
                                                 Command="{Binding RunClientTestConnectivityCommand}"
                                                 ToolTip="Test TCP connection from client to WSUS server on ports 8530/8531"/>
                                         <Button Content="Run Diagnostics" Style="{StaticResource BtnGreen}"
                                                 automation:AutomationProperties.AutomationId="ClientDiagnosticsButton"
-                                                Padding="12,6" Margin="0,0,6,6"
+                                                Padding="16,8" Margin="0,0,8,8"
                                                 Command="{Binding RunClientDiagnosticsCommand}"
                                                 ToolTip="Gather WSUS settings, service status, last check-in, reboot state"/>
                                     </WrapPanel>
                                 </StackPanel>
                             </Border>
-                        </DataTemplate>
 
-                        <DataTemplate x:Key="ClientToolsMassOperationsCardTemplate">
+                            <!-- Mass Operations -->
                             <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
-                                    Padding="12" Margin="0,0,0,8">
+                                    Padding="16" Margin="0,0,0,12">
                                 <StackPanel>
                                     <TextBlock Text="Mass Operations" FontSize="14" FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
                                     <TextBlock Text="Enter hostnames (one per line, or comma-separated) or load from a text file. Mass GPUpdate runs gpupdate + WSUS check-in on every host."
                                                Foreground="{DynamicResource TextSecondary}" FontSize="12"
                                                TextWrapping="Wrap" Margin="0,0,0,12"/>
-                                    <TextBox
+                                    <TextBox 
                                              automation:AutomationProperties.AutomationId="MassHostnamesTextBox"
                                              Text="{Binding MassHostnames, UpdateSourceTrigger=PropertyChanged}"
                                              Background="{DynamicResource InputBackground}"
@@ -776,86 +774,24 @@
                                              AcceptsReturn="True" TextWrapping="Wrap"
                                              MinHeight="80" MaxHeight="150"
                                              VerticalScrollBarVisibility="Auto"/>
-                                    <WrapPanel Margin="0,6,0,0">
+                                    <WrapPanel Margin="0,8,0,0">
                                         <Button Content="Load from File" Style="{StaticResource BtnSec}"
                                                 automation:AutomationProperties.AutomationId="LoadFromFileButton"
-                                                Padding="12,6" Margin="0,0,6,0"
+                                                Padding="16,8" Margin="0,0,8,0"
                                                 Command="{Binding LoadHostFileCommand}"
                                                 ToolTip="Load hostnames from a text file (one per line)"/>
                                         <Button Content="Mass GPUpdate" Style="{StaticResource BtnGreen}"
                                                 automation:AutomationProperties.AutomationId="MassGpUpdateButton"
-                                                Padding="12,6" Margin="0,0,6,0"
+                                                Padding="16,8" Margin="0,0,8,0"
                                                 Command="{Binding RunMassGpUpdateCommand}"
                                                 ToolTip="Run gpupdate + WSUS check-in on all listed hosts"/>
                                     </WrapPanel>
                                 </StackPanel>
                             </Border>
-                        </DataTemplate>
 
-                        <DataTemplate x:Key="ClientToolsFleetAuditCardTemplate">
+                            <!-- Script Generator -->
                             <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
-                                    Padding="12" Margin="0,0,0,8">
-                                <StackPanel>
-                                    <TextBlock Text="Fleet WSUS Target Audit" FontSize="14" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
-                                    <TextBlock Text="Audit all discovered WSUS clients against the expected WUServer/WUStatusServer target baseline."
-                                               Foreground="{DynamicResource TextSecondary}" FontSize="12"
-                                               TextWrapping="Wrap" Margin="0,0,0,12"/>
-
-                                    <Grid Margin="0,0,0,10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="120"/>
-                                            <ColumnDefinition Width="220"/>
-                                            <ColumnDefinition Width="120"/>
-                                            <ColumnDefinition Width="120"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-
-                                        <TextBlock Grid.Column="0" Text="Expected Host:"
-                                                   Foreground="{DynamicResource TextSecondary}" FontSize="12"
-                                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <TextBox Grid.Column="1"
-                                                 Style="{StaticResource UniformInputTextBox}"
-                                                 automation:AutomationProperties.AutomationId="ExpectedWsusHostnameTextBox"
-                                                 Text="{Binding ExpectedWsusHostname, UpdateSourceTrigger=PropertyChanged}"/>
-
-                                        <TextBlock Grid.Column="2" Text="HTTP Port:"
-                                                   Foreground="{DynamicResource TextSecondary}" FontSize="12"
-                                                   VerticalAlignment="Center" Margin="12,0,8,0"/>
-                                        <TextBox Grid.Column="3"
-                                                 Style="{StaticResource UniformInputTextBox}"
-                                                 automation:AutomationProperties.AutomationId="ExpectedWsusHttpPortTextBox"
-                                                 Text="{Binding ExpectedWsusHttpPort, UpdateSourceTrigger=PropertyChanged}"/>
-                                    </Grid>
-
-                                    <Grid Margin="0,0,0,10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="120"/>
-                                            <ColumnDefinition Width="120"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="HTTPS Port:"
-                                                   Foreground="{DynamicResource TextSecondary}" FontSize="12"
-                                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <TextBox Grid.Column="1"
-                                                 Style="{StaticResource UniformInputTextBox}"
-                                                 automation:AutomationProperties.AutomationId="ExpectedWsusHttpsPortTextBox"
-                                                 Text="{Binding ExpectedWsusHttpsPort, UpdateSourceTrigger=PropertyChanged}"/>
-                                    </Grid>
-
-                                    <Button Content="Run Fleet Audit" Style="{StaticResource BtnGreen}"
-                                            automation:AutomationProperties.AutomationId="FleetWsusTargetAuditButton"
-                                            Padding="12,6" HorizontalAlignment="Left"
-                                            Command="{Binding RunFleetWsusTargetAuditCommand}"
-                                            ToolTip="Audit all clients against expected WSUS host and ports"/>
-                                </StackPanel>
-                            </Border>
-                        </DataTemplate>
-
-                        <DataTemplate x:Key="ClientToolsScriptGeneratorCardTemplate">
-                            <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
-                                    Padding="12" Margin="0,0,0,8">
+                                    Padding="16" Margin="0,0,0,12">
                                 <StackPanel>
                                     <TextBlock Text="Script Generator" FontSize="14" FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
@@ -864,50 +800,61 @@
                                                TextWrapping="Wrap" Margin="0,0,0,12"/>
                                     <Grid Margin="0,0,0,8">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="90"/>
+                                            <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
-                                        <ComboBox Grid.Column="0"
-                                                  Margin="0,0,8,0"
-                                                  Width="260"
-                                                  Style="{StaticResource UniformInputComboBox}"
+                                        <TextBlock Grid.Column="0" Text="Operation:"
+                                                   Foreground="{DynamicResource TextSecondary}" FontSize="13"
+                                                   VerticalAlignment="Center"/>
+                                        <ComboBox Grid.Column="1"
+                                                  
                                                   automation:AutomationProperties.AutomationId="ScriptOperationComboBox"
                                                   ItemsSource="{Binding ScriptOperations}"
-                                                  SelectedItem="{Binding SelectedScriptOperation}"/>
-                                        <Button Grid.Column="1" Content="Generate Script" Style="{StaticResource BtnSec}"
-                                                automation:AutomationProperties.AutomationId="GenerateScriptButton"
-                                                Padding="16,8"
-                                                Command="{Binding GenerateScriptCommand}"
-                                                ToolTip="Generate a PowerShell script file for the selected operation"/>
+                                                  SelectedItem="{Binding SelectedScriptOperation}"
+                                                  Background="{DynamicResource InputBackground}"
+                                                  Foreground="{DynamicResource TextPrimary}"
+                                                  BorderBrush="{DynamicResource BorderPrimary}"
+                                                  Padding="8,6" FontSize="13"/>
                                     </Grid>
+                                    <Button Content="Generate Script" Style="{StaticResource BtnSec}"
+                                            automation:AutomationProperties.AutomationId="GenerateScriptButton"
+                                            Padding="16,8" HorizontalAlignment="Left"
+                                            Command="{Binding GenerateScriptCommand}"
+                                            ToolTip="Generate a PowerShell script file for the selected operation"/>
                                 </StackPanel>
                             </Border>
-                        </DataTemplate>
 
-                        <DataTemplate x:Key="ClientToolsErrorCodeLookupCardTemplate">
+                            <!-- Error Code Lookup -->
                             <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
-                                    Padding="12" Margin="0,0,0,8">
+                                    Padding="16">
                                 <StackPanel>
                                     <TextBlock Text="Error Code Lookup" FontSize="14" FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
-                                    <TextBlock Text="Choose a common code or type a custom WSUS/Windows Update code (e.g., 0x80072EE2)."
+                                    <TextBlock Text="Enter a WSUS or Windows Update error code (e.g., 0x80072EE2) to see its description and recommended fix."
                                                Foreground="{DynamicResource TextSecondary}" FontSize="12"
-                                               TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                               TextWrapping="Wrap" Margin="0,0,0,12"/>
                                     <Grid Margin="0,0,0,8">
                                         <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="90"/>
+                                            <ColumnDefinition Width="200"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <ComboBox Grid.Column="0"
-                                                  Width="260"
-                                                  Style="{StaticResource UniformInputComboBox}"
-                                                  automation:AutomationProperties.AutomationId="ErrorCodeInputTextBox"
-                                                  ItemsSource="{Binding CommonErrorCodes}"
-                                                  Text="{Binding ErrorCodeInput, UpdateSourceTrigger=PropertyChanged}"
-                                                  IsEditable="True"
-                                                  IsTextSearchEnabled="True"
-                                                  StaysOpenOnEdit="False"/>
+                                        <TextBlock Grid.Column="0" Text="Error Code:"
+                                                   Foreground="{DynamicResource TextSecondary}" FontSize="13"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBox Grid.Column="1"
+                                                 
+                                                 automation:AutomationProperties.AutomationId="ErrorCodeInputTextBox"
+                                                 Text="{Binding ErrorCodeInput, UpdateSourceTrigger=PropertyChanged}"
+                                                 Background="{DynamicResource InputBackground}"
+                                                 Foreground="{DynamicResource TextPrimary}"
+                                                 BorderBrush="{DynamicResource BorderPrimary}"
+                                                 Padding="8,6" FontSize="13"/>
+                                        <Button Grid.Column="2" Content="Lookup" Style="{StaticResource BtnSec}"
+                                                Padding="16,6" Margin="8,0,0,0"
+                                                Command="{Binding LookupErrorCodeCommand}"/>
                                     </Grid>
-                                    <TextBox
+                                    <TextBox 
                                              automation:AutomationProperties.AutomationId="ErrorCodeResultTextBox"
                                              Text="{Binding ErrorCodeResult, Mode=OneWay}"
                                              Background="{DynamicResource PrimaryBackground}"
@@ -918,56 +865,6 @@
                                              Padding="8" MinHeight="60"/>
                                 </StackPanel>
                             </Border>
-                        </DataTemplate>
-
-                        <DataTemplate x:Key="ClientToolsCardTemplateSelector">
-                            <ContentControl Content="{Binding}">
-                                <ContentControl.Style>
-                                    <Style TargetType="ContentControl">
-                                        <Setter Property="ContentTemplate" Value="{StaticResource ClientToolsTargetHostCardTemplate}"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding}" Value="TargetHost">
-                                                <Setter Property="ContentTemplate" Value="{StaticResource ClientToolsTargetHostCardTemplate}"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding}" Value="RemoteOperations">
-                                                <Setter Property="ContentTemplate" Value="{StaticResource ClientToolsRemoteOperationsCardTemplate}"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding}" Value="MassOperations">
-                                                <Setter Property="ContentTemplate" Value="{StaticResource ClientToolsMassOperationsCardTemplate}"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding}" Value="FleetAudit">
-                                                <Setter Property="ContentTemplate" Value="{StaticResource ClientToolsFleetAuditCardTemplate}"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding}" Value="ScriptGenerator">
-                                                <Setter Property="ContentTemplate" Value="{StaticResource ClientToolsScriptGeneratorCardTemplate}"/>
-                                            </DataTrigger>
-                                            <DataTrigger Binding="{Binding}" Value="ErrorCodeLookup">
-                                                <Setter Property="ContentTemplate" Value="{StaticResource ClientToolsErrorCodeLookupCardTemplate}"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </ContentControl.Style>
-                            </ContentControl>
-                        </DataTemplate>
-                    </Border.Resources>
-
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="16">
-                        <StackPanel>
-                            <TabControl SelectedIndex="{Binding ClientToolsSelectedSubtabIndex}"
-                                        automation:AutomationProperties.AutomationId="ClientToolsSubtabs">
-                                <TabItem Header="Operations">
-                                    <ItemsControl ItemsSource="{Binding ClientToolsOperationsCardKeys}"
-                                                  ItemTemplate="{StaticResource ClientToolsCardTemplateSelector}"/>
-                                </TabItem>
-                                <TabItem Header="Audit &amp; Scripts">
-                                    <ItemsControl ItemsSource="{Binding ClientToolsAuditCardKeys}"
-                                                  ItemTemplate="{StaticResource ClientToolsCardTemplateSelector}"/>
-                                </TabItem>
-                                <TabItem Header="Utilities">
-                                    <ItemsControl ItemsSource="{Binding ClientToolsUtilityCardKeys}"
-                                                  ItemTemplate="{StaticResource ClientToolsCardTemplateSelector}"/>
-                                </TabItem>
-                            </TabControl>
 
                         </StackPanel>
                     </ScrollViewer>
@@ -1194,7 +1091,6 @@
                                     MinHeight="300">
                                 <ListView x:Name="UpdatesListView"
                                           ItemsSource="{Binding FilteredUpdates}"
-                                          ItemContainerStyle="{StaticResource DarkListViewItem}"
                                           VirtualizingPanel.IsVirtualizing="True"
                                           VirtualizingPanel.VirtualizationMode="Recycling"
                                           ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -1242,7 +1138,6 @@
                                                                 <Style TargetType="TextBlock">
                                                                     <Setter Property="FontSize" Value="12"/>
                                                                     <Setter Property="Foreground" Value="{DynamicResource TextSecondary}"/>
-                                                                    <Setter Property="Text" Value="Not Approved"/>
                                                                     <Style.Triggers>
                                                                         <DataTrigger Binding="{Binding IsApproved}" Value="True">
                                                                             <Setter Property="Foreground" Value="{DynamicResource StatusSuccess}"/>
@@ -1251,6 +1146,11 @@
                                                                         <DataTrigger Binding="{Binding IsDeclined}" Value="True">
                                                                             <Setter Property="Foreground" Value="{DynamicResource StatusError}"/>
                                                                             <Setter Property="Text" Value="Declined"/>
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding IsApproved}" Value="False">
+                                                                            <DataTrigger Binding="{Binding IsDeclined}" Value="False">
+                                                                                <Setter Property="Text" Value="Not Approved"/>
+                                                                            </DataTrigger>
                                                                         </DataTrigger>
                                                                     </Style.Triggers>
                                                                 </Style>
@@ -1273,7 +1173,7 @@
 
                                     <!-- Empty State -->
                                     <ListView.Style>
-                                        <Style TargetType="ListView" BasedOn="{StaticResource VirtualizedListView}">
+                                        <Style TargetType="ListView">
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding FilteredUpdates.Count}" Value="0">
                                                     <Setter Property="Template">
@@ -1313,7 +1213,7 @@
                             </Border>
 
                             <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
-                                     Padding="16" Margin="0,0,0,12">
+                                    Padding="16" Margin="0,0,0,12">
                                 <StackPanel>
                                     <TextBlock Text="Keyboard Shortcuts" FontSize="14" FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
@@ -1345,17 +1245,6 @@
                                         <TextBlock Grid.Row="4" Grid.Column="0" Text="Escape" Foreground="{DynamicResource TextSecondary}" FontSize="12" FontFamily="Consolas"/>
                                         <TextBlock Grid.Row="4" Grid.Column="1" Text="Cancel Operation" Foreground="{DynamicResource TextPrimary}" FontSize="12"/>
                                     </Grid>
-                                </StackPanel>
-                            </Border>
-
-                            <Border Background="{DynamicResource CardBackground}" CornerRadius="6"
-                                    Padding="16" Margin="0,0,0,12">
-                                <StackPanel>
-                                    <TextBlock Text="Troubleshooting Commands" FontSize="14" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
-                                    <TextBlock FontFamily="Consolas" FontSize="11"
-                                               Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap"
-                                                Text="• Service status: Get-Service MSSQL$SQLEXPRESS, W3SVC, WsusService | Format-Table Name,Status&#x0a;• Database size: sqlcmd -S localhost\SQLEXPRESS -d SUSDB -Q 'SELECT name, size*8.0/1024 SizeMB FROM sys.database_files'&#x0a;• WSUS content size: Get-ChildItem C:\\WSUS\\WsusContent -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum | Select-Object Count,@{Name='TotalGB';Expression={[math]::Round($_.Sum / 1GB, 2)}}&#x0a;• Firewall/WSUS ports: Test-NetConnection -ComputerName localhost -Port 8530; Test-NetConnection -ComputerName localhost -Port 8531&#x0a;• WSUS content verification: 'C:\\Program Files\\Update Services\\Tools\\wsusutil.exe' reset"/>
                                 </StackPanel>
                             </Border>
 
@@ -1395,7 +1284,7 @@
                                     Padding="16" Margin="0,0,0,12">
                                 <StackPanel Orientation="Horizontal">
                                     <Image Width="56" Height="56" Margin="0,0,16,0" VerticalAlignment="Center"
-                                           Source="pack://application:,,,/general_atomics_logo_big.ico" Stretch="Uniform"/>
+                                           Source="general_atomics_logo_big.ico" Stretch="Uniform"/>
                                     <StackPanel VerticalAlignment="Center">
                                         <TextBlock Text="WSUS Manager" FontSize="18" FontWeight="Bold"
                                                    Foreground="{DynamicResource TextPrimary}"/>
@@ -1443,7 +1332,7 @@
                                                Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
                                     <TextBlock TextWrapping="Wrap" FontSize="11"
                                                Foreground="{DynamicResource TextSecondary}"
-                                                Text="• Windows Server 2019+&#x0a;• .NET 8.0 Runtime&#x0a;• SQL Server Express 2022&#x0a;• 200GB+ free disk space recommended for WSUS content"/>
+                                               Text="• Windows Server 2019+&#x0a;• .NET 8.0 Runtime&#x0a;• SQL Server Express 2022&#x0a;• 50GB+ disk space"/>
                                     <TextBlock Text="© 2026 GA-ASI. Internal use only." FontSize="10"
                                                Foreground="{DynamicResource TextMuted}" Margin="0,12,0,0"/>
                                 </StackPanel>
@@ -1507,17 +1396,12 @@
                                            TextTrimming="CharacterEllipsis"/>
                             </StackPanel>
 
-                             <StackPanel Grid.Column="2" Orientation="Horizontal">
+                            <StackPanel Grid.Column="2" Orientation="Horizontal">
                                 <Button Content="Cancel" Style="{StaticResource BtnRed}"
                                         automation:AutomationProperties.AutomationId="CancelButton"
                                         Padding="10,4" FontSize="11" Margin="0,0,8,0"
                                         Command="{Binding CancelOperationCommand}"
                                         Visibility="{Binding CancelButtonVisibility}"/>
-                                <Button Content="{Binding LiveTerminalToggleLabel}" Style="{StaticResource BtnSec}"
-                                        automation:AutomationProperties.AutomationId="LiveTerminalToggleButton"
-                                        Padding="10,4" FontSize="11" Margin="0,0,4,0"
-                                        Command="{Binding ToggleLiveTerminalModeCommand}"
-                                        ToolTip="Toggle whether operations open in a visible PowerShell terminal"/>
                                 <Button Content="{Binding LogToggleText}" Style="{StaticResource BtnSec}"
                                         automation:AutomationProperties.AutomationId="ToggleLogButton"
                                         Padding="10,4" FontSize="11" Margin="0,0,4,0"

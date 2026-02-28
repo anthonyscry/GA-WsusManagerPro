@@ -91,39 +91,78 @@ public class LogServiceTests : IDisposable
     }
 
     [Fact]
-    public void CreateLogger_Respects_Configured_Log_Level_And_Retention()
+    public void Warning_Log_Level_Suppresses_Debug_Entries()
     {
         var settings = new AppSettings
         {
             LogLevel = LogLevel.Warning,
-            LogRetentionDays = 7,
-            LogMaxFileSizeMb = 5
+            LogRetentionDays = 30,
+            LogMaxFileSizeMb = 10
         };
 
         using var svc = new LogService(_tempDir, settings);
-        svc.Debug("debug-message-should-not-appear");
-        svc.Warning("warning-message-should-appear");
+
+        svc.Debug("Debug should be suppressed");
+        svc.Warning("Warning should be present");
         svc.Flush();
 
-        var files = Directory.GetFiles(_tempDir, "WsusManager-*.log");
-        Assert.Single(files);
-        var content = File.ReadAllText(files[0]);
+        var logFiles = Directory.GetFiles(_tempDir, "WsusManager-*.log", SearchOption.TopDirectoryOnly);
+        Assert.NotEmpty(logFiles);
 
-        Assert.DoesNotContain("debug-message-should-not-appear", content, StringComparison.Ordinal);
-        Assert.Contains("warning-message-should-appear", content, StringComparison.Ordinal);
+        var logContents = string.Join(Environment.NewLine, logFiles.Select(File.ReadAllText));
+        Assert.DoesNotContain("Debug should be suppressed", logContents);
+        Assert.Contains("Warning should be present", logContents);
     }
 
     [Fact]
-    public void CreateLogger_Persists_Fallback_Marker_LogLine()
+    public void Retention_And_File_Size_Use_AppSettings_Values()
     {
-        using var svc = new LogService(_tempDir, new AppSettings { LogLevel = LogLevel.Info });
+        var settings = new AppSettings
+        {
+            LogLevel = LogLevel.Debug,
+            LogRetentionDays = 2,
+            LogMaxFileSizeMb = 1
+        };
 
-        svc.Info("[FALLBACK] Example fallback marker for parity test.");
+        using var svc = new LogService(_tempDir, settings);
+
+        var payload = new string('X', 300_000);
+        for (var i = 0; i < 300; i++)
+        {
+            svc.Info("{Index} {Payload}", i, payload);
+        }
+
         svc.Flush();
 
-        var files = Directory.GetFiles(_tempDir, "WsusManager-*.log");
-        Assert.Single(files);
-        var content = File.ReadAllText(files[0]);
-        Assert.Contains("[FALLBACK] Example fallback marker for parity test.", content, StringComparison.Ordinal);
+        var logFiles = Directory.GetFiles(_tempDir, "WsusManager-*.log", SearchOption.TopDirectoryOnly);
+        Assert.NotEmpty(logFiles);
+        Assert.True(
+            logFiles.Length > settings.LogRetentionDays,
+            $"Expected more than {settings.LogRetentionDays} files because retention is time-based (days), but found {logFiles.Length}.");
+
+        var maxBytes = settings.LogMaxFileSizeMb * 1024 * 1024;
+        var sizeAllowanceBytes = 256 * 1024;
+        Assert.All(logFiles, file =>
+        {
+            var length = new FileInfo(file).Length;
+            Assert.True(length <= maxBytes + sizeAllowanceBytes, $"File '{file}' length {length} exceeded configured max {maxBytes}");
+        });
+    }
+
+    [Fact]
+    public void ToOptions_Maps_LogLevel_RetentionDays_And_FileSize_From_Settings()
+    {
+        var settings = new AppSettings
+        {
+            LogLevel = LogLevel.Warning,
+            LogRetentionDays = 45,
+            LogMaxFileSizeMb = 7
+        };
+
+        var options = LogConfiguration.ToOptions(settings);
+
+        Assert.Equal(Serilog.Events.LogEventLevel.Warning, options.MinimumLevel);
+        Assert.Equal(TimeSpan.FromDays(45), options.Retention);
+        Assert.Equal(7L * 1024L * 1024L, options.FileSizeLimitBytes);
     }
 }

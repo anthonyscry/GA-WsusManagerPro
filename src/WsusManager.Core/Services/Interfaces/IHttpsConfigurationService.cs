@@ -3,17 +3,18 @@ using WsusManager.Core.Models;
 namespace WsusManager.Core.Services.Interfaces;
 
 /// <summary>
-/// Configures WSUS HTTPS bindings and SSL settings.
+/// Configures WSUS HTTPS (port 8531) using a C#-first strategy.
+/// Implementations may fallback to the legacy PowerShell script when native steps fail.
 /// </summary>
 public interface IHttpsConfigurationService
 {
     /// <summary>
-    /// Configures HTTPS for the WSUS server using a native C# path first,
-    /// with optional fallback behavior handled by the implementation.
+    /// Configures HTTPS for WSUS using the provided server name and certificate thumbprint.
+    /// Native steps are attempted first; fallback may be used automatically.
     /// </summary>
-    Task<OperationResult> ConfigureAsync(
-        string wsusServer,
-        string certThumbprint,
-        IProgress<string>? progress,
+    Task<OperationResult> ConfigureHttpsAsync(
+        string? serverName,
+        string? certificateThumbprint,
+        IProgress<string>? progress = null,
         CancellationToken ct = default);
 }

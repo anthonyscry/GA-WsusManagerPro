@@ -5,8 +5,9 @@ using WsusManager.Core.Services.Interfaces;
 namespace WsusManager.Core.Services;
 
 /// <summary>
-/// Native C# installation path. Current implementation validates input and
-/// reports unavailability so callers can decide whether to fallback.
+/// Native C# install orchestrator entry point.
+/// Current behavior is intentionally conservative: emit native progress and
+/// return a controlled failure so InstallationService can use legacy fallback.
 /// </summary>
 public class NativeInstallationService : INativeInstallationService
 {
@@ -17,30 +18,19 @@ public class NativeInstallationService : INativeInstallationService
         _logService = logService;
     }
 
-    public Task<OperationResult> InstallAsync(
+    /// <inheritdoc />
+    public Task<NativeInstallationResult> InstallAsync(
         InstallOptions options,
         IProgress<string>? progress = null,
         CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(options.InstallerPath))
-        {
-            return Task.FromResult(OperationResult.Fail("Installer path is required for native installation."));
-        }
+        ct.ThrowIfCancellationRequested();
 
-        if (string.IsNullOrWhiteSpace(options.SaPassword))
-        {
-            return Task.FromResult(OperationResult.Fail("SA password is required for native installation."));
-        }
+        progress?.Report("[NATIVE] Starting native WSUS installation orchestration...");
 
-        if (!OperatingSystem.IsWindows())
-        {
-            return Task.FromResult(OperationResult.Fail("Native installation requires Windows."));
-        }
+        const string message = "Native installation orchestrator is not yet implemented for full install execution.";
+        _logService.Warning(message);
 
-        progress?.Report("[NATIVE] Native installation path is not yet implemented; using fallback.");
-        _logService.Warning("Native installation requested but not implemented; caller should fallback.");
-        return Task.FromResult(OperationResult.Fail(
-            "Native installation path is not yet implemented.",
-            new NotSupportedException("Native installation path is not yet implemented.")));
+        return Task.FromResult(NativeInstallationResult.Fail(message, allowLegacyFallback: true));
     }
 }

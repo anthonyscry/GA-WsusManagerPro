@@ -1,30 +1,29 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-
 namespace WsusManager.Core.Services.Interfaces;
 
 /// <summary>
-/// Writes per-operation transcript files that mirror output and can be used for
-/// post-run troubleshooting and audit requirements.
+/// Writes per-operation transcript output to disk.
 /// </summary>
 public interface IOperationTranscriptService
 {
     /// <summary>
-    /// Appends a single line to the transcript for the given operation.
+    /// Gets the current transcript file path, or null when no operation is active.
     /// </summary>
-    /// <param name="operationId">Operation correlation id.</param>
-    /// <param name="operationName">Operation display name.</param>
-    /// <param name="line">Line to append.</param>
-    /// <param name="ct">Cancellation token.</param>
-    Task WriteLineAsync(
-        Guid operationId,
-        string operationName,
-        string line,
-        CancellationToken ct);
+    string? CurrentTranscriptPath { get; }
 
     /// <summary>
-    /// Returns the expected transcript file path for an operation.
+    /// Starts a new operation transcript file and returns the full path.
+    /// If a transcript is already active, it is closed first.
     /// </summary>
-    string GetTranscriptPath(Guid operationId, string operationName);
+    string StartOperation(string operationName);
+
+    /// <summary>
+    /// Appends a line to the active operation transcript.
+    /// No-op when no operation transcript is active.
+    /// </summary>
+    void WriteLine(string line);
+
+    /// <summary>
+    /// Ends the current operation transcript.
+    /// </summary>
+    void EndOperation();
 }

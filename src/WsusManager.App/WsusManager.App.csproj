@@ -37,24 +37,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="general_atomics_logo_big.ico" />
+    <Content Include="general_atomics_logo_big.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="general_atomics_logo_small.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="..\..\Scripts\**\*">
-      <Link>Scripts\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    <Content Include="..\..\Scripts\Set-WsusHttps.ps1" Link="Scripts\Set-WsusHttps.ps1">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-    </Content>
-    <Content Include="..\..\Modules\**\*">
-      <Link>Modules\%(RecursiveDir)%(Filename)%(Extension)</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
     </Content>
   </ItemGroup>
 

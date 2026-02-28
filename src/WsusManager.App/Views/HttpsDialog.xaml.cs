@@ -1,38 +1,35 @@
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Input;
 
 namespace WsusManager.App.Views;
 
+public sealed record HttpsDialogResult(string ServerName, string CertificateThumbprint);
+
 /// <summary>
-/// Collects WSUS server name and certificate thumbprint for HTTPS setup.
+/// Collects WSUS server and certificate thumbprint for HTTPS configuration.
 /// </summary>
 public partial class HttpsDialog : Window
 {
+    private static readonly Regex HexThumbprintRegex = new("^[0-9A-Fa-f]{40}$", RegexOptions.Compiled);
     private KeyEventHandler? _escHandler;
+
+    public HttpsDialogResult? Result { get; private set; }
 
     public HttpsDialog()
     {
         InitializeComponent();
 
-        TxtServerName.Text = Environment.MachineName;
-
         _escHandler = (s, e) =>
         {
             if (e.Key == Key.Escape)
-            {
                 Close();
-            }
         };
-
         KeyDown += _escHandler;
         Closed += Dialog_Closed;
 
         ValidateInputs();
     }
-
-    public string ServerName => TxtServerName.Text.Trim();
-
-    public string CertificateThumbprint => TxtThumbprint.Text.Trim().Replace(" ", string.Empty, StringComparison.Ordinal);
 
     private void Dialog_Closed(object? sender, EventArgs e)
     {
@@ -49,33 +46,46 @@ public partial class HttpsDialog : Window
 
     private void ValidateInputs()
     {
-        if (TxtServerName is null || TxtThumbprint is null || TxtValidation is null || BtnApply is null)
+        if (TxtServerName is null || TxtThumbprint is null || TxtValidation is null || BtnSetHttps is null)
             return;
 
-        if (string.IsNullOrWhiteSpace(ServerName))
+        var serverName = TxtServerName.Text.Trim();
+        var thumbprint = NormalizeThumbprint(TxtThumbprint.Text);
+
+        if (string.IsNullOrWhiteSpace(serverName))
         {
             TxtValidation.Text = "WSUS server name is required.";
-            BtnApply.IsEnabled = false;
+            BtnSetHttps.IsEnabled = false;
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(CertificateThumbprint))
+        if (string.IsNullOrWhiteSpace(thumbprint))
         {
             TxtValidation.Text = "Certificate thumbprint is required.";
-            BtnApply.IsEnabled = false;
+            BtnSetHttps.IsEnabled = false;
+            return;
+        }
+
+        if (!HexThumbprintRegex.IsMatch(thumbprint))
+        {
+            TxtValidation.Text = "Thumbprint must be 40 hexadecimal characters.";
+            BtnSetHttps.IsEnabled = false;
             return;
         }
 
         TxtValidation.Text = string.Empty;
-        BtnApply.IsEnabled = true;
+        BtnSetHttps.IsEnabled = true;
     }
 
     private void Ok_Click(object sender, RoutedEventArgs e)
     {
-        ValidateInputs();
-        if (!BtnApply.IsEnabled)
+        var serverName = TxtServerName.Text.Trim();
+        var thumbprint = NormalizeThumbprint(TxtThumbprint.Text);
+
+        if (string.IsNullOrWhiteSpace(serverName) || !HexThumbprintRegex.IsMatch(thumbprint))
             return;
 
+        Result = new HttpsDialogResult(serverName, thumbprint.ToUpperInvariant());
         DialogResult = true;
         Close();
     }
@@ -85,4 +95,9 @@ public partial class HttpsDialog : Window
         DialogResult = false;
         Close();
     }
+
+    private static string NormalizeThumbprint(string value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : value.Replace(" ", string.Empty, StringComparison.Ordinal).Trim();
 }

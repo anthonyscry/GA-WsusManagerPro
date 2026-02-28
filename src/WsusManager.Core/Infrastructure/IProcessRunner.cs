@@ -9,41 +9,49 @@ namespace WsusManager.Core.Infrastructure;
 public interface IProcessRunner
 {
     /// <summary>
-    /// Runs an external process with captured stdout/stderr unless live terminal is requested
-    /// and opt-in is provided.
+    /// Runs an external process with captured stdout/stderr.
     /// </summary>
     /// <param name="executable">Path to the executable.</param>
     /// <param name="arguments">Command-line arguments.</param>
     /// <param name="progress">Optional progress reporter for real-time output.</param>
     /// <param name="ct">Cancellation token — kills the process on cancellation.</param>
-    /// <param name="enableLiveTerminal">Opt-in flag that allows visible terminal output when the global
-    /// live terminal setting is enabled.</param>
     /// <returns>Process result with exit code and captured output.</returns>
     Task<ProcessResult> RunAsync(
         string executable,
         string arguments,
         IProgress<string>? progress = null,
-        CancellationToken ct = default,
-        bool enableLiveTerminal = false);
+        CancellationToken ct = default);
 
     /// <summary>
-    /// Runs an external process with optional child-process environment variables.
-    /// Environment variables are scoped to the launched process only.
+    /// Runs an external process with default captured mode, but allows the caller to
+    /// opt in to visible terminal execution when settings permit it.
     /// </summary>
     /// <param name="executable">Path to the executable.</param>
     /// <param name="arguments">Command-line arguments.</param>
-    /// <param name="progress">Optional progress reporter for real-time output.</param>
-    /// <param name="ct">Cancellation token - kills the process on cancellation.</param>
-    /// <param name="enableLiveTerminal">Opt-in flag that allows visible terminal output when the global
-    /// live terminal setting is enabled.</param>
-    /// <param name="environmentVariables">Environment variables to set/remove for the child process only.
-    /// Null means no additional variables.</param>
-    /// <returns>Process result with exit code and captured output.</returns>
+    /// <param name="allowVisibleTerminal">
+    /// When true, ProcessRunner may use visible terminal mode if AppSettings.LiveTerminalMode is enabled.
+    /// When false, captured hidden mode is always used.
+    /// </param>
+    /// <param name="progress">Optional progress reporter for real-time output in captured mode.</param>
+    /// <param name="ct">Cancellation token — kills the process on cancellation.</param>
+    /// <returns>Process result with exit code and captured output when captured mode is used.</returns>
     Task<ProcessResult> RunAsync(
         string executable,
         string arguments,
-        IProgress<string>? progress,
-        CancellationToken ct,
-        bool enableLiveTerminal,
-        IReadOnlyDictionary<string, string?>? environmentVariables);
+        bool allowVisibleTerminal,
+        IProgress<string>? progress = null,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Runs an external process in a visible terminal window. Output is not captured,
+    /// so this is only appropriate for callers that do not parse stdout/stderr.
+    /// </summary>
+    /// <param name="executable">Path to the executable.</param>
+    /// <param name="arguments">Command-line arguments.</param>
+    /// <param name="ct">Cancellation token — kills the process on cancellation.</param>
+    /// <returns>Process result with exit code and no captured output.</returns>
+    Task<ProcessResult> RunVisibleAsync(
+        string executable,
+        string arguments,
+        CancellationToken ct = default);
 }

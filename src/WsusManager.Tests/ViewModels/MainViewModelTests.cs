@@ -1,13 +1,10 @@
-using System.Reflection;
-using System.Windows.Data;
 using Moq;
+using System.Windows.Data;
 using WsusManager.App.Services;
 using WsusManager.App.ViewModels;
 using WsusManager.Core.Logging;
 using WsusManager.Core.Models;
 using WsusManager.Core.Services.Interfaces;
-
-#pragma warning disable CA2007
 
 namespace WsusManager.Tests.ViewModels;
 
@@ -31,34 +28,24 @@ public class MainViewModelTests
     private readonly Mock<IImportService> _mockImport = new();
     private readonly Mock<IInstallationService> _mockInstall = new();
     private readonly Mock<IScheduledTaskService> _mockScheduledTask = new();
-    private readonly Mock<IHttpsConfigurationService> _mockHttps = new();
     private readonly Mock<IGpoDeploymentService> _mockGpo = new();
-    private readonly Mock<IHttpsDialogService> _mockHttpsDialogService = new();
     private readonly Mock<IClientService> _mockClient = new();
     private readonly Mock<IScriptGeneratorService> _mockScriptGenerator = new();
     private readonly Mock<IThemeService> _mockThemeService = new();
-    private readonly Mock<IBenchmarkTimingService> _mockBenchmarkTiming = new();
-    private readonly Mock<ISettingsValidationService> _mockValidation = new();
-    private readonly Mock<ICsvExportService> _mockCsvExport = new();
-    private readonly Mock<IOperationTranscriptService> _mockTranscript = new();
+    private readonly Mock<IBenchmarkTimingService> _mockBenchmarkTimingService = new();
+    private readonly Mock<ISettingsValidationService> _mockValidationService = new();
+    private readonly Mock<ICsvExportService> _mockCsvExportService = new();
+    private readonly Mock<IOperationTranscriptService> _mockOperationTranscriptService = new();
+    private readonly Mock<IHttpsConfigurationService> _mockHttpsConfigurationService = new();
     private readonly MainViewModel _vm;
 
     public MainViewModelTests()
     {
         _mockSettings.Setup(s => s.LoadAsync()).ReturnsAsync(new AppSettings());
         _mockSettings.Setup(s => s.Current).Returns(new AppSettings());
-        _mockHttpsDialogService.Setup(d => d.ShowDialog()).Returns((HttpsDialogResult?)null);
-        _mockTranscript
-            .Setup(t => t.WriteLineAsync(
-                It.IsAny<Guid>(),
-                It.IsAny<string>(),
-                It.IsAny<string>(),
-                It.IsAny<CancellationToken>()))
-            .Returns(Task.CompletedTask);
 
         _vm = new MainViewModel(
             _mockLog.Object,
-            _mockTranscript.Object,
             _mockSettings.Object,
             _mockDashboard.Object,
             _mockHealth.Object,
@@ -71,15 +58,15 @@ public class MainViewModelTests
             _mockImport.Object,
             _mockInstall.Object,
             _mockScheduledTask.Object,
-            _mockHttps.Object,
             _mockGpo.Object,
-            _mockHttpsDialogService.Object,
             _mockClient.Object,
             _mockScriptGenerator.Object,
             _mockThemeService.Object,
-            _mockBenchmarkTiming.Object,
-            _mockValidation.Object,
-            _mockCsvExport.Object);
+            _mockBenchmarkTimingService.Object,
+            _mockValidationService.Object,
+            _mockCsvExportService.Object,
+            _mockOperationTranscriptService.Object,
+            _mockHttpsConfigurationService.Object);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -94,7 +81,7 @@ public class MainViewModelTests
         await _vm.RunOperationAsync("Test", async (progress, ct) =>
         {
             wasRunningDuringOp = _vm.IsOperationRunning;
-            await Task.CompletedTask.ConfigureAwait(false);
+            await Task.CompletedTask;
             return true;
         });
 
@@ -107,7 +94,7 @@ public class MainViewModelTests
     {
         var result = await _vm.RunOperationAsync("Test", async (progress, ct) =>
         {
-            await Task.CompletedTask.ConfigureAwait(false);
+            await Task.CompletedTask;
             return true;
         });
 
@@ -122,7 +109,7 @@ public class MainViewModelTests
     {
         var result = await _vm.RunOperationAsync("Test", async (progress, ct) =>
         {
-            await Task.CompletedTask.ConfigureAwait(false);
+            await Task.CompletedTask;
             return false;
         });
 
@@ -136,7 +123,7 @@ public class MainViewModelTests
     {
         var result = await _vm.RunOperationAsync("Test", async (progress, ct) =>
         {
-            await Task.CompletedTask.ConfigureAwait(false);
+            await Task.CompletedTask;
             throw new OperationCanceledException();
         });
 
@@ -150,7 +137,7 @@ public class MainViewModelTests
     {
         var result = await _vm.RunOperationAsync("Test", async (progress, ct) =>
         {
-            await Task.CompletedTask.ConfigureAwait(false);
+            await Task.CompletedTask;
             throw new InvalidOperationException("Something broke");
         });
 
@@ -161,18 +148,70 @@ public class MainViewModelTests
     }
 
     [Fact]
+    public async Task RunOperationAsync_WhenTranscriptStartThrows_ShouldContinueOperation()
+    {
+        _mockOperationTranscriptService
+            .Setup(s => s.StartOperation("TranscriptFail"))
+            .Throws(new IOException("transcript start failed"));
+
+        var operationBodyExecuted = false;
+
+        var result = await _vm.RunOperationAsync("TranscriptFail", async (progress, ct) =>
+        {
+            operationBodyExecuted = true;
+            await Task.CompletedTask;
+            return true;
+        });
+
+        Assert.True(result);
+        Assert.True(operationBodyExecuted);
+        Assert.False(_vm.IsOperationRunning);
+        Assert.Equal(string.Empty, _vm.CurrentOperationName);
+        Assert.Contains("completed", _vm.StatusMessage, StringComparison.OrdinalIgnoreCase);
+
+        _mockLog.Verify(l => l.Warning(
+            It.Is<string>(m => m.Contains("transcript start failed", StringComparison.OrdinalIgnoreCase)),
+            It.IsAny<object[]>()),
+            Times.Once);
+        _mockOperationTranscriptService.Verify(s => s.EndOperation(), Times.Once);
+    }
+
+    [Fact]
+    public async Task RunOperationAsync_WhenTranscriptWriteThrows_ShouldContinueOperation()
+    {
+        _mockOperationTranscriptService
+            .Setup(s => s.WriteLine(It.IsAny<string>()))
+            .Throws(new IOException("transcript write failed"));
+
+        var result = await _vm.RunOperationAsync("TranscriptWriteFail", async (progress, ct) =>
+        {
+            progress.Report("line from operation");
+            await Task.Delay(25, ct);
+            return true;
+        });
+
+        Assert.True(result);
+        Assert.False(_vm.IsOperationRunning);
+
+        _mockLog.Verify(l => l.Debug(
+            It.Is<string>(m => m.Contains("transcript write skipped", StringComparison.OrdinalIgnoreCase)),
+            It.IsAny<object[]>()),
+            Times.AtLeastOnce);
+    }
+
+    [Fact]
     public async Task RunOperationAsync_Blocks_Concurrent_Operations()
     {
         var tcs = new TaskCompletionSource<bool>();
 
         var firstOp = _vm.RunOperationAsync("First", async (progress, ct) =>
         {
-            return await tcs.Task.ConfigureAwait(false);
+            return await tcs.Task;
         });
 
         var secondResult = await _vm.RunOperationAsync("Second", async (progress, ct) =>
         {
-            await Task.CompletedTask.ConfigureAwait(false);
+            await Task.CompletedTask;
             return true;
         });
 
@@ -191,7 +230,7 @@ public class MainViewModelTests
         var opTask = _vm.RunOperationAsync("CancelTest", async (progress, ct) =>
         {
             operationStarted.SetResult();
-            await Task.Delay(TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
+            await Task.Delay(TimeSpan.FromSeconds(30), ct);
             return true;
         });
 
@@ -216,38 +255,13 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public async Task ToggleLiveTerminalModeCommand_Toggles_LiveTerminalMode_And_Saves()
-    {
-        _mockSettings.Setup(s => s.SaveAsync(It.IsAny<AppSettings>())).Returns(Task.CompletedTask);
-
-        var initialState = _vm.LiveTerminalMode;
-
-        await _vm.ToggleLiveTerminalModeCommand.ExecuteAsync(null);
-
-        Assert.Equal(!initialState, _vm.LiveTerminalMode);
-        _mockSettings.Verify(
-            s => s.SaveAsync(It.Is<AppSettings>(settings => settings.LiveTerminalMode == _vm.LiveTerminalMode)),
-            Times.Once);
-    }
-
-    [Fact]
-    public void LiveTerminalToggleLabel_Reflects_Current_State()
-    {
-        _vm.LiveTerminalMode = false;
-        Assert.Equal("Live Terminal: Off", _vm.LiveTerminalToggleLabel);
-
-        _vm.LiveTerminalMode = true;
-        Assert.Equal("Live Terminal: On", _vm.LiveTerminalToggleLabel);
-    }
-
-    [Fact]
     public async Task RunOperationAsync_Reports_Progress()
     {
         await _vm.RunOperationAsync("ProgressTest", async (progress, ct) =>
         {
             progress.Report("Step 1 done");
             progress.Report("Step 2 done");
-            await Task.CompletedTask.ConfigureAwait(false);
+            await Task.CompletedTask;
             return true;
         });
 
@@ -256,19 +270,57 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public async Task RunOperationAsync_Logs_OperationId_OnStartAndFinish()
+    public async Task RunOperationAsync_Logs_Same_OperationId_On_Start_And_Success_Finish()
     {
-        var result = await _vm.RunOperationAsync("Diagnostics", async (_, ct) =>
+        await _vm.RunOperationAsync("TelemetrySuccess", async (progress, ct) =>
         {
-            await Task.Yield();
+            await Task.CompletedTask;
             return true;
         });
 
-        Assert.True(result);
+        var startInvocation = _mockLog.Invocations.Single(i =>
+            string.Equals(i.Method.Name, nameof(ILogService.Info), StringComparison.Ordinal) &&
+            string.Equals(i.Arguments[0] as string, "Starting operation: {Operation} [OperationId: {OperationId}]", StringComparison.Ordinal));
 
-        _mockLog.Verify(
-            l => l.Info(It.Is<string>(m => m.Contains("OperationId", StringComparison.Ordinal)), It.IsAny<object[]>()),
-            Times.AtLeast(2));
+        var finishInvocation = _mockLog.Invocations.Single(i =>
+            string.Equals(i.Method.Name, nameof(ILogService.Info), StringComparison.Ordinal) &&
+            string.Equals(i.Arguments[0] as string, "Operation completed: {Operation} [OperationId: {OperationId}] [ElapsedMs: {ElapsedMs}]", StringComparison.Ordinal));
+
+        var startValues = Assert.IsType<object[]>(startInvocation.Arguments[1]);
+        var finishValues = Assert.IsType<object[]>(finishInvocation.Arguments[1]);
+
+        var startOperationId = Assert.IsType<Guid>(startValues[1]);
+        var finishOperationId = Assert.IsType<Guid>(finishValues[1]);
+
+        Assert.NotEqual(Guid.Empty, startOperationId);
+        Assert.Equal(startOperationId, finishOperationId);
+    }
+
+    [Fact]
+    public async Task RunOperationAsync_Logs_Same_OperationId_On_Start_And_Failure_Finish()
+    {
+        await _vm.RunOperationAsync("TelemetryFailure", async (progress, ct) =>
+        {
+            await Task.CompletedTask;
+            return false;
+        });
+
+        var startInvocation = _mockLog.Invocations.Single(i =>
+            string.Equals(i.Method.Name, nameof(ILogService.Info), StringComparison.Ordinal) &&
+            string.Equals(i.Arguments[0] as string, "Starting operation: {Operation} [OperationId: {OperationId}]", StringComparison.Ordinal));
+
+        var finishInvocation = _mockLog.Invocations.Single(i =>
+            string.Equals(i.Method.Name, nameof(ILogService.Warning), StringComparison.Ordinal) &&
+            string.Equals(i.Arguments[0] as string, "Operation failed: {Operation} [OperationId: {OperationId}] [ElapsedMs: {ElapsedMs}]", StringComparison.Ordinal));
+
+        var startValues = Assert.IsType<object[]>(startInvocation.Arguments[1]);
+        var finishValues = Assert.IsType<object[]>(finishInvocation.Arguments[1]);
+
+        var startOperationId = Assert.IsType<Guid>(startValues[1]);
+        var finishOperationId = Assert.IsType<Guid>(finishValues[1]);
+
+        Assert.NotEqual(Guid.Empty, startOperationId);
+        Assert.Equal(startOperationId, finishOperationId);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -294,28 +346,6 @@ public class MainViewModelTests
         Assert.Equal("Dashboard", _vm.PageTitle);
     }
 
-    [Fact]
-    public void ClientToolsOperationsCardKeys_Are_In_Expected_Order()
-    {
-        Assert.Equal(
-            ["TargetHost", "RemoteOperations", "MassOperations"],
-            _vm.ClientToolsOperationsCardKeys);
-    }
-
-    [Fact]
-    public void ClientToolsAuditCardKeys_Are_In_Expected_Order()
-    {
-        Assert.Equal(
-            ["FleetAudit", "ScriptGenerator"],
-            _vm.ClientToolsAuditCardKeys);
-    }
-
-    [Fact]
-    public void ClientToolsUtilityCardKeys_Are_In_Expected_Order()
-    {
-        Assert.Equal(["ErrorCodeLookup"], _vm.ClientToolsUtilityCardKeys);
-    }
-
     // ═══════════════════════════════════════════════════════════════
     // Dashboard Card Threshold Tests
     // ═══════════════════════════════════════════════════════════════
@@ -334,7 +364,7 @@ public class MainViewModelTests
             IsOnline = true
         };
 
-        InvokeUpdateDashboardCards(data);
+        _vm.UpdateDashboardCards(data);
 
         Assert.Equal("3 / 3", _vm.ServicesValue);
         // Green color: #3FB950
@@ -355,7 +385,7 @@ public class MainViewModelTests
             IsOnline = true
         };
 
-        InvokeUpdateDashboardCards(data);
+        _vm.UpdateDashboardCards(data);
 
         Assert.Equal("1 / 3", _vm.ServicesValue);
         // Orange color: #D29922
@@ -368,7 +398,7 @@ public class MainViewModelTests
         var data = CreateHealthyData();
         data.DatabaseSizeGB = 5.0;
 
-        InvokeUpdateDashboardCards(data);
+        _vm.UpdateDashboardCards(data);
 
         Assert.Equal("5.0 / 10 GB", _vm.DatabaseValue);
         Assert.Equal(Color(0x3F, 0xB9, 0x50), _vm.DatabaseBarColor.Color);
@@ -380,7 +410,7 @@ public class MainViewModelTests
         var data = CreateHealthyData();
         data.DatabaseSizeGB = 7.5;
 
-        InvokeUpdateDashboardCards(data);
+        _vm.UpdateDashboardCards(data);
 
         Assert.Equal("7.5 / 10 GB", _vm.DatabaseValue);
         Assert.Equal(Color(0xD2, 0x99, 0x22), _vm.DatabaseBarColor.Color);
@@ -393,7 +423,7 @@ public class MainViewModelTests
         var data = CreateHealthyData();
         data.DatabaseSizeGB = 9.5;
 
-        InvokeUpdateDashboardCards(data);
+        _vm.UpdateDashboardCards(data);
 
         Assert.Equal("9.5 / 10 GB", _vm.DatabaseValue);
         Assert.Equal(Color(0xF8, 0x51, 0x49), _vm.DatabaseBarColor.Color);
@@ -406,7 +436,7 @@ public class MainViewModelTests
         var data = CreateHealthyData();
         data.DatabaseSizeGB = -1;
 
-        InvokeUpdateDashboardCards(data);
+        _vm.UpdateDashboardCards(data);
 
         Assert.Equal("Offline", _vm.DatabaseValue);
         Assert.Equal(Color(0xF8, 0x51, 0x49), _vm.DatabaseBarColor.Color);
@@ -426,7 +456,7 @@ public class MainViewModelTests
             IsOnline = false
         };
 
-        InvokeUpdateDashboardCards(data);
+        _vm.UpdateDashboardCards(data);
 
         Assert.Equal("N/A", _vm.ServicesValue);
         Assert.Equal("Not Installed", _vm.ServicesSubtext);
@@ -442,7 +472,7 @@ public class MainViewModelTests
         var data = CreateHealthyData();
         data.DiskFreeGB = 5.0;
 
-        InvokeUpdateDashboardCards(data);
+        _vm.UpdateDashboardCards(data);
 
         Assert.Equal("5.0 GB", _vm.DiskValue);
         Assert.Equal(Color(0xF8, 0x51, 0x49), _vm.DiskBarColor.Color);
@@ -459,7 +489,7 @@ public class MainViewModelTests
         var data = CreateHealthyData();
         data.IsOnline = true;
 
-        InvokeUpdateDashboardCards(data);
+        _vm.UpdateDashboardCards(data);
 
         Assert.True(_vm.IsOnline);
         Assert.Equal("Online", _vm.ConnectionStatusText);
@@ -472,7 +502,7 @@ public class MainViewModelTests
         var data = CreateHealthyData();
         data.IsOnline = false;
 
-        InvokeUpdateDashboardCards(data);
+        _vm.UpdateDashboardCards(data);
 
         Assert.False(_vm.IsOnline);
         Assert.Equal("Offline", _vm.ConnectionStatusText);
@@ -776,33 +806,6 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public async Task RunSetHttpsCommand_InvokesHttpsConfigurationService()
-    {
-        _vm.IsWsusInstalled = true;
-
-        _mockHttpsDialogService
-            .Setup(d => d.ShowDialog())
-            .Returns(new HttpsDialogResult("wsus.contoso.local", "THUMBPRINT"));
-
-        _mockHttps
-            .Setup(s => s.ConfigureAsync(
-                "wsus.contoso.local",
-                "THUMBPRINT",
-                It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(OperationResult.Ok("HTTPS configured."));
-
-        await _vm.RunSetHttpsCommand.ExecuteAsync(null);
-
-        _mockHttps.Verify(s => s.ConfigureAsync(
-            "wsus.contoso.local",
-            "THUMBPRINT",
-            It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>()),
-            Times.Once);
-    }
-
-    [Fact]
     public void RunDeepCleanupCommand_CanExecute_False_When_WsusNotInstalled()
     {
         _vm.IsWsusInstalled = false;
@@ -857,89 +860,6 @@ public class MainViewModelTests
     }
 
     [Fact]
-    public async Task RunOnlineSyncWorkflow_Exports_When_Paths_Are_Provided()
-    {
-        _vm.IsWsusInstalled = true;
-
-        _mockSync
-            .Setup(s => s.RunSyncAsync(
-                It.IsAny<SyncProfile>(),
-                It.IsAny<int>(),
-                It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(OperationResult.Ok("Sync complete."));
-
-        _mockExport
-            .Setup(e => e.ExportAsync(
-                It.IsAny<ExportOptions>(),
-                It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(OperationResult.Ok("Export complete."));
-
-        var method = typeof(MainViewModel).GetMethod(
-            "RunOnlineSyncWorkflowAsync",
-            BindingFlags.Instance | BindingFlags.NonPublic);
-
-        Assert.NotNull(method);
-
-        var exportOptions = new ExportOptions
-        {
-            SourcePath = @"C:\WSUS",
-            FullExportPath = @"C:\Exports\Full",
-            ExportDays = 30
-        };
-
-        var task = (Task<bool>)method!.Invoke(_vm, new object?[] { SyncProfile.FullSync, exportOptions })!;
-        var result = await task;
-
-        Assert.True(result);
-        _mockSync.Verify(s => s.RunSyncAsync(
-            It.IsAny<SyncProfile>(),
-            It.IsAny<int>(),
-            It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>()), Times.Once);
-        _mockExport.Verify(e => e.ExportAsync(
-            It.IsAny<ExportOptions>(),
-            It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>()), Times.Once);
-    }
-
-    [Fact]
-    public async Task RunOnlineSyncWorkflow_Skips_Export_When_No_Paths()
-    {
-        _vm.IsWsusInstalled = true;
-
-        _mockSync
-            .Setup(s => s.RunSyncAsync(
-                It.IsAny<SyncProfile>(),
-                It.IsAny<int>(),
-                It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(OperationResult.Ok("Sync complete."));
-
-        var method = typeof(MainViewModel).GetMethod(
-            "RunOnlineSyncWorkflowAsync",
-            BindingFlags.Instance | BindingFlags.NonPublic);
-
-        Assert.NotNull(method);
-
-        var exportOptions = new ExportOptions
-        {
-            SourcePath = @"C:\WSUS",
-            ExportDays = 30
-        };
-
-        var task = (Task<bool>)method!.Invoke(_vm, new object?[] { SyncProfile.FullSync, exportOptions })!;
-        var result = await task;
-
-        Assert.True(result);
-        _mockExport.Verify(e => e.ExportAsync(
-            It.IsAny<ExportOptions>(),
-            It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>()), Times.Never);
-    }
-
-    [Fact]
     public void RunTransferCommand_CanExecute_False_When_WsusNotInstalled()
     {
         _vm.IsWsusInstalled = false;
@@ -953,6 +873,41 @@ public class MainViewModelTests
         _vm.IsWsusInstalled = true;
 
         Assert.True(_vm.RunTransferCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void RunSetHttpsCommand_CanExecute_False_When_WsusNotInstalled()
+    {
+        _vm.IsWsusInstalled = false;
+
+        Assert.False(_vm.RunSetHttpsCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task RunSetHttpsWithInputsAsync_Calls_HttpsConfigurationService()
+    {
+        _vm.IsWsusInstalled = true;
+
+        _mockHttpsConfigurationService
+            .Setup(s => s.ConfigureHttpsAsync(
+                "wsus-server01",
+                "00112233445566778899AABBCCDDEEFF00112233",
+                It.IsAny<IProgress<string>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OperationResult.Ok("HTTPS configured."));
+
+        var success = await _vm.RunSetHttpsWithInputsAsync(
+            "wsus-server01",
+            "00112233445566778899AABBCCDDEEFF00112233");
+
+        Assert.True(success);
+        Assert.Equal("SetHttps", _vm.CurrentPanel);
+        _mockHttpsConfigurationService.Verify(s => s.ConfigureHttpsAsync(
+            "wsus-server01",
+            "00112233445566778899AABBCCDDEEFF00112233",
+            It.IsAny<IProgress<string>>(),
+            It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -1008,145 +963,6 @@ public class MainViewModelTests
         Assert.True(_vm.RunCreateGpoCommand.CanExecute(null));
     }
 
-    [Theory]
-    [InlineData(null, 8530, 8530)]
-    [InlineData("", 8530, 8530)]
-    [InlineData("8530", 8530, 8530)]
-    [InlineData("65535", 8530, 65535)]
-    [InlineData("0", 8530, 8530)]
-    [InlineData("70000", 8530, 8530)]
-    [InlineData("not-a-number", 8530, 8530)]
-    [InlineData(" 8531 ", 8531, 8531)]
-    [InlineData("-1", 8531, 8531)]
-    public void NormalizeWsusPort_Returns_Expected_Value(string? candidate, int fallback, int expected)
-    {
-        var method = typeof(MainViewModel).GetMethod(
-            "NormalizeWsusPort",
-            BindingFlags.Static | BindingFlags.NonPublic);
-
-        Assert.NotNull(method);
-
-        var actual = (int)method!.Invoke(null, new object?[] { candidate, fallback })!;
-        Assert.Equal(expected, actual);
-    }
-
-    [Fact]
-    public async Task CreateGpoDeploymentRequest_Forwards_Host_And_Both_Ports_To_Service()
-    {
-        const string wsusHostname = "wsus01.contoso.local";
-        const int wsusHttpPort = 8530;
-        const int wsusHttpsPort = 8531;
-
-        _mockGpo
-            .Setup(g => g.DeployGpoFilesAsync(
-                wsusHostname,
-                wsusHttpPort,
-                wsusHttpsPort,
-                It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(OperationResult<string>.Ok("ok"));
-
-        var method = typeof(MainViewModel).GetMethod(
-            "DeployCreateGpoFilesAsync",
-            BindingFlags.Instance | BindingFlags.NonPublic);
-
-        Assert.NotNull(method);
-
-        var task = (Task<OperationResult<string>>)method!.Invoke(_vm,
-            new object?[]
-            {
-                wsusHostname,
-                wsusHttpPort,
-                wsusHttpsPort,
-                new Progress<string>(_ => { }),
-                CancellationToken.None
-            })!;
-
-        var result = await task;
-
-        Assert.True(result.Success);
-        _mockGpo.Verify(g => g.DeployGpoFilesAsync(
-            wsusHostname,
-            wsusHttpPort,
-            wsusHttpsPort,
-            It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>()),
-            Times.Once);
-    }
-
-    [Fact]
-    public async Task RunFleetWsusTargetAudit_Forwards_ExpectedHostname_And_Ports_To_Service()
-    {
-        _vm.ExpectedWsusHostname = " wsus-gold.contoso.local ";
-        _vm.ExpectedWsusHttpPort = " 8532 ";
-        _vm.ExpectedWsusHttpsPort = " ";
-
-        _mockDashboard
-            .Setup(d => d.GetComputersAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(
-            [
-                new ComputerInfo("host-a", "10.0.0.10", "Online", DateTime.UtcNow, 0, "Windows 11"),
-                new ComputerInfo("host-a", "10.0.0.11", "Online", DateTime.UtcNow, 0, "Windows 11"),
-                new ComputerInfo("", "10.0.0.12", "Online", DateTime.UtcNow, 0, "Windows 11")
-            ]);
-
-        _mockClient
-            .Setup(c => c.RunFleetWsusTargetAuditAsync(
-                It.IsAny<IReadOnlyList<string>>(),
-                It.IsAny<string>(),
-                It.IsAny<int>(),
-                It.IsAny<int>(),
-                It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(OperationResult<FleetWsusTargetAuditReport>.Ok(new FleetWsusTargetAuditReport()));
-
-        await _vm.RunFleetWsusTargetAuditCommand.ExecuteAsync(null);
-
-        _mockClient.Verify(c => c.RunFleetWsusTargetAuditAsync(
-            It.Is<IReadOnlyList<string>>(hosts => hosts.Count == 1 && hosts[0] == "host-a"),
-            "wsus-gold.contoso.local",
-            8532,
-            8531,
-            It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>()),
-            Times.Once);
-    }
-
-    [Fact]
-    public void RunFleetWsusTargetAuditCommand_CanExecute_False_When_ExpectedHostname_Blank()
-    {
-        _vm.ExpectedWsusHostname = "   ";
-
-        Assert.False(_vm.RunFleetWsusTargetAuditCommand.CanExecute(null));
-    }
-
-    [Fact]
-    public async Task RunFleetWsusTargetAudit_DoesNotCallService_When_Inventory_Is_Empty()
-    {
-        _vm.ExpectedWsusHostname = "wsus-gold.contoso.local";
-        _vm.ExpectedWsusHttpPort = "8530";
-        _vm.ExpectedWsusHttpsPort = "8531";
-
-        _mockDashboard
-            .Setup(d => d.GetComputersAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(
-            [
-                new ComputerInfo("", "10.0.0.10", "Online", DateTime.UtcNow, 0, "Windows 11"),
-                new ComputerInfo("   ", "10.0.0.11", "Online", DateTime.UtcNow, 0, "Windows 11")
-            ]);
-
-        await _vm.RunFleetWsusTargetAuditCommand.ExecuteAsync(null);
-
-        _mockClient.Verify(c => c.RunFleetWsusTargetAuditAsync(
-            It.IsAny<IReadOnlyList<string>>(),
-            It.IsAny<string>(),
-            It.IsAny<int>(),
-            It.IsAny<int>(),
-            It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>()),
-            Times.Never);
-    }
-
     // ═══════════════════════════════════════════════════════════════
     // Phase 7: Comprehensive CanExecute and State Tests
     // ═══════════════════════════════════════════════════════════════
@@ -1165,27 +981,6 @@ public class MainViewModelTests
         _vm.IsWsusInstalled = true;
 
         Assert.True(_vm.ResetContentCommand.CanExecute(null));
-    }
-
-    [Fact]
-    public async Task ResetContentCommand_Executes_WithoutPrompt_When_ConfirmationDisabled()
-    {
-        // Arrange
-        _mockSettings.Setup(s => s.LoadAsync())
-            .ReturnsAsync(new AppSettings { RequireConfirmationDestructive = false });
-
-        await _vm.InitializeAsync();
-        _vm.IsWsusInstalled = true;
-
-        _mockContentReset.Setup(x => x.ResetContentAsync(It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(OperationResult.Ok("Content reset complete."))
-            .Verifiable();
-
-        // Act
-        await _vm.ResetContentCommand.ExecuteAsync(null);
-
-        // Assert
-        _mockContentReset.Verify();
     }
 
     [Fact]
@@ -1272,7 +1067,7 @@ public class MainViewModelTests
         await _vm.RunOperationAsync("TestOp", async (progress, ct) =>
         {
             nameCapture = _vm.CurrentOperationName;
-            await Task.CompletedTask.ConfigureAwait(false);
+            await Task.CompletedTask;
             return true;
         });
 
@@ -1346,7 +1141,7 @@ public class MainViewModelTests
         await _vm.RunOperationAsync("FeedbackTest", async (progress, ct) =>
         {
             wasVisibleDuringOp = _vm.IsProgressBarVisible;
-            await Task.CompletedTask.ConfigureAwait(false);
+            await Task.CompletedTask;
             return true;
         });
 
@@ -1359,7 +1154,7 @@ public class MainViewModelTests
     {
         await _vm.RunOperationAsync("MyOp", async (progress, ct) =>
         {
-            await Task.CompletedTask.ConfigureAwait(false);
+            await Task.CompletedTask;
             return true;
         });
 
@@ -1374,7 +1169,7 @@ public class MainViewModelTests
     {
         await _vm.RunOperationAsync("FailOp", async (progress, ct) =>
         {
-            await Task.CompletedTask.ConfigureAwait(false);
+            await Task.CompletedTask;
             return false;
         });
 
@@ -1393,7 +1188,7 @@ public class MainViewModelTests
         {
             progress.Report("[Step 3/6]: Rebuilding indexes");
             // Allow Progress<T> callback to fire on the UI thread
-            await Task.Delay(50, ct).ConfigureAwait(false);
+            await Task.Delay(50, ct);
             capturedStepText = _vm.OperationStepText;
             return true;
         });
@@ -1407,27 +1202,17 @@ public class MainViewModelTests
         await _vm.RunOperationAsync("CleanupTest", async (progress, ct) =>
         {
             progress.Report("[Step 1/3]: Starting");
-            await Task.CompletedTask.ConfigureAwait(false);
+            await Task.CompletedTask;
             return true;
         });
 
         Assert.False(_vm.IsProgressBarVisible, "IsProgressBarVisible should be false after completion");
-        Assert.Equal(string.Empty, _vm.OperationStepText);
+        Assert.Equal(string.Empty, _vm.OperationStepText, "OperationStepText should be empty after completion");
     }
 
     // ═══════════════════════════════════════════════════════════════
     // Helpers
     // ═══════════════════════════════════════════════════════════════
-
-    private void InvokeUpdateDashboardCards(DashboardData data)
-    {
-        var method = typeof(MainViewModel).GetMethod(
-            "UpdateDashboardCards",
-            BindingFlags.Instance | BindingFlags.NonPublic);
-
-        Assert.NotNull(method);
-        method!.Invoke(_vm, new object[] { data });
-    }
 
     private static DashboardData CreateHealthyData() => new()
     {
@@ -1563,41 +1348,4 @@ public class MainViewModelTests
         Assert.Equal("All", _vm.UpdateClassificationFilter);
         Assert.Empty(_vm.UpdateSearchText);
     }
-
-    [Fact]
-    public async Task LoadUpdatesAsync_ShouldCallSettingsBasedDashboardApi()
-    {
-        var updates = new List<UpdateInfo>
-        {
-            new(Guid.NewGuid(), "Security Update", "5031000", "Security Updates", DateTime.UtcNow, true, false)
-        };
-
-        _mockDashboard
-            .Setup(d => d.GetUpdatesAsync(It.IsAny<AppSettings>(), 1, 100, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(updates);
-
-        await _vm.LoadUpdatesAsync();
-
-        _mockDashboard.Verify(
-            d => d.GetUpdatesAsync(It.IsAny<AppSettings>(), 1, 100, It.IsAny<CancellationToken>()),
-            Times.Once);
-    }
-
-    [Fact]
-    public void CommonErrorCodes_Contains_Known_Update_Error_Codes()
-    {
-        Assert.Contains("0x80072EE2", _vm.CommonErrorCodes);
-        Assert.Contains("0x80244022", _vm.CommonErrorCodes);
-    }
-
-    [Fact]
-    public void CommonErrorCodes_All_Map_To_Known_Wsus_Error_Definitions()
-    {
-        foreach (var code in _vm.CommonErrorCodes)
-        {
-            Assert.NotNull(WsusErrorCodes.Lookup(code));
-        }
-    }
 }
-
-#pragma warning restore CA2007

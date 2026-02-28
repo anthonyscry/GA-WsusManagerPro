@@ -1,23 +1,37 @@
-using System;
-
 namespace WsusManager.Core.Models;
 
 /// <summary>
-/// Encapsulates per-operation telemetry metadata used for structured logging.
+/// Holds telemetry data for a single operation execution.
 /// </summary>
-public sealed record OperationTelemetryContext(
-    Guid OperationId,
-    string OperationName,
-    DateTimeOffset StartedAtUtc)
+public sealed record OperationTelemetryContext
 {
-    /// <summary>Initializes a new instance of the <see cref="OperationTelemetryContext"/> class.</summary>
-    public OperationTelemetryContext(string operationName)
-        : this(Guid.NewGuid(), operationName, DateTimeOffset.UtcNow)
+    private readonly long _startTimestamp;
+
+    private OperationTelemetryContext(Guid operationId, string operationName, DateTime startedAtUtc, long startTimestamp)
     {
+        OperationId = operationId;
+        OperationName = operationName;
+        StartedAtUtc = startedAtUtc;
+        _startTimestamp = startTimestamp;
     }
 
-    /// <summary>
-    /// Duration since this operation started.
-    /// </summary>
-    public TimeSpan Elapsed => DateTimeOffset.UtcNow - StartedAtUtc;
+    public Guid OperationId { get; }
+
+    public string OperationName { get; }
+
+    public DateTime StartedAtUtc { get; }
+
+    public static OperationTelemetryContext Start(string operationName)
+    {
+        return new OperationTelemetryContext(
+            Guid.NewGuid(),
+            operationName,
+            DateTime.UtcNow,
+            System.Diagnostics.Stopwatch.GetTimestamp());
+    }
+
+    public TimeSpan GetElapsed()
+    {
+        return System.Diagnostics.Stopwatch.GetElapsedTime(_startTimestamp);
+    }
 }

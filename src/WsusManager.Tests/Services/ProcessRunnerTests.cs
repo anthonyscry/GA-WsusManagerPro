@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Moq;
 using WsusManager.Core.Infrastructure;
 using WsusManager.Core.Logging;
@@ -9,43 +10,62 @@ namespace WsusManager.Tests.Services;
 public class ProcessRunnerTests
 {
     [Fact]
-    public async Task RunAsync_WithLiveTerminalOptIn_UsesVisibleProcessStart()
+    public async Task RunAsync_WhenLiveTerminalModeEnabledInSettings_StillCapturesOutput()
     {
-        var mockLog = new Mock<ILogService>();
-        var mockSettings = new Mock<ISettingsService>();
-        mockSettings.Setup(s => s.Current).Returns(new AppSettings { LiveTerminalMode = true });
+        var runner = CreateRunner(liveTerminalMode: true);
 
-        var runner = new ProcessRunner(mockLog.Object, mockSettings.Object);
-        var executable = OperatingSystem.IsWindows() ? "cmd.exe" : "/bin/sh";
-        var arguments = OperatingSystem.IsWindows() ? "/c exit 0" : "-c \"exit 0\"";
+        var command = GetEchoCommand("process-runner-capture");
 
-        _ = await runner.RunAsync(executable, arguments, enableLiveTerminal: true).ConfigureAwait(false);
+        var result = await runner.RunAsync(command.Executable, command.Arguments).ConfigureAwait(false);
 
-        Assert.NotNull(runner.LastStartInfoSnapshot);
-        Assert.False(runner.LastStartInfoSnapshot!.CreateNoWindow);
-        Assert.True(runner.LastStartInfoSnapshot.UseShellExecute);
-        Assert.False(runner.LastStartInfoSnapshot.RedirectStandardOutput);
-        Assert.False(runner.LastStartInfoSnapshot.RedirectStandardError);
+        Assert.True(result.Success);
+        Assert.Contains(result.OutputLines, line => line.Contains("process-runner-capture", StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task RunAsync_LiveTerminalSetting_WithoutOptIn_RemainsCaptured()
+    public async Task RunAsync_WhenOptInAndLiveTerminalEnabled_UsesVisibleModeWithoutCapture()
     {
-        var mockLog = new Mock<ILogService>();
-        var mockSettings = new Mock<ISettingsService>();
-        mockSettings.Setup(s => s.Current).Returns(new AppSettings { LiveTerminalMode = true });
+        var runner = CreateRunner(liveTerminalMode: true);
+        var command = GetEchoCommand("process-runner-visible");
 
-        var runner = new ProcessRunner(mockLog.Object, mockSettings.Object);
-        var executable = OperatingSystem.IsWindows() ? "cmd.exe" : "/bin/sh";
-        var arguments = OperatingSystem.IsWindows() ? "/c exit 0" : "-c \"exit 0\"";
+        var result = await runner.RunAsync(
+            command.Executable,
+            command.Arguments,
+            allowVisibleTerminal: true).ConfigureAwait(false);
 
-        _ = await runner.RunAsync(executable, arguments).ConfigureAwait(false);
+        Assert.True(result.Success);
+        Assert.Empty(result.OutputLines);
+    }
 
-        Assert.NotNull(runner.LastStartInfoSnapshot);
-        Assert.True(runner.LastStartInfoSnapshot!.CreateNoWindow);
-        Assert.False(runner.LastStartInfoSnapshot.UseShellExecute);
-        Assert.True(runner.LastStartInfoSnapshot.RedirectStandardOutput);
-        Assert.True(runner.LastStartInfoSnapshot.RedirectStandardError);
+    [Fact]
+    public async Task RunAsync_WhenOptInAndLiveTerminalDisabled_RemainsHiddenAndCapturesOutput()
+    {
+        var runner = CreateRunner(liveTerminalMode: false);
+
+        var command = GetEchoCommand("process-runner-hidden");
+
+        var result = await runner.RunAsync(
+            command.Executable,
+            command.Arguments,
+            allowVisibleTerminal: true).ConfigureAwait(false);
+
+        Assert.True(result.Success);
+        Assert.Contains(result.OutputLines, line => line.Contains("process-runner-hidden", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RunAsync_WhenOptInAndLiveTerminalEnabledAndCancelled_ThrowsOperationCanceledException()
+    {
+        var runner = CreateRunner(liveTerminalMode: true);
+        var command = GetSleepCommand(30);
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            runner.RunAsync(
+                command.Executable,
+                command.Arguments,
+                allowVisibleTerminal: true,
+                ct: cts.Token)).ConfigureAwait(false);
     }
 
     [Fact]
@@ -63,7 +83,7 @@ public class ProcessRunnerTests
                 capturedValues = values;
             });
 
-        var runner = new ProcessRunner(mockLog.Object);
+        var runner = CreateRunner(mockLog.Object, liveTerminalMode: false);
 
         _ = await Assert.ThrowsAnyAsync<Exception>(() =>
             runner.RunAsync("__not_a_real_executable__", "-SaPassword \"SuperSecret123!\" -Password=\"OtherSecret!\" /RP \"TaskSecret\"")).ConfigureAwait(false);
@@ -89,7 +109,7 @@ public class ProcessRunnerTests
                 capturedValues = values;
             });
 
-        var runner = new ProcessRunner(mockLog.Object);
+        var runner = CreateRunner(mockLog.Object, liveTerminalMode: false);
 
         _ = await Assert.ThrowsAnyAsync<Exception>(() =>
             runner.RunAsync("__not_a_real_executable__", "-ExecutionPolicy Bypass -File script.ps1")).ConfigureAwait(false);
@@ -100,110 +120,31 @@ public class ProcessRunnerTests
         Assert.Equal("__not_a_real_executable__", capturedValues![0]);
     }
 
-    [Fact]
-    public async Task RunAsync_DefaultMode_DoesNotEmitLiveTerminalMarker()
+    private static ProcessRunner CreateRunner(ILogService? logService = null, bool liveTerminalMode = false)
     {
-        var mockLog = new Mock<ILogService>();
         var mockSettings = new Mock<ISettingsService>();
-        mockSettings.Setup(s => s.Current).Returns(new AppSettings { LiveTerminalMode = false });
+        mockSettings.SetupGet(s => s.Current).Returns(new AppSettings { LiveTerminalMode = liveTerminalMode });
 
-        var lines = new List<string>();
-        var progress = new Progress<string>(line => lines.Add(line));
-
-        var runner = new ProcessRunner(mockLog.Object, mockSettings.Object);
-        var executable = OperatingSystem.IsWindows() ? "cmd.exe" : "/bin/sh";
-        var arguments = OperatingSystem.IsWindows() ? "/c exit 0" : "-c \"exit 0\"";
-
-        _ = await runner.RunAsync(executable, arguments, progress).ConfigureAwait(false);
-
-        Assert.DoesNotContain(lines, l => l.Contains("Live Terminal mode enabled", StringComparison.Ordinal));
+        return new ProcessRunner(logService ?? Mock.Of<ILogService>(), mockSettings.Object);
     }
 
-    [Fact]
-    public async Task RunAsync_LiveTerminalSettingWithoutOptIn_DoesNotEmitLiveTerminalMarker()
+    private static (string Executable, string Arguments) GetEchoCommand(string message)
     {
-        var mockLog = new Mock<ILogService>();
-        var mockSettings = new Mock<ISettingsService>();
-        mockSettings.Setup(s => s.Current).Returns(new AppSettings { LiveTerminalMode = true });
-
-        var lines = new List<string>();
-        var progress = new Progress<string>(line => lines.Add(line));
-
-        var runner = new ProcessRunner(mockLog.Object, mockSettings.Object);
-        var executable = OperatingSystem.IsWindows() ? "cmd.exe" : "/bin/sh";
-        var arguments = OperatingSystem.IsWindows() ? "/c exit 0" : "-c \"exit 0\"";
-
-        _ = await runner.RunAsync(executable, arguments, progress).ConfigureAwait(false);
-
-        Assert.DoesNotContain(lines, l => l.Contains("Live Terminal mode enabled", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public async Task RunAsync_WithScopedEnvironmentVariables_PassesValuesToChildProcessOnly()
-    {
-        const string variableName = "WSUS_TEST_ENV";
-        const string expectedValue = "ScopedValue123";
-
-        var originalValue = Environment.GetEnvironmentVariable(variableName, EnvironmentVariableTarget.Process);
-
-        try
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            var mockLog = new Mock<ILogService>();
-            var runner = new ProcessRunner(mockLog.Object);
-
-            var executable = OperatingSystem.IsWindows() ? "cmd.exe" : "/bin/sh";
-            var arguments = OperatingSystem.IsWindows()
-                ? "/c echo %WSUS_TEST_ENV%"
-                : "-c \"printf '%s' \\\"$WSUS_TEST_ENV\\\"\"";
-
-            var result = await runner.RunAsync(
-                executable,
-                arguments,
-                progress: null,
-                ct: CancellationToken.None,
-                enableLiveTerminal: false,
-                environmentVariables: new Dictionary<string, string?>
-                {
-                    [variableName] = expectedValue
-                }).ConfigureAwait(false);
-
-            Assert.True(result.Success);
-            Assert.Contains(result.OutputLines, line => line.Contains(expectedValue, StringComparison.Ordinal));
-            Assert.Equal(originalValue, Environment.GetEnvironmentVariable(variableName, EnvironmentVariableTarget.Process));
+            return ("cmd.exe", $"/c echo {message}");
         }
-        finally
-        {
-            Environment.SetEnvironmentVariable(variableName, originalValue, EnvironmentVariableTarget.Process);
-        }
+
+        return ("/bin/sh", $"-c \"printf '{message}\\n'\"");
     }
 
-    [Fact]
-    public async Task RunAsync_WithScopedEnvironmentVariables_DisablesLiveTerminalMode()
+    private static (string Executable, string Arguments) GetSleepCommand(int seconds)
     {
-        var mockLog = new Mock<ILogService>();
-        var mockSettings = new Mock<ISettingsService>();
-        mockSettings.Setup(s => s.Current).Returns(new AppSettings { LiveTerminalMode = true });
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return ("cmd.exe", $"/c timeout /t {seconds} /nobreak >nul");
+        }
 
-        var lines = new List<string>();
-        var progress = new Progress<string>(line => lines.Add(line));
-
-        var runner = new ProcessRunner(mockLog.Object, mockSettings.Object);
-        var executable = OperatingSystem.IsWindows() ? "cmd.exe" : "/bin/sh";
-        var arguments = OperatingSystem.IsWindows() ? "/c exit 0" : "-c \"exit 0\"";
-
-        _ = await runner.RunAsync(
-            executable,
-            arguments,
-            progress,
-            CancellationToken.None,
-            enableLiveTerminal: true,
-            environmentVariables: new Dictionary<string, string?> { ["WSUS_TEST_ENV"] = "value" }).ConfigureAwait(false);
-
-        Assert.NotNull(runner.LastStartInfoSnapshot);
-        Assert.True(runner.LastStartInfoSnapshot!.CreateNoWindow);
-        Assert.False(runner.LastStartInfoSnapshot.UseShellExecute);
-        Assert.True(runner.LastStartInfoSnapshot.RedirectStandardOutput);
-        Assert.True(runner.LastStartInfoSnapshot.RedirectStandardError);
-        Assert.Contains(lines, line => line.Contains("Live Terminal mode disabled", StringComparison.Ordinal));
+        return ("/bin/sh", $"-c \"sleep {seconds}\"");
     }
 }

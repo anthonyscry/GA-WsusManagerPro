@@ -1,21 +1,19 @@
 using System.Diagnostics;
 using System.IO;
-using System.Windows;
 using System.Text.Json;
+using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
-using Serilog.Events;
-using WsusManager.Core.Models;
 using WsusManager.App.Services;
 using WsusManager.App.ViewModels;
 using WsusManager.App.Views;
 using WsusManager.Core.Infrastructure;
 using WsusManager.Core.Logging;
+using WsusManager.Core.Models;
 using WsusManager.Core.Services;
 using WsusManager.Core.Services.Interfaces;
-using AppLogLevel = WsusManager.Core.Models.LogLevel;
 
 namespace WsusManager.App;
 
@@ -25,19 +23,19 @@ namespace WsusManager.App;
 /// </summary>
 public static class Program
 {
-    public const string AppVersion = "4.5.19";
+    public const string AppVersion = "4.5.9";
     private const string LogDirectory = @"C:\WSUS\Logs";
 
     [STAThread]
     public static void Main(string[] args)
     {
         var startupTimer = Stopwatch.StartNew();
-        var startupSettings = LoadStartupSettings();
+        var loggingSettings = LoadLoggingSettings();
 
         // Create structured logger early so all startup activity is captured
-        var logService = new LogService(LogDirectory, startupSettings);
+        var logService = new LogService(LogDirectory, loggingSettings);
 
-        var host = CreateHost(args, logService, startupSettings);
+        var host = CreateHost(args, logService, loggingSettings);
 
         var app = new App();
         app.InitializeComponent();
@@ -77,32 +75,16 @@ public static class Program
     /// Creates the DI host with all services registered.
     /// Exposed as internal for integration testing.
     /// </summary>
-    internal static IHost CreateHost(string[] args, LogService logService, AppSettings startupSettings)
+    internal static IHost CreateHost(string[] args, LogService logService, AppSettings loggingSettings)
+        => CreateHost(args, logService, loggingSettings, LogDirectory);
+
+    internal static IHost CreateHost(string[] args, LogService logService, AppSettings loggingSettings, string hostLogDirectory)
     {
         var builder = Host.CreateApplicationBuilder(args);
 
-        var retentionDays = Math.Clamp(startupSettings.LogRetentionDays, 1, 365);
-        var fileSizeBytes = (long)Math.Clamp(startupSettings.LogMaxFileSizeMb, 1, 1000) * 1024 * 1024;
-        var level = startupSettings.LogLevel switch
-        {
-            AppLogLevel.Debug => LogEventLevel.Debug,
-            AppLogLevel.Info => LogEventLevel.Information,
-            AppLogLevel.Warning => LogEventLevel.Warning,
-            AppLogLevel.Error => LogEventLevel.Error,
-            AppLogLevel.Fatal => LogEventLevel.Fatal,
-            _ => LogEventLevel.Information
-        };
-
         // Configure Serilog as the logging provider for Microsoft.Extensions.Logging
-        var serilogLogger = new LoggerConfiguration()
-            .MinimumLevel.Is(level)
-            .WriteTo.File(
-                Path.Combine(LogDirectory, "WsusManager-.log"),
-                rollingInterval: Serilog.RollingInterval.Day,
-                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}",
-                retainedFileCountLimit: retentionDays,
-                fileSizeLimitBytes: fileSizeBytes,
-                shared: true)
+        var serilogLogger = LogConfiguration
+            .CreateFileLoggerConfiguration(Path.Combine(hostLogDirectory, "WsusManager-.log"), loggingSettings)
             .CreateLogger();
 
         builder.Logging.ClearProviders();
@@ -110,7 +92,6 @@ public static class Program
 
         // Core services
         builder.Services.AddSingleton<ILogService>(logService);
-        builder.Services.AddSingleton<IOperationTranscriptService>(_ => new OperationTranscriptService(LogDirectory));
         builder.Services.AddSingleton<ISettingsService, SettingsService>();
         builder.Services.AddSingleton<IProcessRunner, ProcessRunner>();
         builder.Services.AddSingleton<IDashboardService, DashboardService>();
@@ -124,7 +105,6 @@ public static class Program
 
         // Phase 4: Database Operations
         builder.Services.AddSingleton<ISqlService, SqlService>();
-        builder.Services.AddSingleton<IWsusCleanupExecutor, WsusCleanupExecutor>();
         builder.Services.AddSingleton<IDeepCleanupService, DeepCleanupService>();
         builder.Services.AddSingleton<IDatabaseBackupService, DatabaseBackupService>();
 
@@ -134,12 +114,9 @@ public static class Program
         builder.Services.AddSingleton<IRobocopyService, RobocopyService>();
         builder.Services.AddSingleton<IExportService, ExportService>();
         builder.Services.AddSingleton<IImportService, ImportService>();
-        builder.Services.AddSingleton<LegacyHttpsConfigurationFallback>();
-        builder.Services.AddSingleton<IHttpsConfigurationService, HttpsConfigurationService>();
 
         // Phase 6: Installation and Scheduling
         builder.Services.AddSingleton<INativeInstallationService, NativeInstallationService>();
-        builder.Services.AddSingleton<IMaintenanceCommandBuilder, MaintenanceCommandBuilder>();
         builder.Services.AddSingleton<IInstallationService, InstallationService>();
         builder.Services.AddSingleton<IScheduledTaskService, ScheduledTaskService>();
         builder.Services.AddSingleton<IGpoDeploymentService, GpoDeploymentService>();
@@ -153,7 +130,6 @@ public static class Program
 
         // Phase 16: Theme Infrastructure
         builder.Services.AddSingleton<IThemeService, ThemeService>();
-        builder.Services.AddSingleton<IHttpsDialogService, HttpsDialogService>();
 
         // Phase 27: Visual Feedback Polish
         builder.Services.AddSingleton<IBenchmarkTimingService, BenchmarkTimingService>();
@@ -164,6 +140,13 @@ public static class Program
         // Phase 30: Data Export
         builder.Services.AddSingleton<ICsvExportService, CsvExportService>();
 
+        // Task 3: Per-operation transcript writer
+        builder.Services.AddSingleton<IOperationTranscriptService, OperationTranscriptService>();
+
+        // Task 5: HTTPS configuration (C#-first + fallback)
+        builder.Services.AddSingleton<LegacyHttpsConfigurationFallback>();
+        builder.Services.AddSingleton<IHttpsConfigurationService, HttpsConfigurationService>();
+
         // ViewModels
         builder.Services.AddSingleton<MainViewModel>();
 
@@ -173,30 +156,20 @@ public static class Program
         return builder.Build();
     }
 
-    private static string GetSettingsPath()
-    {
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        return Path.Combine(appData, "WsusManager", "settings.json");
-    }
-
-    private static AppSettings LoadStartupSettings()
+    private static AppSettings LoadLoggingSettings()
     {
         try
         {
-            var settingsPath = GetSettingsPath();
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var settingsPath = Path.Combine(appData, "WsusManager", "settings.json");
+
             if (!File.Exists(settingsPath))
             {
                 return new AppSettings();
             }
 
             var json = File.ReadAllText(settingsPath);
-            if (string.IsNullOrWhiteSpace(json))
-            {
-                return new AppSettings();
-            }
-
-            var settings = JsonSerializer.Deserialize<AppSettings>(json);
-            return settings ?? new AppSettings();
+            return JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
         }
         catch
         {

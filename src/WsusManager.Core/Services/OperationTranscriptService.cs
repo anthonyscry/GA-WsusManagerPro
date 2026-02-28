@@ -1,74 +1,133 @@
-using System;
-using System.Collections.Concurrent;
-using System.IO;
-using System.Linq;
-using System.Text.RegularExpressions;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Text;
 using WsusManager.Core.Services.Interfaces;
 
 namespace WsusManager.Core.Services;
 
 /// <summary>
-/// Creates and appends transcript files for each long-running operation.
-/// File path format is deterministic per operation id + operation name.
+/// File-based operation transcript writer.
+/// Creates one transcript file per operation under the transcript directory.
 /// </summary>
-public sealed class OperationTranscriptService : IOperationTranscriptService
+public sealed class OperationTranscriptService : IOperationTranscriptService, IDisposable
 {
-    private const string TranscriptSubfolder = "Transcripts";
-    private const string DefaultOperationName = "Operation";
-    private static readonly ConcurrentDictionary<string, SemaphoreSlim> FileWriteLocks = new(StringComparer.Ordinal);
-    private readonly string _transcriptsDirectory;
+    private const string DefaultTranscriptDirectory = @"C:\WSUS\Logs\Transcripts";
+    private const int DefaultMaxTranscriptFiles = 200;
 
-    public OperationTranscriptService(string logDirectory)
+    private readonly string _transcriptDirectory;
+    private readonly int _maxTranscriptFiles;
+    private readonly object _sync = new();
+    private long _operationCounter;
+    private StreamWriter? _writer;
+
+    public OperationTranscriptService()
+        : this(DefaultTranscriptDirectory, DefaultMaxTranscriptFiles)
     {
-        _transcriptsDirectory = Path.Combine(logDirectory, TranscriptSubfolder);
     }
 
-    public async Task WriteLineAsync(
-        Guid operationId,
-        string operationName,
-        string line,
-        CancellationToken ct)
+    public OperationTranscriptService(string transcriptDirectory)
+        : this(transcriptDirectory, DefaultMaxTranscriptFiles)
     {
-        var path = GetTranscriptPath(operationId, operationName);
-        Directory.CreateDirectory(_transcriptsDirectory);
+    }
 
-        var fileLock = FileWriteLocks.GetOrAdd(path, _ => new SemaphoreSlim(1, 1));
-        await fileLock.WaitAsync(ct).ConfigureAwait(false);
+    public OperationTranscriptService(string transcriptDirectory, int maxTranscriptFiles)
+    {
+        _transcriptDirectory = transcriptDirectory;
+        _maxTranscriptFiles = maxTranscriptFiles < 1 ? 1 : maxTranscriptFiles;
+    }
 
+    public string? CurrentTranscriptPath { get; private set; }
+
+    public string StartOperation(string operationName)
+    {
+        var safeOperationName = SanitizeFileName(operationName);
+        var timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss-fff");
+        var sequence = Interlocked.Increment(ref _operationCounter);
+        var fileName = $"{timestamp}-{sequence:D6}-{safeOperationName}.log";
+
+        lock (_sync)
+        {
+            EndOperationInternal();
+
+            Directory.CreateDirectory(_transcriptDirectory);
+            var transcriptPath = Path.Combine(_transcriptDirectory, fileName);
+
+            _writer = new StreamWriter(transcriptPath, append: false, new UTF8Encoding(false));
+            CurrentTranscriptPath = transcriptPath;
+            _writer.Flush();
+
+            CleanupOldTranscripts();
+
+            return transcriptPath;
+        }
+    }
+
+    public void WriteLine(string line)
+    {
+        lock (_sync)
+        {
+            if (_writer is null)
+            {
+                return;
+            }
+
+            _writer.WriteLine(line);
+            _writer.Flush();
+        }
+    }
+
+    public void EndOperation()
+    {
+        lock (_sync)
+        {
+            EndOperationInternal();
+        }
+    }
+
+    public void Dispose()
+    {
+        EndOperation();
+    }
+
+    private void EndOperationInternal()
+    {
+        _writer?.Dispose();
+        _writer = null;
+        CurrentTranscriptPath = null;
+    }
+
+    private static string SanitizeFileName(string operationName)
+    {
+        if (string.IsNullOrWhiteSpace(operationName))
+        {
+            return "operation";
+        }
+
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var chars = operationName
+            .Trim()
+            .Select(c => invalidChars.Contains(c) ? '-' : c)
+            .ToArray();
+
+        var sanitized = new string(chars).Replace(' ', '-');
+        return string.IsNullOrWhiteSpace(sanitized) ? "operation" : sanitized;
+    }
+
+    private void CleanupOldTranscripts()
+    {
         try
         {
-            await File.AppendAllTextAsync(
-                path,
-                line + Environment.NewLine,
-                ct).ConfigureAwait(false);
+            var transcriptFiles = Directory
+                .GetFiles(_transcriptDirectory, "*.log", SearchOption.TopDirectoryOnly)
+                .OrderByDescending(Path.GetFileName, StringComparer.Ordinal)
+                .ToArray();
+
+            foreach (var oldFile in transcriptFiles.Skip(_maxTranscriptFiles))
+            {
+                File.Delete(oldFile);
+            }
         }
-        finally
+        catch
         {
-            fileLock.Release();
+            // Retention cleanup is best-effort and must not block transcript creation.
         }
-    }
-
-    public string GetTranscriptPath(Guid operationId, string operationName)
-    {
-        var safeName = SanitizeFileName(string.IsNullOrWhiteSpace(operationName)
-            ? DefaultOperationName
-            : operationName);
-        var fileName = $"{safeName}_{operationId:D}.log";
-        return Path.Combine(_transcriptsDirectory, fileName);
-    }
-
-    private static string SanitizeFileName(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return DefaultOperationName;
-        }
-
-        var invalidChars = Regex.Escape(new string(Path.GetInvalidFileNameChars().Distinct().ToArray()));
-        var replaced = Regex.Replace(value, $"[{invalidChars}]+", "_", RegexOptions.Compiled);
-        var sanitized = replaced.Trim('_');
-        return string.IsNullOrWhiteSpace(sanitized) ? DefaultOperationName : sanitized;
     }
 }
