@@ -86,7 +86,8 @@ public partial class SyncProfileDialog : Window
             SourcePath = @"C:\WSUS",
             FullExportPath = fullExportPath,
             DifferentialExportPath = diffExportPath,
-            ExportDays = exportDays
+            ExportDays = exportDays,
+            IncludeDatabaseBackup = ChkIncludeBackup?.IsChecked == true
         };
 
         DialogResult = true;

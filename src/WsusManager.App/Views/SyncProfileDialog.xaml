@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
         Title="Online Sync - Select Profile"
-        Width="520" Height="620"
+        Width="520" Height="660"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         Background="{DynamicResource PrimaryBackground}"
@@ -108,9 +108,14 @@
             <TextBlock Text="Export Days (for differential)" Foreground="{DynamicResource TextSecondary}"
                        FontSize="12" Margin="0,4,0,4"/>
             <TextBox x:Name="TxtExportDays" Text="30" Width="80"
-                     automation:AutomationProperties.AutomationId="ExportDaysTextBox"
-                     Background="{DynamicResource InputBackground}" Foreground="{DynamicResource TextPrimary}"
-                     BorderBrush="{DynamicResource BorderPrimary}" Padding="6,4" FontSize="12"/>
+                      automation:AutomationProperties.AutomationId="ExportDaysTextBox"
+                      Background="{DynamicResource InputBackground}" Foreground="{DynamicResource TextPrimary}"
+                      BorderBrush="{DynamicResource BorderPrimary}" Padding="6,4" FontSize="12"/>
+
+            <CheckBox x:Name="ChkIncludeBackup" Content="Include database backup (.bak) in export"
+                      automation:AutomationProperties.AutomationId="SyncIncludeBackupCheckBox"
+                      Foreground="{DynamicResource TextSecondary}" FontSize="12"
+                      Margin="0,10,0,0"/>
         </StackPanel>
 
         <!-- Buttons -->

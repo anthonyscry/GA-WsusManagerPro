@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Moq;
 using WsusManager.Core.Logging;
 using WsusManager.Core.Models;
@@ -6,10 +7,6 @@ using WsusManager.Core.Services.Interfaces;
 
 namespace WsusManager.Tests.Services;
 
-/// <summary>
-/// Tests for DeepCleanupService. All SQL operations are mocked via ISqlService.
-/// IProcessRunner is mocked for Step 1 (PowerShell command).
-/// </summary>
 public class DeepCleanupServiceTests
 {
     private readonly Mock<ISqlService> _mockSql = new();
@@ -19,327 +16,155 @@ public class DeepCleanupServiceTests
     private DeepCleanupService CreateService() =>
         new(_mockSql.Object, _mockCleanupExecutor.Object, _mockLog.Object);
 
-    private void SetupDefaultMocks()
+    [Fact]
+    public async Task RunAsync_UsesWsusCleanupExecutor_ForBuiltInCleanup()
     {
-        // Default: SQL is available and returns reasonable values
         _mockSql
-            .Setup(s => s.BuildConnectionString(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>()))
-            .Returns("Data Source=localhost;Initial Catalog=SUSDB;Integrated Security=True;TrustServerCertificate=True;Connect Timeout=5");
+            .SetupSequence(s => s.GetDatabaseSizeAsync(It.IsAny<string>(), "SUSDB", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(-1)
+            .ReturnsAsync(-1);
 
-        // DB size query
-        _mockSql
-            .Setup(s => s.GetDatabaseSizeAsync(It.IsAny<string>(), "SUSDB", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(3.5);
-
-        // Step 2: delete declined supersession records
-        _mockSql
-            .Setup(s => s.ExecuteNonQueryAsync(
-                It.IsAny<string>(), "SUSDB", It.Is<string>(q => q.Contains("RevisionState = 2")),
-                It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(150);
-
-        // Step 3: delete superseded supersession records (return < batch size to stop looping)
-        _mockSql
-            .Setup(s => s.ExecuteNonQueryAsync(
-                It.IsAny<string>(), "SUSDB", It.Is<string>(q => q.Contains("RevisionState = 3")),
-                It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(0); // No rows = stop immediately
-
-        // Step 5: sp_updatestats
-        _mockSql
-            .Setup(s => s.ExecuteNonQueryAsync(
-                It.IsAny<string>(), "SUSDB", "EXEC sp_updatestats",
-                It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(0);
-
-        // Step 6: DBCC SHRINKDATABASE
-        _mockSql
-            .Setup(s => s.ExecuteNonQueryAsync(
-                It.IsAny<string>(), "SUSDB", It.Is<string>(q => q.Contains("SHRINKDATABASE")),
-                It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(0);
-
-        // Step 1: WSUS built-in cleanup executor
         _mockCleanupExecutor
             .Setup(e => e.RunBuiltInCleanupAsync(It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(OperationResult.Ok("Cleanup complete."));
-    }
-
-    // ─── Step 1 Tests ─────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task RunAsync_UsesWsusCleanupExecutor_ForStep1()
-    {
-        SetupDefaultMocks();
-        _mockSql
-            .Setup(s => s.ExecuteNonQueryAsync(
-                It.IsAny<string>(), "SUSDB", It.Is<string>(q => q.Contains("RevisionState = 2")),
-                It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new OperationCanceledException("Stop after step 1 verification."));
 
         var service = CreateService();
-        var progress = new Progress<string>(_ => { });
+        var result = await service.RunAsync("localhost\\SQLEXPRESS", new Progress<string>(_ => { }), CancellationToken.None).ConfigureAwait(false);
 
-        _ = await service.RunAsync("localhost\\SQLEXPRESS", progress, CancellationToken.None).ConfigureAwait(false);
-
+        Assert.True(result.Success);
         _mockCleanupExecutor.Verify(e => e.RunBuiltInCleanupAsync(It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public void Step1_PowerShell_Command_Includes_Correct_Parameters()
+    public async Task RunAsync_UsesBuiltInCleanupOnly_AndAvoidsSqlMutationSteps()
     {
-        // Verify the PS command string contains required cleanup parameters
-        // This is a whitebox test of the expected command format
-        var expectedParams = new[]
-        {
-            "Get-WsusServer",
-            "Invoke-WsusServerCleanup",
-            "CleanupObsoleteUpdates",
-            "CleanupUnneededContentFiles",
-            "CompressUpdates",
-            "DeclineSupersededUpdates"
-        };
-
-        // Build the command the same way the service does
-        var psCommand =
-            "Get-WsusServer -Name localhost -PortNumber 8530 | " +
-            "Invoke-WsusServerCleanup " +
-            "-CleanupObsoleteUpdates " +
-            "-CleanupUnneededContentFiles " +
-            "-CompressUpdates " +
-            "-DeclineSupersededUpdates";
-
-        foreach (var param in expectedParams)
-        {
-            Assert.Contains(param, psCommand);
-        }
-    }
-
-    // ─── Step 2 Tests ─────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Step2_Executes_Delete_With_RevisionState_2()
-    {
-        SetupDefaultMocks();
-
-        string? capturedQuery = null;
         _mockSql
-            .Setup(s => s.ExecuteNonQueryAsync(
-                It.IsAny<string>(), "SUSDB",
-                It.Is<string>(q => q.Contains("RevisionState = 2")),
-                It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Callback<string, string, string, int, CancellationToken>((_, _, q, _, _) => capturedQuery = q)
-            .ReturnsAsync(100);
-
-        // Call step 2 indirectly by calling ExecuteNonQueryAsync with RevisionState=2
-        await _mockSql.Object.ExecuteNonQueryAsync(
-            "localhost", "SUSDB",
-            "DELETE FROM tbRevisionSupersedesUpdate WHERE RevisionState = 2",
-            0);
-
-        Assert.NotNull(capturedQuery);
-        Assert.Contains("tbRevisionSupersedesUpdate", capturedQuery!);
-        Assert.Contains("RevisionState = 2", capturedQuery!);
-    }
-
-    [Fact]
-    public async Task Step2_Delete_Targets_tbRevisionSupersedesUpdate()
-    {
-        SetupDefaultMocks();
+            .SetupSequence(s => s.GetDatabaseSizeAsync(It.IsAny<string>(), "SUSDB", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(2.8)
+            .ReturnsAsync(2.7);
 
         _mockSql
             .Setup(s => s.ExecuteNonQueryAsync(
-                It.IsAny<string>(), "SUSDB",
-                It.Is<string>(q => q.Contains("tbRevisionSupersedesUpdate") && q.Contains("RevisionState = 2")),
-                It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(50)
-            .Verifiable();
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("SQL mutation should not run in built-in cleanup mode."));
 
-        await _mockSql.Object.ExecuteNonQueryAsync(
-            "localhost", "SUSDB",
-            "DELETE FROM tbRevisionSupersedesUpdate WHERE RevisionState = 2",
-            0);
+        _mockCleanupExecutor
+            .Setup(e => e.RunBuiltInCleanupAsync(It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OperationResult.Ok("Cleanup complete."));
 
+        var service = CreateService();
+        var result = await service.RunAsync("localhost\\SQLEXPRESS", new Progress<string>(_ => { }), CancellationToken.None).ConfigureAwait(false);
+
+        Assert.True(result.Success);
         _mockSql.Verify(s => s.ExecuteNonQueryAsync(
-            It.IsAny<string>(), "SUSDB",
-            It.Is<string>(q => q.Contains("tbRevisionSupersedesUpdate") && q.Contains("RevisionState = 2")),
-            It.IsAny<int>(), It.IsAny<CancellationToken>()),
-            Times.Once);
-    }
-
-    // ─── Step 3 Tests ─────────────────────────────────────────────────────
-
-    [Fact]
-    public void Step3_Uses_10000_Batch_Size()
-    {
-        // Verify the DELETE TOP (10000) batch size is correctly specified
-        const int expectedBatchSize = 10000;
-        var batchSql = $@"
-            DELETE TOP ({expectedBatchSize}) FROM tbRevisionSupersedesUpdate
-            WHERE SupersededRevisionID IN (
-                SELECT RevisionID FROM tbRevision
-                WHERE RevisionState = 3
-            )";
-
-        Assert.Contains("10000", batchSql);
-        Assert.Contains("RevisionState = 3", batchSql);
-        Assert.Contains("DELETE TOP", batchSql);
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<string>(),
+            It.IsAny<int>(),
+            It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public async Task Step3_Uses_Unlimited_Command_Timeout()
+    public async Task RunAsync_ReportsBuiltInCleanupAsSingleStep()
     {
-        SetupDefaultMocks();
-
-        int? capturedTimeout = null;
         _mockSql
-            .Setup(s => s.ExecuteNonQueryAsync(
-                It.IsAny<string>(), "SUSDB",
-                It.Is<string>(q => q.Contains("RevisionState = 3")),
-                It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Callback<string, string, string, int, CancellationToken>((_, _, _, t, _) => capturedTimeout = t)
-            .ReturnsAsync(0);
+            .SetupSequence(s => s.GetDatabaseSizeAsync(It.IsAny<string>(), "SUSDB", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(2.8)
+            .ReturnsAsync(2.7);
 
-        await _mockSql.Object.ExecuteNonQueryAsync(
-            "localhost", "SUSDB",
-            "DELETE TOP (10000) FROM tbRevisionSupersedesUpdate WHERE RevisionState = 3",
-            0); // 0 = unlimited
+        _mockCleanupExecutor
+            .Setup(e => e.RunBuiltInCleanupAsync(It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OperationResult.Ok("Cleanup complete."));
 
-        Assert.Equal(0, capturedTimeout); // 0 = unlimited timeout
-    }
+        var lines = new ConcurrentQueue<string>();
+        var progress = new Progress<string>(line => lines.Enqueue(line));
+        var service = CreateService();
 
-    // ─── Step 4 Tests ─────────────────────────────────────────────────────
+        var result = await service.RunAsync("localhost\\SQLEXPRESS", progress, CancellationToken.None).ConfigureAwait(false);
 
-    [Fact]
-    public void Step4_Uses_100_Batch_Size()
-    {
-        // Verify the batch size constant in the implementation
-        const int expectedBatchSize = 100;
-        Assert.Equal(100, expectedBatchSize);
+        var snapshot = lines.ToArray();
+
+        Assert.True(result.Success);
+        Assert.Contains(snapshot, line => line.Contains("[Step 1/1]", StringComparison.Ordinal));
+        Assert.DoesNotContain(snapshot, line => line.Contains("/6", StringComparison.Ordinal));
     }
 
     [Fact]
-    public void Step4_SelectQuery_Uses_LocalUpdateID_Not_UpdateID()
+    public async Task RunAsync_ReturnsFailure_WhenBuiltInCleanupFails()
     {
-        // BUG-08 fix: spDeleteUpdate expects INT LocalUpdateID, not GUID UpdateID
-        // Verify the SELECT query targets r.LocalUpdateID (not u.UpdateID)
-        const string selectSql = @"
-            SELECT DISTINCT r.LocalUpdateID
-            FROM tbUpdate u
-            INNER JOIN tbRevision r ON u.LocalUpdateID = r.LocalUpdateID
-            WHERE r.RevisionState = 2";
-
-        Assert.Contains("r.LocalUpdateID", selectSql);
-        Assert.DoesNotContain("u.UpdateID", selectSql);
-    }
-
-    [Fact]
-    public void Step4_UpdateIds_List_Is_Int_Not_Guid()
-    {
-        // BUG-08 fix: the update ID list must be List<int> since spDeleteUpdate takes INT
-        var updateIds = new List<int> { 1001, 1002, 1003 };
-        Assert.IsType<List<int>>(updateIds);
-        Assert.Equal(3, updateIds.Count);
-    }
-
-    // ─── Step 5 Tests ─────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Step5_Calls_sp_updatestats()
-    {
-        SetupDefaultMocks();
-
         _mockSql
-            .Setup(s => s.ExecuteNonQueryAsync(
-                It.IsAny<string>(), "SUSDB", "EXEC sp_updatestats",
-                It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(0)
-            .Verifiable();
+            .Setup(s => s.GetDatabaseSizeAsync(It.IsAny<string>(), "SUSDB", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(-1);
 
-        await _mockSql.Object.ExecuteNonQueryAsync("localhost", "SUSDB", "EXEC sp_updatestats", 0);
+        _mockCleanupExecutor
+            .Setup(e => e.RunBuiltInCleanupAsync(It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OperationResult.Fail("WSUS cleanup failed."));
 
-        _mockSql.Verify(s => s.ExecuteNonQueryAsync(
-            It.IsAny<string>(), "SUSDB", "EXEC sp_updatestats",
-            It.IsAny<int>(), It.IsAny<CancellationToken>()),
-            Times.Once);
+        var service = CreateService();
+        var result = await service.RunAsync("localhost\\SQLEXPRESS", new Progress<string>(_ => { }), CancellationToken.None).ConfigureAwait(false);
+
+        Assert.False(result.Success);
+        Assert.Contains("WSUS cleanup failed", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void Step5_Index_SQL_Uses_Correct_Thresholds()
+    public async Task RunAsync_ReportsDatabaseSizeDelta_WhenAvailable()
     {
-        // Verify the index optimization thresholds from the PowerShell module
-        // > 30% fragmentation = REBUILD, > 10% = REORGANIZE, page_count > 1000
-        const string indexSqlSnippet = "avg_fragmentation_in_percent > 10";
-        Assert.Contains("10", indexSqlSnippet);
-    }
+        _mockSql
+            .SetupSequence(s => s.GetDatabaseSizeAsync(It.IsAny<string>(), "SUSDB", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(3.0)
+            .ReturnsAsync(2.5);
 
-    // ─── Step 6 Tests ─────────────────────────────────────────────────────
+        _mockCleanupExecutor
+            .Setup(e => e.RunBuiltInCleanupAsync(It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OperationResult.Ok("Cleanup complete."));
 
-    [Fact]
-    public void Step6_ShrinkDatabase_Uses_SUSDB_Target()
-    {
-        const string shrinkSql = "DBCC SHRINKDATABASE(SUSDB, 10) WITH NO_INFOMSGS";
-        Assert.Contains("SUSDB", shrinkSql);
-        Assert.Contains("SHRINKDATABASE", shrinkSql);
-        Assert.Contains("NO_INFOMSGS", shrinkSql);
-    }
+        var lines = new List<string>();
+        var progress = new Progress<string>(line => lines.Add(line));
+        var service = CreateService();
 
-    [Fact]
-    public void Step6_Retry_Parameters_Match_PowerShell()
-    {
-        // Verify retry constants match WsusDatabase.psm1 (3 retries, 30s delay)
-        const int maxRetries = 3;
-        const int retryDelaySec = 30;
-        Assert.Equal(3, maxRetries);
-        Assert.Equal(30, retryDelaySec);
+        var result = await service.RunAsync("localhost\\SQLEXPRESS", progress, CancellationToken.None).ConfigureAwait(false);
+
+        Assert.True(result.Success);
+        Assert.Contains(lines, line => line.Contains("Database size (allocated): 3.00 GB -> 2.50 GB", StringComparison.Ordinal));
     }
 
     [Fact]
-    public void Step6_Backup_Block_Detection_Covers_Key_Patterns()
+    public async Task RunAsync_Continues_WhenDatabaseSizeTelemetryFails()
     {
-        // Test IsBackupBlockingError patterns (whitebox test)
-        var blockingMessages = new[]
-        {
-            "The database cannot be serialized",
-            "backup operation is in progress",
-            "file manipulation operation"
-        };
+        _mockSql
+            .Setup(s => s.GetDatabaseSizeAsync(It.IsAny<string>(), "SUSDB", It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("SQL unavailable"));
 
-        foreach (var msg in blockingMessages)
-        {
-            var isBackup =
-                msg.Contains("serialized", StringComparison.OrdinalIgnoreCase) ||
-                (msg.Contains("backup", StringComparison.OrdinalIgnoreCase) &&
-                 msg.Contains("operation", StringComparison.OrdinalIgnoreCase)) ||
-                msg.Contains("file manipulation", StringComparison.OrdinalIgnoreCase);
+        _mockCleanupExecutor
+            .Setup(e => e.RunBuiltInCleanupAsync(It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(OperationResult.Ok("Cleanup complete."));
 
-            Assert.True(isBackup, $"Pattern should match: {msg}");
-        }
+        var service = CreateService();
+        var result = await service.RunAsync("localhost\\SQLEXPRESS", new Progress<string>(_ => { }), CancellationToken.None).ConfigureAwait(false);
+
+        Assert.True(result.Success);
     }
 
-    // ─── Progress Format Tests ─────────────────────────────────────────────
-
     [Fact]
-    public void Progress_Format_Includes_StepNumber_And_Total()
+    public async Task RunAsync_ReturnsCancelled_WhenCancelled()
     {
-        // Verify the expected format [Step N/6] matches what the service reports
-        for (int i = 1; i <= 6; i++)
-        {
-            var expectedPrefix = $"[Step {i}/6]";
-            Assert.Contains("/6", expectedPrefix);
-            Assert.Contains($"[Step {i}", expectedPrefix);
-        }
-    }
+        _mockSql
+            .Setup(s => s.GetDatabaseSizeAsync(It.IsAny<string>(), "SUSDB", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(-1);
 
-    // ─── DB Size Before/After Tests ────────────────────────────────────────
+        _mockCleanupExecutor
+            .Setup(e => e.RunBuiltInCleanupAsync(It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new OperationCanceledException());
 
-    [Fact]
-    public void DbSize_BeforeAfter_Comparison_Formula()
-    {
-        // Verify the before/after comparison math
-        double before = 5.5;
-        double after = 4.2;
-        double saved = before - after;
-        Assert.Equal(1.3, Math.Round(saved, 1));
+        var service = CreateService();
+        var result = await service.RunAsync("localhost\\SQLEXPRESS", new Progress<string>(_ => { }), CancellationToken.None).ConfigureAwait(false);
+
+        Assert.False(result.Success);
+        Assert.Contains("cancelled", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 }

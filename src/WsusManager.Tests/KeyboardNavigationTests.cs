@@ -10,8 +10,9 @@ namespace WsusManager.Tests;
 /// </summary>
 public class KeyboardNavigationTests
 {
-    // Navigate from test output dir to Views folder
-    private static string GetViewsPath() => Path.Combine("..", "..", "..", "..", "WsusManager.App", "Views");
+    // Resolve from test assembly location to avoid dependence on process current directory.
+    private static string GetViewsPath() =>
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "WsusManager.App", "Views"));
 
     private static string GetXamlPath(string fileName) => Path.Combine(GetViewsPath(), fileName);
 
