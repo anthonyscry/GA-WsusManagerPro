@@ -105,6 +105,7 @@ public static class Program
 
         // Phase 4: Database Operations
         builder.Services.AddSingleton<ISqlService, SqlService>();
+        builder.Services.AddSingleton<IWsusCleanupExecutor, WsusCleanupExecutor>();
         builder.Services.AddSingleton<IDeepCleanupService, DeepCleanupService>();
         builder.Services.AddSingleton<IDatabaseBackupService, DatabaseBackupService>();
 
@@ -118,6 +119,7 @@ public static class Program
         // Phase 6: Installation and Scheduling
         builder.Services.AddSingleton<INativeInstallationService, NativeInstallationService>();
         builder.Services.AddSingleton<IInstallationService, InstallationService>();
+        builder.Services.AddSingleton<IMaintenanceCommandBuilder, MaintenanceCommandBuilder>();
         builder.Services.AddSingleton<IScheduledTaskService, ScheduledTaskService>();
         builder.Services.AddSingleton<IGpoDeploymentService, GpoDeploymentService>();
 
