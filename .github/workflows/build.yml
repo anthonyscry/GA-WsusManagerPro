@@ -51,7 +51,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
 
     - name: Record CI context & prepare diagnostics
@@ -268,7 +268,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Record CI context & prepare diagnostics
       shell: pwsh
@@ -433,7 +433,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Record CI context & prepare diagnostics
       shell: pwsh
