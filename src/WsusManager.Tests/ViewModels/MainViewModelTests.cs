@@ -742,7 +742,7 @@ public class MainViewModelTests
             .Setup(d => d.RunAsync(
                 It.IsAny<string>(),
                 It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(OperationResult.Ok("Cleanup complete."));
 
         _mockDashboard
@@ -763,7 +763,7 @@ public class MainViewModelTests
             .Setup(d => d.RunAsync(
                 It.IsAny<string>(),
                 It.IsAny<IProgress<string>>(),
-                It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(OperationResult.Ok("Cleanup complete."));
 
         await _vm.RunDeepCleanupCommand.ExecuteAsync(null);
@@ -771,7 +771,7 @@ public class MainViewModelTests
         _mockDeepCleanup.Verify(d => d.RunAsync(
             It.IsAny<string>(),
             It.IsAny<IProgress<string>>(),
-            It.IsAny<CancellationToken>(), It.IsAny<bool>()),
+            It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
