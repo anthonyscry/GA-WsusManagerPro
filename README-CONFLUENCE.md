@@ -145,6 +145,24 @@ Download and save to `C:\WSUS\SQLDB\` before installation:
 | 4 | Wait for installation to complete (10-30 minutes) |
 | 5 | Verify dashboard shows all services running (green) |
 
+### 7.3 Install Script Flags (Optional)
+
+The install script `Scripts/Install-WsusWithSqlExpress.ps1` accepts optional flags for HTTPS mode and certificate selection.
+- `-EnableHttps` enables the HTTPS listener after installation.
+- `-CertificateThumbprint` specifies the certificate used for the HTTPS port.
+
+Guardrail: when `-EnableHttps` is combined with `-NonInteractive`, you must also provide `-CertificateThumbprint`.
+
+Example (default HTTP, non-interactive):
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\Install-WsusWithSqlExpress.ps1 -InstallerPath "C:\WSUS\SQLDB" -SaPassword "<StrongPassword>" -NonInteractive
+```
+
+Example (HTTPS, non-interactive):
+```powershell
+powershell -ExecutionPolicy Bypass -File .\Scripts\Install-WsusWithSqlExpress.ps1 -InstallerPath "C:\WSUS\SQLDB" -SaPassword "<StrongPassword>" -NonInteractive -EnableHttps -CertificateThumbprint "ABCDEF1234567890ABCDEF1234567890ABCDEF12"
+```
+
 ---
 
 ## 8. Dashboard Overview

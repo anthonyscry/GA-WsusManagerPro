@@ -491,6 +491,7 @@ gpresult /r | findstr WSUS
 ## HTTPS Configuration (Optional)
 
 The `Scripts/Set-WsusHttps.ps1` script enables HTTPS (SSL/TLS) on your WSUS server.
+Install-time HTTPS can also be enabled via `Scripts/Install-WsusWithSqlExpress.ps1 -EnableHttps`, so IIS bindings and WSUS configuration are pre-seeded before this optional step. When you run the installer with `-NonInteractive`, the script enforces `-CertificateThumbprint` (the operation halts without it). See the `### Install Script Flags` subsection earlier in this document for those installer options.
 
 ### Usage
 
