@@ -25,4 +25,25 @@ public interface IProcessRunner
         IProgress<string>? progress = null,
         CancellationToken ct = default,
         bool enableLiveTerminal = false);
+
+    /// <summary>
+    /// Runs an external process with optional child-process environment variables.
+    /// Environment variables are scoped to the launched process only.
+    /// </summary>
+    /// <param name="executable">Path to the executable.</param>
+    /// <param name="arguments">Command-line arguments.</param>
+    /// <param name="progress">Optional progress reporter for real-time output.</param>
+    /// <param name="ct">Cancellation token - kills the process on cancellation.</param>
+    /// <param name="enableLiveTerminal">Opt-in flag that allows visible terminal output when the global
+    /// live terminal setting is enabled.</param>
+    /// <param name="environmentVariables">Environment variables to set/remove for the child process only.
+    /// Null means no additional variables.</param>
+    /// <returns>Process result with exit code and captured output.</returns>
+    Task<ProcessResult> RunAsync(
+        string executable,
+        string arguments,
+        IProgress<string>? progress,
+        CancellationToken ct,
+        bool enableLiveTerminal,
+        IReadOnlyDictionary<string, string?>? environmentVariables);
 }

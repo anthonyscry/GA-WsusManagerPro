@@ -113,21 +113,30 @@ public class InstallationService : IInstallationService
             }
 
             var allowFallback = _settingsService?.Current.EnableLegacyFallbackForInstall ?? true;
-            var nativePathUnavailable = native.Message?.Contains("not yet implemented", StringComparison.OrdinalIgnoreCase) == true;
+            var nativePathUnavailable = native.Exception is NotSupportedException;
             var nativeReason = native.Message ?? "Unknown reason";
+
+            if (!nativePathUnavailable)
+            {
+                var nativeFailedMessage = allowFallback
+                    ? $"Native installation failed; legacy fallback was skipped to avoid partial-state conflicts. Reason: {nativeReason}"
+                    : $"Native installation failed and legacy fallback is disabled. Reason: {nativeReason}";
+
+                _logService.Warning(nativeFailedMessage);
+                progress?.Report(nativeFailedMessage);
+                return OperationResult.Fail(nativeFailedMessage, native.Exception);
+            }
 
             if (!allowFallback)
             {
-                var fallbackDisabledMessage = nativePathUnavailable
-                    ? "Native installation path is unavailable and legacy fallback is disabled; installation cannot proceed."
-                    : $"Native installation failed and legacy fallback is disabled. Reason: {nativeReason}";
+                var fallbackDisabledMessage = "Native installation path is unavailable and legacy fallback is disabled; installation cannot proceed.";
 
                 _logService.Warning(fallbackDisabledMessage);
                 progress?.Report(fallbackDisabledMessage);
                 return OperationResult.Fail(fallbackDisabledMessage);
             }
 
-            progress?.Report("[FALLBACK] Native install failed; using legacy PowerShell install path.");
+            progress?.Report("[FALLBACK] Native install path unavailable; using legacy PowerShell install path.");
             _logService.Warning("Native install path failed; using legacy PowerShell fallback. Reason: {Reason}", nativeReason);
 
             // Locate the PowerShell install script
@@ -164,26 +173,18 @@ public class InstallationService : IInstallationService
             var encodedCommand = EncodePowerShellCommand(command);
             var arguments = $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}";
 
-            var previousPassword = Environment.GetEnvironmentVariable(InstallPasswordEnvironmentVariable, EnvironmentVariableTarget.Process);
-            Environment.SetEnvironmentVariable(InstallPasswordEnvironmentVariable, options.SaPassword, EnvironmentVariableTarget.Process);
+            var environmentVariables = new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                [InstallPasswordEnvironmentVariable] = options.SaPassword
+            };
 
-            ProcessResult result;
-            try
-            {
-                result = await _processRunner.RunAsync(
-                    "powershell.exe",
-                    arguments,
-                    progress,
-                    ct,
-                    enableLiveTerminal: true).ConfigureAwait(false);
-            }
-            finally
-            {
-                Environment.SetEnvironmentVariable(
-                    InstallPasswordEnvironmentVariable,
-                    previousPassword,
-                    EnvironmentVariableTarget.Process);
-            }
+            var result = await _processRunner.RunAsync(
+                "powershell.exe",
+                arguments,
+                progress,
+                ct,
+                enableLiveTerminal: true,
+                environmentVariables: environmentVariables).ConfigureAwait(false);
 
             if (result.Success)
             {

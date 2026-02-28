@@ -42,6 +42,7 @@ public class NativeInstallationServiceTests
         {
             Assert.Contains(messages, m => m.Contains("[NATIVE]", StringComparison.Ordinal));
             Assert.Contains("not yet implemented", result.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.IsType<NotSupportedException>(result.Exception);
         }
         else
         {
