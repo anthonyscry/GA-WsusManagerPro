@@ -340,12 +340,17 @@ jobs:
         $config = New-PesterConfiguration
         $config.Run.Path = $testFiles.FullName
         $config.Run.Exit = $false
+        $config.Run.PassThru = $true
         $config.Output.Verbosity = 'Detailed'
         $config.TestResult.Enabled = $true
         $config.TestResult.OutputPath = './test-results.xml'
         $config.TestResult.OutputFormat = 'NUnitXml'
 
         $results = Invoke-Pester -Configuration $config
+        if (-not $results) {
+          Write-Host "::error::Invoke-Pester did not return results"
+          exit 1
+        }
 
         Write-Host ""
         Write-Host "=== Test Summary ===" -ForegroundColor Cyan
@@ -566,9 +571,14 @@ jobs:
         $config = New-PesterConfiguration
         $config.Run.Path = "./Tests/ExeValidation.Tests.ps1"
         $config.Run.Exit = $false
+        $config.Run.PassThru = $true
         $config.Output.Verbosity = 'Detailed'
 
         $results = Invoke-Pester -Configuration $config
+        if (-not $results) {
+          Write-Host "::error::Invoke-Pester did not return results for EXE validation"
+          exit 1
+        }
 
         Write-Host "`n=== EXE Validation Summary ===" -ForegroundColor Cyan
         Write-Host "Passed: $($results.PassedCount)" -ForegroundColor Green

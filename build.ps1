@@ -299,10 +299,15 @@ if (-not $SkipTests) {
             $config = New-PesterConfiguration
             $config.Run.Path = $TestFiles.FullName
             $config.Run.Exit = $false
+            $config.Run.PassThru = $true
             $config.Output.Verbosity = 'Normal'
 
             # Run tests
             $testResult = Invoke-Pester -Configuration $config
+            if (-not $testResult) {
+                Write-Host "[!] Build blocked: Pester did not return results." -ForegroundColor Red
+                exit 1
+            }
 
             # Summary
             Write-Host ""
