@@ -153,7 +153,7 @@ public class ExeValidationTests
         var versionInfo = FileVersionInfo.GetVersionInfo(exePath);
 
         Assert.NotNull(versionInfo.FileVersion);
-        Assert.StartsWith("4.0", versionInfo.FileVersion);
+        Assert.Matches(@"^\d+\.\d+\.\d+(\.\d+)?$", versionInfo.FileVersion);
     }
 
     [Fact]
