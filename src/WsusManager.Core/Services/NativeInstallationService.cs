@@ -39,6 +39,8 @@ public class NativeInstallationService : INativeInstallationService
 
         progress?.Report("[NATIVE] Native installation path is not yet implemented; using fallback.");
         _logService.Warning("Native installation requested but not implemented; caller should fallback.");
-        return Task.FromResult(OperationResult.Fail("Native installation path is not yet implemented."));
+        return Task.FromResult(OperationResult.Fail(
+            "Native installation path is not yet implemented.",
+            new NotSupportedException("Native installation path is not yet implemented.")));
     }
 }

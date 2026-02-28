@@ -1,7 +1,9 @@
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Input;
 using WsusManager.Core.Models;
+using WsusManager.Core.Services;
 
 namespace WsusManager.App.Views;
 
@@ -73,6 +75,14 @@ public partial class InstallDialog : Window
             return;
         }
 
+        var installerExePath = Path.Combine(path, InstallationService.RequiredInstallerExe);
+        if (!File.Exists(installerExePath))
+        {
+            TxtValidation.Text = $"Required installer not found: {InstallationService.RequiredInstallerExe}";
+            BtnInstall.IsEnabled = false;
+            return;
+        }
+
         // Check SA password
         if (string.IsNullOrEmpty(password))
         {
@@ -81,9 +91,23 @@ public partial class InstallDialog : Window
             return;
         }
 
-        if (password.Length < 15)
+        if (password.Length < InstallationService.MinPasswordLength)
         {
-            TxtValidation.Text = "SA password must be at least 15 characters.";
+            TxtValidation.Text = $"SA password must be at least {InstallationService.MinPasswordLength} characters.";
+            BtnInstall.IsEnabled = false;
+            return;
+        }
+
+        if (!Regex.IsMatch(password, @"\d"))
+        {
+            TxtValidation.Text = "SA password must contain at least 1 digit.";
+            BtnInstall.IsEnabled = false;
+            return;
+        }
+
+        if (!Regex.IsMatch(password, @"[^a-zA-Z0-9]"))
+        {
+            TxtValidation.Text = "SA password must contain at least 1 special character.";
             BtnInstall.IsEnabled = false;
             return;
         }
@@ -117,14 +141,12 @@ public partial class InstallDialog : Window
 
     private void Ok_Click(object sender, RoutedEventArgs e)
     {
+        ValidateInputs();
+
+        if (BtnInstall is null || !BtnInstall.IsEnabled)
+            return;
+
         var password = PwdSaPassword.Password;
-
-        // Safety net — button should already be disabled for invalid inputs
-        if (string.IsNullOrWhiteSpace(password) || password.Length < 15)
-            return;
-
-        if (string.IsNullOrWhiteSpace(TxtInstallerPath.Text))
-            return;
 
         Options = new InstallOptions
         {

@@ -23,17 +23,35 @@ public class ProcessRunner : IProcessRunner
         _settingsService = settingsService;
     }
 
-    public async Task<ProcessResult> RunAsync(
+    public Task<ProcessResult> RunAsync(
         string executable,
         string arguments,
         IProgress<string>? progress = null,
         CancellationToken ct = default,
         bool enableLiveTerminal = false)
     {
+        return RunAsync(executable, arguments, progress, ct, enableLiveTerminal, null);
+    }
+
+    public async Task<ProcessResult> RunAsync(
+        string executable,
+        string arguments,
+        IProgress<string>? progress,
+        CancellationToken ct,
+        bool enableLiveTerminal,
+        IReadOnlyDictionary<string, string?>? environmentVariables)
+    {
         _logService.Debug("Running: {Executable} [arguments hidden]", executable);
 
         var globalLiveTerminal = _settingsService?.Current.LiveTerminalMode ?? false;
+        var requiresChildEnvironment = environmentVariables is { Count: > 0 };
         var liveTerminalMode = enableLiveTerminal && globalLiveTerminal;
+        if (requiresChildEnvironment && liveTerminalMode)
+        {
+            liveTerminalMode = false;
+            progress?.Report("[INFO] Live Terminal mode disabled for this operation because scoped environment variables are required.");
+        }
+
         if (liveTerminalMode)
         {
             progress?.Report("[INFO] Live Terminal mode enabled for this operation.");
@@ -46,6 +64,26 @@ public class ProcessRunner : IProcessRunner
             UseShellExecute = liveTerminalMode,
             CreateNoWindow = !liveTerminalMode
         };
+
+        if (requiresChildEnvironment)
+        {
+            foreach (var variable in environmentVariables!)
+            {
+                if (string.IsNullOrWhiteSpace(variable.Key))
+                {
+                    continue;
+                }
+
+                if (variable.Value is null)
+                {
+                    startInfo.Environment.Remove(variable.Key);
+                }
+                else
+                {
+                    startInfo.Environment[variable.Key] = variable.Value;
+                }
+            }
+        }
 
         LastStartInfoSnapshot = new ProcessStartInfo(startInfo.FileName, startInfo.Arguments)
         {
