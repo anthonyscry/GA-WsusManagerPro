@@ -1,0 +1,130 @@
+name: Build C# WSUS Manager
+
+on:
+  push:
+    branches: [ main, master, develop ]
+    paths:
+      - 'src/**'
+      - '.github/workflows/build-csharp.yml'
+      - 'global.json'
+      - 'Scripts/verify.ps1'
+      - 'Scripts/verify-local.ps1'
+  pull_request:
+    branches: [ main, master, develop ]
+    paths:
+      - 'src/**'
+      - '.github/workflows/build-csharp.yml'
+      - 'global.json'
+      - 'Scripts/verify.ps1'
+      - 'Scripts/verify-local.ps1'
+  workflow_dispatch:
+
+concurrency:
+  group: build-csharp-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-release-check:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: 'true'
+      NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK (global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json', 'src/**/*.csproj', 'src/**/*.props', 'src/**/*.targets', '**/nuget.config', 'global.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Verify (restore/build/format/test)
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_EVENT_NAME -ne 'pull_request') {
+            ./Scripts/verify.ps1 `
+              -Configuration Release `
+              -CollectCoverage `
+              -RestoreRetryCount 3 `
+              -RestoreRetryDelaySeconds 5
+          } else {
+            ./Scripts/verify.ps1 `
+              -Configuration Release `
+              -RestoreRetryCount 3 `
+              -RestoreRetryDelaySeconds 5
+          }
+
+      - name: Upload verification diagnostics
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verify-diagnostics
+          path: .ci-artifacts/**
+          retention-days: 14
+
+      - name: Publish single-file EXE
+        shell: pwsh
+        run: |
+          dotnet publish src/WsusManager.App/WsusManager.App.csproj `
+            --configuration Release `
+            --output ./publish `
+            --self-contained true `
+            --runtime win-x64 `
+            -p:PublishSingleFile=true `
+            -p:IncludeAllContentForSelfExtract=true
+
+      - name: Validate published EXE
+        shell: pwsh
+        run: |
+          $env:WSUS_EXE_PATH = "${{ github.workspace }}/publish/WsusManager.App.exe"
+          dotnet test src/WsusManager.Tests/WsusManager.Tests.csproj `
+            --configuration Release `
+            --no-build `
+            --verbosity normal `
+            --filter "FullyQualifiedName~ExeValidation"
+
+      - name: Stage distribution package
+        shell: pwsh
+        run: |
+          $distDir = "dist-csharp"
+          New-Item -ItemType Directory -Path $distDir -Force | Out-Null
+
+          Copy-Item "publish/WsusManager.App.exe" "$distDir/WsusManager.exe"
+          Copy-Item -Recurse "Scripts" "$distDir/Scripts"
+          Copy-Item -Recurse "Modules" "$distDir/Modules"
+
+          if (Test-Path "DomainController") {
+            Copy-Item -Recurse "DomainController" "$distDir/DomainController"
+          }
+
+          if (Test-Path "README.md") {
+            Copy-Item "README.md" "$distDir/README.md"
+          }
+
+      - name: Validate distribution package
+        shell: pwsh
+        run: |
+          $env:WSUS_DIST_PATH = "${{ github.workspace }}/dist-csharp"
+          dotnet test src/WsusManager.Tests/WsusManager.Tests.csproj `
+            --configuration Release `
+            --no-build `
+            --verbosity normal `
+            --filter "FullyQualifiedName~DistributionPackage"
+
+      - name: Upload distribution artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WsusManager-CSharp-distribution
+          path: dist-csharp/**
+          retention-days: 14
