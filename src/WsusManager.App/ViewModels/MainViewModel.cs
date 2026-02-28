@@ -1136,13 +1136,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanExecuteWsusOperation))]
     private async Task RunDeepCleanup()
     {
-        // Confirm before running destructive operation
-        if (!ConfirmDestructiveOperation("Deep Cleanup"))
-            return;
-
         await Navigate("Database").ConfigureAwait(false);
 
-        await RunOperationAsync("Deep Cleanup", async (progress, ct) =>
+        await RunOperationAsync("WSUS Cleanup", async (progress, ct) =>
         {
             var result = await _deepCleanupService.RunAsync(
                 _settings.SqlInstance,
@@ -1311,7 +1307,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 {
                     SourcePath = string.IsNullOrWhiteSpace(_settings.ContentPath) ? @"C:\WSUS" : _settings.ContentPath,
                     ExportDays = exportOptions.ExportDays > 0 ? exportOptions.ExportDays : 30,
-                    IncludeDatabaseBackup = true
+                    IncludeDatabaseBackup = exportOptions.IncludeDatabaseBackup
                 };
 
             var result = await orchestrator.RunAsync(

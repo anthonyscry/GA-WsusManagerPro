@@ -10,7 +10,9 @@ namespace WsusManager.Tests;
 /// </summary>
 public class KeyboardShortcutsTests
 {
-    private static string GetViewsPath() => Path.Combine("..", "..", "..", "..", "WsusManager.App", "Views");
+    private static string GetViewsPath() =>
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "WsusManager.App", "Views"));
+
     private static string GetXamlPath(string fileName) => Path.Combine(GetViewsPath(), fileName);
 
     [Fact]

@@ -56,7 +56,7 @@ public class OnlineSyncOrchestrationService
         {
             SourcePath = string.IsNullOrWhiteSpace(exportOptions.SourcePath) ? @"C:\WSUS" : exportOptions.SourcePath,
             ExportDays = exportOptions.ExportDays > 0 ? exportOptions.ExportDays : 30,
-            IncludeDatabaseBackup = true
+            IncludeDatabaseBackup = exportOptions.IncludeDatabaseBackup
         };
 
         var exportProgress = progress ?? new Progress<string>(_ => { });
