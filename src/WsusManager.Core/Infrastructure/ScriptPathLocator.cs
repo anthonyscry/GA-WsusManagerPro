@@ -15,13 +15,21 @@ internal static class ScriptPathLocator
 
         var paths = new List<string>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var roots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        AddScriptCandidates(paths, seen, AppContext.BaseDirectory, scriptName);
-        var parent = new DirectoryInfo(AppContext.BaseDirectory).Parent;
-        for (var i = 0; i < maxParentDepth && parent is not null; i++)
+        foreach (var root in GetSearchRoots())
         {
-            AddScriptCandidates(paths, seen, parent.FullName, scriptName);
-            parent = parent.Parent;
+            if (!roots.Add(root))
+                continue;
+
+            AddScriptCandidates(paths, seen, root, scriptName);
+
+            var parent = new DirectoryInfo(root).Parent;
+            for (var i = 0; i < maxParentDepth && parent is not null; i++)
+            {
+                AddScriptCandidates(paths, seen, parent.FullName, scriptName);
+                parent = parent.Parent;
+            }
         }
 
         return [.. paths];
@@ -53,5 +61,20 @@ internal static class ScriptPathLocator
         var fullPath = Path.GetFullPath(path);
         if (seen.Add(fullPath))
             paths.Add(fullPath);
+    }
+
+    private static IEnumerable<string> GetSearchRoots()
+    {
+        yield return Path.GetFullPath(AppContext.BaseDirectory);
+
+        var processPath = Environment.ProcessPath;
+        if (string.IsNullOrWhiteSpace(processPath))
+            yield break;
+
+        var processDirectory = Path.GetDirectoryName(processPath);
+        if (string.IsNullOrWhiteSpace(processDirectory))
+            yield break;
+
+        yield return Path.GetFullPath(processDirectory);
     }
 }

@@ -516,6 +516,23 @@ public class InstallationServiceTests
     }
 
     [Fact]
+    public void GetSearchPaths_Includes_ProcessDirectory_Candidates()
+    {
+        var processPath = Environment.ProcessPath;
+        if (string.IsNullOrWhiteSpace(processPath))
+            return;
+
+        var processDirectory = Path.GetDirectoryName(processPath);
+        Assert.False(string.IsNullOrWhiteSpace(processDirectory));
+
+        var service = CreateService();
+        var paths = service.GetSearchPaths();
+
+        Assert.Contains(Path.Combine(processDirectory!, "Scripts", InstallationService.InstallScriptName), paths);
+        Assert.Contains(Path.Combine(processDirectory, InstallationService.InstallScriptName), paths);
+    }
+
+    [Fact]
     public async Task Install_Restores_PasswordEnvironmentVariable_When_ProcessRunner_Throws()
     {
         const string envVarName = "WSUS_INSTALL_SA_PASSWORD";
