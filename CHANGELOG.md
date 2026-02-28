@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - No unreleased changes yet.
 
+## [4.5.19] - 2026-02-28
+
+### Changed
+- Updated C# application version metadata and in-app version display to `4.5.19`.
+- Synchronized release references in project documentation for the `v4.5.19` release cut.
+
 ## [4.5.12] - 2026-02-25
 
 ### Added
@@ -303,7 +309,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - MaxAutoApproveCount increased to 200
 
-[Unreleased]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.12...HEAD
+[Unreleased]: https://github.com/anthonyscry/GA-WsusManagerPro/compare/v4.5.19...HEAD
+[4.5.19]: https://github.com/anthonyscry/GA-WsusManagerPro/compare/v4.5.18...v4.5.19
 [4.5.12]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.11...v4.5.12
 [4.5.7]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.6...v4.5.7
 [4.5.6]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.5...v4.5.6

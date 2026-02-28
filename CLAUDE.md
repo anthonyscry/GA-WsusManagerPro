@@ -7,7 +7,7 @@ This file provides guidance for AI assistants working with this codebase.
 WSUS Manager is a C# WPF automation suite for Windows Server Update Services (WSUS) with SQL Server Express 2022. It provides a modern GUI application for managing WSUS servers, including support for air-gapped networks. The PowerShell version (v3.8.11) is still available for backward compatibility.
 
 **Author:** Tony Tran, ISSO, GA-ASI
-**Current Version:** 4.5.0 (C# WPF)
+**Current Version:** 4.5.19 (C# WPF)
 **Legacy Version:** 3.8.11 (PowerShell)
 
 ## Repository Structure
