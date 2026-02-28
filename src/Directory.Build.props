@@ -4,9 +4,9 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
 
     <!-- Shared version and metadata across all projects (Core, App, Tests) -->
-    <Version>4.5.19</Version>
-    <AssemblyVersion>4.5.19.0</AssemblyVersion>
-    <FileVersion>4.5.19.0</FileVersion>
+    <Version>4.5.20</Version>
+    <AssemblyVersion>4.5.20.0</AssemblyVersion>
+    <FileVersion>4.5.20.0</FileVersion>
     <Product>WSUS Manager</Product>
     <Company>GA-ASI</Company>
     <Copyright>Tony Tran, ISSO - GA-ASI</Copyright>
