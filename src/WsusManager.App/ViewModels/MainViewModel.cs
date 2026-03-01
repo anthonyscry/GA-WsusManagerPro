@@ -468,7 +468,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
             TryStartOperationTranscript(operationName);
             AppendLog($"=== {operationName} ===");
 
-            var success = await operation(progress, _operationCts.Token).ConfigureAwait(false);
+            // Must resume on UI thread — continuation updates WPF observable properties
+            // (StatusMessage, IsOperationRunning, etc.) and triggers CanExecuteChanged.
+#pragma warning disable CA2007, MA0004 // UI context required for post-operation property updates
+            var success = await operation(progress, _operationCts.Token);
+#pragma warning restore CA2007, MA0004
 
             if (success)
             {
