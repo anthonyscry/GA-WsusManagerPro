@@ -436,7 +436,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
             telemetryContext.OperationName,
             telemetryContext.OperationId);
 
-        var progress = new Progress<string>(line =>
+        // Use synchronous IProgress<string> to avoid Progress<T>'s async SynchronizationContext
+        // dispatch, which can drop messages when operations complete before posted callbacks execute.
+        var progress = new SynchronousProgress<string>(line =>
         {
             AppendLog(line);
 
@@ -2502,4 +2504,22 @@ public partial class MainViewModel : ObservableObject, IDisposable
     // Note: Data list models (ComputerInfo, UpdateInfo) are now in
     // WsusManager.Core.Models namespace for proper layering
     // ═══════════════════════════════════════════════════════════════
+}
+
+/// <summary>
+/// Synchronous IProgress&lt;T&gt; implementation that invokes the callback on the calling thread.
+/// Unlike <see cref="Progress{T}"/>, this does not post via SynchronizationContext,
+/// ensuring log messages appear immediately rather than being lost when operations
+/// complete before async callbacks execute.
+/// </summary>
+internal sealed class SynchronousProgress<T> : IProgress<T>
+{
+    private readonly Action<T> _handler;
+
+    public SynchronousProgress(Action<T> handler)
+    {
+        _handler = handler ?? throw new ArgumentNullException(nameof(handler));
+    }
+
+    public void Report(T value) => _handler(value);
 }
