@@ -529,7 +529,21 @@ if ($sqlcmd) {
 }
 
 # =====================================================================
-# 10. WSUS POSTINSTALL
+# 10. PRE-CONFIGURE WSUS REGISTRY (before postinstall)
+# =====================================================================
+# Set OobeInitialized/OobeComplete before postinstall to prevent the
+# WSUS Configuration Wizard from launching when the console opens.
+# These are re-applied in step 12 in case postinstall overwrites them.
+$wsusRegPreSetup = "HKLM:\SOFTWARE\Microsoft\Update Services\Server\Setup"
+if (!(Test-Path $wsusRegPreSetup)) {
+    New-Item -Path $wsusRegPreSetup -Force | Out-Null
+}
+Set-ItemProperty -Path $wsusRegPreSetup -Name OobeInitialized -Value 1 -Force
+Set-ItemProperty -Path $wsusRegPreSetup -Name OobeComplete -Value 1 -Force
+Write-Host "[+] Pre-configured WSUS wizard suppression registry keys."
+
+# =====================================================================
+# 11. WSUS POSTINSTALL
 # =====================================================================
 Write-Host "[+] Running WSUS postinstall (this may take several minutes)..."
 
@@ -544,10 +558,11 @@ if (Test-Path $wsusUtil) {
     $wsusProcess = Start-Process $wsusUtil -ArgumentList $postInstallArgs -PassThru -NoNewWindow
     Wait-WithHeartbeat -Process $wsusProcess -Message "Configuring WSUS post-install steps (this can take several minutes)..."
 
-    if ($wsusProcess.ExitCode -eq 0) {
+    $exitCode = $wsusProcess.ExitCode
+    if ($null -eq $exitCode -or $exitCode -eq 0) {
         Write-Host "    WSUS postinstall complete."
     } else {
-        Write-Host "    Warning: WSUS postinstall exited with code $($wsusProcess.ExitCode)"
+        Write-Host "    Warning: WSUS postinstall exited with code $exitCode"
     }
 } else {
     Write-Host "    Warning: wsusutil.exe not found at $wsusUtil"
@@ -623,7 +638,7 @@ New-NetFirewallRule -DisplayName "WSUS API Remoting (Port 8531)" `
 Write-Host "    Firewall rules configured."
 
 # =====================================================================
-# 12. CONFIGURE WSUS REGISTRY SETTINGS
+# 12. CONFIGURE WSUS REGISTRY SETTINGS & SUPPRESS CONFIGURATION WIZARD
 # =====================================================================
 Write-Host "[+] Configuring WSUS registry settings..."
 
@@ -638,10 +653,12 @@ if (!(Test-Path $wsusRegSetupInstalled)) {
     New-Item -Path $wsusRegSetupInstalled -Force | Out-Null
 }
 
-# Set content directory in registry (from Repair-WsusContentPath.ps1)
+# Set content directory in registry
 Set-ItemProperty -Path $wsusRegSetup -Name ContentDir -Value $WSUSContent -Force
 
-# Disable the initial configuration wizard
+# Suppress the WSUS Configuration Wizard (OOBE)
+# These must be set AFTER postinstall completes, as postinstall may reset them.
+# OobeInitialized=1 + OobeComplete=1 tells the WSUS console the wizard has already run.
 $setupFlags = @{
     OobeInitialized          = 1
     OobeComplete             = 1
@@ -655,12 +672,18 @@ foreach ($key in $setupFlags.Keys) {
     Set-ItemProperty -Path $wsusRegSetup -Name $key -Value $setupFlags[$key] -Force
 }
 
-# Mark role services as installed to prevent wizard
+# Mark role services as installed
 Set-ItemProperty -Path $wsusRegSetupInstalled -Name "UpdateServices-WidDatabase" -Value 2 -Force
 Set-ItemProperty -Path $wsusRegSetupInstalled -Name "UpdateServices-Services" -Value 2 -Force
 Set-ItemProperty -Path $wsusRegSetupInstalled -Name "UpdateServices-UI" -Value 2 -Force
 
 Write-Host "    WSUS registry configured."
+
+# Restart WSUS service so it reads the updated registry values
+Write-Host "    Restarting WSUS service to apply configuration..."
+Restart-Service WsusService -Force -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 5
+Write-Host "    WSUS service restarted."
 
 # =====================================================================
 # 13. CONFIGURE SQL SERVER FIREWALL RULES
