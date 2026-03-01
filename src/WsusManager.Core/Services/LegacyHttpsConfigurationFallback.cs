@@ -91,25 +91,12 @@ public class LegacyHttpsConfigurationFallback
             return _scriptPathOverride;
         }
 
-        foreach (var path in GetSearchPaths())
-        {
-            if (File.Exists(path))
-            {
-                return path;
-            }
-        }
-
-        return null;
+        return Infrastructure.ScriptPathLocator.LocateScript(ScriptName, maxParentDepth: 0);
     }
 
     internal string[] GetSearchPaths()
     {
-        var appDir = AppContext.BaseDirectory;
-        return
-        [
-            Path.Combine(appDir, "Scripts", ScriptName),
-            Path.Combine(appDir, ScriptName)
-        ];
+        return Infrastructure.ScriptPathLocator.GetScriptSearchPaths(ScriptName, maxParentDepth: 0);
     }
 
     private static string BuildSafeOutputSummary(ProcessResult result)

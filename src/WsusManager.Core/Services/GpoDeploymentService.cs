@@ -235,11 +235,34 @@ public class GpoDeploymentService : IGpoDeploymentService
 
     internal string[] GetSearchPaths()
     {
-        var appDir = AppContext.BaseDirectory;
-        return
-        [
-            Path.Combine(appDir, SourceDirectoryName),
-            Path.Combine(appDir, "..", SourceDirectoryName)
-        ];
+        var paths = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var root in GetDirectorySearchRoots())
+        {
+            AddUnique(paths, seen, Path.Combine(root, SourceDirectoryName));
+            AddUnique(paths, seen, Path.Combine(root, "..", SourceDirectoryName));
+        }
+
+        return [.. paths];
+    }
+
+    private static IEnumerable<string> GetDirectorySearchRoots()
+    {
+        yield return Path.GetFullPath(AppContext.BaseDirectory);
+
+        var processPath = Environment.ProcessPath;
+        if (string.IsNullOrWhiteSpace(processPath)) yield break;
+
+        var processDir = Path.GetDirectoryName(processPath);
+        if (!string.IsNullOrWhiteSpace(processDir))
+            yield return Path.GetFullPath(processDir);
+    }
+
+    private static void AddUnique(List<string> paths, HashSet<string> seen, string path)
+    {
+        var full = Path.GetFullPath(path);
+        if (seen.Add(full))
+            paths.Add(full);
     }
 }

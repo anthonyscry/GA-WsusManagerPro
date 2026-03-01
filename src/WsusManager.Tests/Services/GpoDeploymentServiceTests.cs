@@ -250,12 +250,12 @@ public class GpoDeploymentServiceTests
     }
 
     [Fact]
-    public void GetSearchPaths_Returns_Two_Paths()
+    public void GetSearchPaths_Returns_Paths_Containing_SourceDirectoryName()
     {
         var service = CreateService();
         var paths = service.GetSearchPaths();
 
-        Assert.Equal(2, paths.Length);
+        Assert.True(paths.Length >= 2, $"Expected at least 2 search paths, got {paths.Length}");
         Assert.All(paths, p => Assert.Contains(GpoDeploymentService.SourceDirectoryName, p));
     }
 
