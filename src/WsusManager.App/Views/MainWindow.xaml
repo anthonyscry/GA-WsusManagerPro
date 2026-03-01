@@ -290,12 +290,7 @@
                     <!-- Connection Status Indicator -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal"
                                 VerticalAlignment="Center">
-                        <!-- Loading Spinner (shown during operations - Phase 27) -->
-                        <ProgressBar Width="16" Height="16"
-                                     IsIndeterminate="True"
-                                     Visibility="{Binding ProgressBarVisibility}"
-                                     Margin="0,0,8,0"
-                                     VerticalAlignment="Center"/>
+                        <!-- Loading spinner removed: log panel progress bar is sufficient -->
                         <Ellipse Width="8" Height="8"
                                  Fill="{Binding ConnectionDotColor}"
                                  Margin="0,0,6,0"/>
@@ -1371,7 +1366,6 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
 
                             <StackPanel Grid.Column="0" Orientation="Horizontal"
@@ -1379,24 +1373,22 @@
                                 <TextBlock Text="Output Log" FontSize="12" FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextPrimary}" Margin="0,0,12,0"/>
                                 <TextBlock Text="{Binding CurrentOperationName}"
-                                           FontSize="11" Foreground="{DynamicResource TextSecondary}"/>
-                            </StackPanel>
-
-                            <!-- Progress bar and step text (shown during operations) -->
-                            <StackPanel Grid.Column="1" Orientation="Horizontal"
-                                        VerticalAlignment="Center" Margin="8,0"
-                                        Visibility="{Binding ProgressBarVisibility}">
+                                           FontSize="11" Foreground="{DynamicResource TextSecondary}"
+                                           Margin="0,0,12,0"/>
+                                <!-- Progress bar inline with text to prevent overflow into buttons -->
                                 <ProgressBar IsIndeterminate="True"
-                                             Width="120" Height="3"
+                                             Width="100" Height="3"
                                              Margin="0,0,8,0"
-                                             VerticalAlignment="Center"/>
+                                             VerticalAlignment="Center"
+                                             Visibility="{Binding ProgressBarVisibility}"/>
                                 <TextBlock Text="{Binding OperationStepText}"
                                            FontSize="11" Foreground="{DynamicResource TextSecondary}"
-                                           VerticalAlignment="Center" MaxWidth="200"
-                                           TextTrimming="CharacterEllipsis"/>
+                                           VerticalAlignment="Center" MaxWidth="150"
+                                           TextTrimming="CharacterEllipsis"
+                                           Visibility="{Binding ProgressBarVisibility}"/>
                             </StackPanel>
 
-                            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
                                 <Button Content="Cancel" Style="{StaticResource BtnRed}"
                                         automation:AutomationProperties.AutomationId="CancelButton"
                                         Padding="10,4" FontSize="11" Margin="0,0,8,0"
