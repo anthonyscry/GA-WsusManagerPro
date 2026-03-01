@@ -175,8 +175,8 @@ public class InstallationService : IInstallationService
         var scriptPath = LocateScript();
         if (scriptPath is null)
         {
-            var msg = $"Install script not found. Searched for '{InstallScriptName}' in:\n" +
-                      $"  {GetSearchPaths()[0]}\n  {GetSearchPaths()[1]}";
+            var searchedPaths = string.Join("\n", GetSearchPaths().Select(p => $"  {p}"));
+            var msg = $"Install script not found. Searched for '{InstallScriptName}' in:\n{searchedPaths}";
             _logService.Warning(msg);
             progress?.Report(msg);
             return OperationResult.Fail(msg);
@@ -213,8 +213,10 @@ public class InstallationService : IInstallationService
     }
 
     /// <summary>
-    /// Locates the install script relative to the current executable directory.
-    /// Checks: {AppDir}\Scripts\Install-WsusWithSqlExpress.ps1, then {AppDir}\Install-WsusWithSqlExpress.ps1.
+    /// Locates the install script using ScriptPathLocator which searches both
+    /// AppContext.BaseDirectory and the actual EXE directory (Environment.ProcessPath).
+    /// This is critical for single-file deployments where AppContext.BaseDirectory
+    /// points to a temp extraction folder, not the directory containing the EXE.
     /// </summary>
     internal string? LocateScript()
     {
@@ -223,21 +225,11 @@ public class InstallationService : IInstallationService
             return _scriptPathOverride;
         }
 
-        foreach (var path in GetSearchPaths())
-        {
-            if (File.Exists(path))
-                return path;
-        }
-        return null;
+        return Infrastructure.ScriptPathLocator.LocateScript(InstallScriptName, maxParentDepth: 0);
     }
 
     internal string[] GetSearchPaths()
     {
-        var appDir = AppContext.BaseDirectory;
-        return
-        [
-            Path.Combine(appDir, "Scripts", InstallScriptName),
-            Path.Combine(appDir, InstallScriptName)
-        ];
+        return Infrastructure.ScriptPathLocator.GetScriptSearchPaths(InstallScriptName, maxParentDepth: 0);
     }
 }
