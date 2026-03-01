@@ -17,9 +17,10 @@ public interface IWsusServerService
 
     /// <summary>
     /// Loads the WSUS API assembly and connects to the local WSUS server on port 8530.
+    /// Retries up to 6 times with 5-second delays to handle post-install startup.
     /// Returns failure if the WSUS API DLL is not found or the connection fails.
     /// </summary>
-    Task<OperationResult> ConnectAsync(CancellationToken ct = default);
+    Task<OperationResult> ConnectAsync(IProgress<string>? progress = null, CancellationToken ct = default);
 
     /// <summary>
     /// Triggers a WSUS synchronization and polls status/progress until complete or cancelled.

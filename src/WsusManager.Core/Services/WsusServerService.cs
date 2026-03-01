@@ -42,6 +42,8 @@ public class WsusServerService : IWsusServerService
 
     private const int SyncPollIntervalMs = 5000;
     private const int SyncMaxIterations = 720; // 60 minutes at 5-second intervals
+    private const int ConnectMaxRetries = 6;
+    private const int ConnectRetryDelayMs = 5000;
 
     public WsusServerService(ILogService logService)
     {
@@ -50,49 +52,69 @@ public class WsusServerService : IWsusServerService
 
     public bool IsConnected => _updateServer is not null;
 
-    public async Task<OperationResult> ConnectAsync(CancellationToken ct = default)
+    public async Task<OperationResult> ConnectAsync(IProgress<string>? progress = null, CancellationToken ct = default)
     {
-        return await Task.Run(() =>
+        // Pre-flight: check DLL exists (no retry needed for this)
+        if (!File.Exists(WsusApiDllPath))
         {
+            _logService.Warning("WSUS API not found at {Path}", WsusApiDllPath);
+            return OperationResult.Fail(
+                $"WSUS API not found at {WsusApiDllPath}.\n\nTo fix: Install WSUS Server role, verify WSUS is installed");
+        }
+
+        _wsusAssembly ??= Assembly.LoadFrom(WsusApiDllPath);
+
+        var adminProxyType = _wsusAssembly.GetType(
+            "Microsoft.UpdateServices.Administration.AdminProxy");
+        if (adminProxyType is null)
+            return OperationResult.Fail("Could not load AdminProxy type from WSUS API assembly.");
+
+        var getServerMethod = adminProxyType.GetMethod("GetUpdateServer",
+            [typeof(string), typeof(bool), typeof(int)]);
+        if (getServerMethod is null)
+            return OperationResult.Fail("Could not find GetUpdateServer method.");
+
+        // Retry loop: WSUS service may still be starting after install
+        Exception? lastException = null;
+        for (int attempt = 1; attempt <= ConnectMaxRetries; attempt++)
+        {
+            ct.ThrowIfCancellationRequested();
+
             try
             {
-                if (!File.Exists(WsusApiDllPath))
-                {
-                    _logService.Warning("WSUS API not found at {Path}", WsusApiDllPath);
-                    return OperationResult.Fail(
-                        $"WSUS API not found at {WsusApiDllPath}.\n\nTo fix: Install WSUS Server role, verify WSUS is installed");
-                }
-
-                _wsusAssembly = Assembly.LoadFrom(WsusApiDllPath);
-
-                // Get AdminProxy type and call GetUpdateServer("localhost", false, 8530)
-                var adminProxyType = _wsusAssembly.GetType(
-                    "Microsoft.UpdateServices.Administration.AdminProxy");
-
-                if (adminProxyType is null)
-                    return OperationResult.Fail("Could not load AdminProxy type from WSUS API assembly.");
-
-                var getServerMethod = adminProxyType.GetMethod("GetUpdateServer",
-                    [typeof(string), typeof(bool), typeof(int)]);
-
-                if (getServerMethod is null)
-                    return OperationResult.Fail("Could not find GetUpdateServer method.");
-
-                _updateServer = getServerMethod.Invoke(null, ["localhost", false, 8530]);
+                _updateServer = await Task.Run(
+                    () => getServerMethod.Invoke(null, ["localhost", false, 8530]), ct).ConfigureAwait(false);
 
                 if (_updateServer is null)
-                    return OperationResult.Fail("GetUpdateServer returned null.");
-
-                _logService.Info("Connected to WSUS server on localhost:8530");
-                return OperationResult.Ok("Connected to WSUS server.");
+                {
+                    lastException = new InvalidOperationException("GetUpdateServer returned null.");
+                    progress?.Report($"Connection attempt {attempt}/{ConnectMaxRetries} failed: server returned null");
+                }
+                else
+                {
+                    _logService.Info("Connected to WSUS server on localhost:8530");
+                    return OperationResult.Ok("Connected to WSUS server.");
+                }
             }
             catch (Exception ex)
             {
-                var inner = ex.InnerException ?? ex;
-                _logService.Error(inner, "Failed to connect to WSUS server");
-                return OperationResult.Fail($"Failed to connect to WSUS: {inner.Message}\n\nTo fix: Start WSUS Server service, run Diagnostics", inner);
+                lastException = ex.InnerException ?? ex;
+                _logService.Debug("WSUS connection attempt {Attempt}/{Max} failed: {Error}",
+                    attempt, ConnectMaxRetries, lastException.Message);
+                progress?.Report($"Connection attempt {attempt}/{ConnectMaxRetries} failed: {lastException.Message}");
             }
-        }, ct).ConfigureAwait(false);
+
+            if (attempt < ConnectMaxRetries)
+            {
+                progress?.Report($"Retrying in {ConnectRetryDelayMs / 1000}s...");
+                await Task.Delay(ConnectRetryDelayMs, ct).ConfigureAwait(false);
+            }
+        }
+
+        var inner = lastException ?? new InvalidOperationException("Connection failed after retries.");
+        _logService.Error(inner, "Failed to connect to WSUS server after {Max} attempts", ConnectMaxRetries);
+        return OperationResult.Fail(
+            $"Failed to connect to WSUS: {inner.Message}\n\nTo fix: Start WSUS Server service, run Diagnostics", inner);
     }
 
     public async Task<OperationResult> StartSynchronizationAsync(
@@ -472,7 +494,7 @@ public class WsusServerService : IWsusServerService
     {
         if (_updateServer is null)
         {
-            var connectResult = await ConnectAsync(ct).ConfigureAwait(false);
+            var connectResult = await ConnectAsync(null, ct).ConfigureAwait(false);
             if (!connectResult.Success || _updateServer is null)
             {
                 _logService.Warning("WSUS computer inventory unavailable: {Message}", connectResult.Message);

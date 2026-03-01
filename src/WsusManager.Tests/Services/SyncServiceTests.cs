@@ -23,7 +23,7 @@ public class SyncServiceTests
         _progress = new Progress<string>(msg => _progressMessages.Add(msg));
 
         // Default setup: connect succeeds
-        _mockWsus.Setup(w => w.ConnectAsync(It.IsAny<CancellationToken>()))
+        _mockWsus.Setup(w => w.ConnectAsync(It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(OperationResult.Ok("Connected."));
 
         // Default: last sync info succeeds
@@ -56,7 +56,7 @@ public class SyncServiceTests
         Assert.True(result.Success);
 
         // Verify all steps were called
-        _mockWsus.Verify(w => w.ConnectAsync(It.IsAny<CancellationToken>()), Times.Once);
+        _mockWsus.Verify(w => w.ConnectAsync(It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()), Times.Once);
         _mockWsus.Verify(w => w.GetLastSyncInfoAsync(It.IsAny<CancellationToken>()), Times.Once);
         _mockWsus.Verify(w => w.StartSynchronizationAsync(
             It.IsAny<IProgress<string>>(), It.IsAny<CancellationToken>()), Times.Once);
@@ -100,7 +100,7 @@ public class SyncServiceTests
     [Fact]
     public async Task RunSyncAsync_Fails_When_Connect_Fails()
     {
-        _mockWsus.Setup(w => w.ConnectAsync(It.IsAny<CancellationToken>()))
+        _mockWsus.Setup(w => w.ConnectAsync(It.IsAny<IProgress<string>?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(OperationResult.Fail("Connection failed."));
 
         var result = await _service.RunSyncAsync(

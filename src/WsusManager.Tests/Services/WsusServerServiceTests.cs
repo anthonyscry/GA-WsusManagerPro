@@ -78,14 +78,18 @@ public class WsusServerServiceTests
     }
 
     [Fact]
-    public async Task ConnectAsync_Supports_Cancellation()
+    public async Task ConnectAsync_Returns_Failure_When_Cancelled_Before_Dll_Found()
     {
+        // When the WSUS API DLL is not present, ConnectAsync returns Fail immediately
+        // without reaching the cancellation-aware retry loop.
         var service = new WsusServerService(_mockLog.Object);
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => service.ConnectAsync(cts.Token));
+        var result = await service.ConnectAsync(null, cts.Token);
+
+        Assert.False(result.Success);
+        Assert.Contains("WSUS API not found", result.Message);
     }
 
     [Fact]

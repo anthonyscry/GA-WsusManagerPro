@@ -40,7 +40,7 @@ public class SyncService : ISyncService
 
         // Step 1: Connect to WSUS server
         progress.Report("[Step 1] Connecting to WSUS server...");
-        var connectResult = await _wsusServer.ConnectAsync(ct).ConfigureAwait(false);
+        var connectResult = await _wsusServer.ConnectAsync(progress, ct).ConfigureAwait(false);
         if (!connectResult.Success)
         {
             progress.Report($"[FAIL] {connectResult.Message}");
