@@ -2507,19 +2507,27 @@ public partial class MainViewModel : ObservableObject, IDisposable
 }
 
 /// <summary>
-/// Synchronous IProgress&lt;T&gt; implementation that invokes the callback on the calling thread.
-/// Unlike <see cref="Progress{T}"/>, this does not post via SynchronizationContext,
-/// ensuring log messages appear immediately rather than being lost when operations
-/// complete before async callbacks execute.
+/// Dispatcher-aware IProgress&lt;T&gt; that avoids two problems with <see cref="Progress{T}"/>:
+/// 1. Messages from synchronous code paths execute immediately (no async post delay).
+/// 2. Messages from background threads marshal to the UI thread via Dispatcher.Invoke.
+/// This prevents both lost messages (sync paths) and cross-thread crashes (async paths).
 /// </summary>
 internal sealed class SynchronousProgress<T> : IProgress<T>
 {
     private readonly Action<T> _handler;
+    private readonly System.Windows.Threading.Dispatcher _dispatcher;
 
     public SynchronousProgress(Action<T> handler)
     {
         _handler = handler ?? throw new ArgumentNullException(nameof(handler));
+        _dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
     }
 
-    public void Report(T value) => _handler(value);
+    public void Report(T value)
+    {
+        if (_dispatcher.CheckAccess())
+            _handler(value);
+        else
+            _dispatcher.Invoke(() => _handler(value));
+    }
 }

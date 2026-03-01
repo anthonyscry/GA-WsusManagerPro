@@ -209,6 +209,8 @@ function Wait-WithHeartbeat {
         Write-Host "." -NoNewline
         [Console]::Out.Flush()
     }
+    # Ensure ExitCode is populated (Start-Process -PassThru can leave it null without this)
+    $Process.WaitForExit()
     Write-Host ""
     [Console]::Out.Flush()
 }
