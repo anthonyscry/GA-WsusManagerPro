@@ -1,6 +1,6 @@
 # WSUS Manager
 
-**Version:** 4.5.19
+**Version:** 4.5.21
 **Author:** Tony Tran, ISSO, Classified Computing, GA-ASI
 
 A comprehensive C# WPF automation suite for Windows Server Update Services (WSUS) with SQL Server Express 2022. Single-file EXE distribution with dark-themed dashboard, real-time diagnostics, theme picker, data filtering, CSV export, and air-gap support.

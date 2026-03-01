@@ -27,7 +27,8 @@ public class BenchmarkWinRMOperations
     public void Setup()
     {
         var logService = new LogService();
-        var processRunner = new Core.Infrastructure.ProcessRunner(logService);
+        var settingsService = new SettingsService(logService);
+        var processRunner = new Core.Infrastructure.ProcessRunner(logService, settingsService);
         _winrmExecutor = new WinRmExecutor(processRunner, logService);
         _clientService = new ClientService(_winrmExecutor, logService);
     }

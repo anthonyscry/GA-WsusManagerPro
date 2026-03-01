@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - No unreleased changes yet.
 
+## [4.5.21] - 2026-02-28
+
+### Fixed
+- Registered DI services for cleanup and maintenance command generation to keep application startup and operations wiring stable.
+- Fixed benchmark process-runner setup to match updated constructor dependencies.
+- Ensured release packaging includes external Scripts and Modules content outside the single-file extraction path.
+
 ## [4.5.19] - 2026-02-28
 
 ### Changed
@@ -309,7 +316,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - MaxAutoApproveCount increased to 200
 
-[Unreleased]: https://github.com/anthonyscry/GA-WsusManagerPro/compare/v4.5.19...HEAD
+[Unreleased]: https://github.com/anthonyscry/GA-WsusManagerPro/compare/v4.5.21...HEAD
+[4.5.21]: https://github.com/anthonyscry/GA-WsusManagerPro/compare/v4.5.19...v4.5.21
 [4.5.19]: https://github.com/anthonyscry/GA-WsusManagerPro/compare/v4.5.18...v4.5.19
 [4.5.12]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.11...v4.5.12
 [4.5.7]: https://github.com/anthonyscry/GA-WsusManager/compare/v4.5.6...v4.5.7
